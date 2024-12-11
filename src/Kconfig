@@ -3,3 +3,5 @@ module-str = Toothfairy
 
 menuconfig TOOTHFAIRY
     bool "Golioth Toothfairy protocol"
+    depends on BT
+    select BT_GATT_DYNAMIC_DB
