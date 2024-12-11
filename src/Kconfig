@@ -1,0 +1,5 @@
+module = TOOTHFAIRY
+module-str = Toothfairy
+
+menuconfig TOOTHFAIRY
+    bool "Golioth Toothfairy protocol"
