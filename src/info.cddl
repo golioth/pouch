@@ -1,0 +1,4 @@
+tf_info = {
+    "enc_type" => "plaintext" / "other",
+    "device_id" => tstr,
+}
