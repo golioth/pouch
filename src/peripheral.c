@@ -4,6 +4,13 @@
 
 #include <stdlib.h>
 
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/uuid.h>
+
+#include <toothfairy/peripheral.h>
+
+#include "toothfairy_uuids.h"
+
 struct toothfairy_peripheral
 {
     void *unused;
