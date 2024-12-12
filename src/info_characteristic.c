@@ -12,17 +12,18 @@ LOG_MODULE_REGISTER(info_chrc, LOG_LEVEL_DBG);
 #include "toothfairy_declarations.h"
 #include "toothfairy_uuids.h"
 #include "packetizer.h"
+#include "peripheral_int.h"
 
 #include <cddl/info_encode.h>
 
 #define INFO_CHRC_MAX_SIZE 64
-#define DEVICE_ID "123456789"
 
 static const struct bt_uuid_128 tf_info_chrc_uuid = BT_UUID_INIT_128(TF_UUID_GOLIOTH_INFO_CHRC_VAL);
 
 static struct info_ctx
 {
     uint8_t buf[INFO_CHRC_MAX_SIZE];
+    size_t buf_len;
     struct tf_packetizer *packetizer;
 } info_chrc_ctx;
 
@@ -41,25 +42,11 @@ static ssize_t info_read(struct bt_conn *conn,
 
     struct info_ctx *ctx = attr->user_data;
 
-    /* Initialize packetizer and payload on first packet */
+    /* Initialize packetizer on first packet */
 
     if (NULL == ctx->packetizer)
     {
-        /* Serialize Info CBOR */
-
-        struct tf_info info = {
-            .tf_info_enc_type_choice = tf_info_enc_type_plaintext_tstr_c,
-            .tf_info_device_id =
-                {
-                    .value = DEVICE_ID,
-                    .len = sizeof(DEVICE_ID) - 1,
-                },
-        };
-
-        size_t info_len = 0;
-        cbor_encode_tf_info(ctx->buf, INFO_CHRC_MAX_SIZE, &info, &info_len);
-
-        ctx->packetizer = tf_packetizer_start(ctx->buf, info_len);
+        ctx->packetizer = tf_packetizer_start(ctx->buf, ctx->buf_len);
     }
 
     size_t buf_len = len;
@@ -82,11 +69,32 @@ static ssize_t info_read(struct bt_conn *conn,
     return buf_len;
 }
 
+static int info_init(const struct toothfairy_peripheral *tf_peripheral, struct bt_gatt_attr *attr)
+{
+    struct info_ctx *ctx = attr->user_data;
+    const char *device_id;
+
+    tf_int_peripheral_get_device_id(tf_peripheral, &device_id);
+
+    struct tf_info info = {
+        .tf_info_enc_type_choice = tf_info_enc_type_plaintext_tstr_c,
+        .tf_info_device_id =
+            {
+                .value = device_id,
+                .len = strlen(device_id),
+            },
+    };
+
+    int err = cbor_encode_tf_info(ctx->buf, INFO_CHRC_MAX_SIZE, &info, &ctx->buf_len);
+
+    return err;
+}
+
 TOOTHFAIRY_CHARACTERISTIC(info,
                           (const struct bt_uuid *) &tf_info_chrc_uuid,
                           BT_GATT_CHRC_READ,
                           BT_GATT_PERM_READ,
-                          NULL,
+                          info_init,
                           info_read,
                           NULL,
                           &info_chrc_ctx);
