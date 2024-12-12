@@ -11,6 +11,7 @@ zephyr_library_sources(
     src/info_characteristic.c
     src/packetizer.c
     src/peripheral.c
+    src/uplink_characteristic.c
 )
 
 zephyr_linker_sources(DATA_SECTIONS src/attributes.ld)
