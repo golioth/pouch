@@ -42,6 +42,14 @@ struct toothfairy_peripheral *toothfairy_peripheral_create(void)
         tf = NULL;
     }
 
+    STRUCT_SECTION_FOREACH(toothfairy_characteristic, tf_chrc)
+    {
+        if (tf_chrc->init)
+        {
+            tf_chrc->init(tf, tf_chrc->attr);
+        }
+    }
+
 finish:
     return tf;
 }

@@ -86,6 +86,7 @@ TOOTHFAIRY_CHARACTERISTIC(info,
                           (const struct bt_uuid *) &tf_info_chrc_uuid,
                           BT_GATT_CHRC_READ,
                           BT_GATT_PERM_READ,
+                          NULL,
                           info_read,
                           NULL,
                           &info_chrc_ctx);
