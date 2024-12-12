@@ -42,7 +42,7 @@ static struct bt_data ad[] = {
 
 int main(void)
 {
-    struct toothfairy_peripheral *tf_peripheral = toothfairy_peripheral_create();
+    struct toothfairy_peripheral *tf_peripheral = toothfairy_peripheral_create("987654321");
     if (NULL == tf_peripheral)
     {
         LOG_ERR("Failed to create toothfairy peripheral");

@@ -15,7 +15,7 @@
 
 struct toothfairy_peripheral
 {
-    void *unused;
+    const char *device_id;
 };
 
 static const struct bt_uuid_128 tf_svc_uuid = BT_UUID_INIT_128(TF_UUID_GOLIOTH_SVC_VAL);
@@ -26,13 +26,21 @@ static struct bt_gatt_service golioth_svc = {
     .attrs = TOOTHFAIRY_ATTR_ARRAY_PTR,
 };
 
-struct toothfairy_peripheral *toothfairy_peripheral_create(void)
+void tf_int_peripheral_get_device_id(const struct toothfairy_peripheral *tf_peripheral,
+                                     const char **device_id)
+{
+    *device_id = tf_peripheral->device_id;
+}
+
+struct toothfairy_peripheral *toothfairy_peripheral_create(const char *device_id)
 {
     struct toothfairy_peripheral *tf = malloc(sizeof(struct toothfairy_peripheral));
     if (NULL == tf)
     {
         goto finish;
     }
+
+    tf->device_id = device_id;
 
     TOOTHFAIRY_ATTR_ARRAY_LEN(&golioth_svc.attr_count);
     int err = bt_gatt_service_register(&golioth_svc);

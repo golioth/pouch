@@ -12,5 +12,5 @@
 
 struct toothfairy_peripheral;
 
-struct toothfairy_peripheral *toothfairy_peripheral_create(void);
+struct toothfairy_peripheral *toothfairy_peripheral_create(const char *device_id);
 int toothfairy_peripheral_destroy(struct toothfairy_peripheral *tf_peripheral);
