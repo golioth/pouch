@@ -1,0 +1,5 @@
+module = POUCH
+module-str = Pouch
+
+menuconfig POUCH
+    bool "Golioth Pouch protocol"
