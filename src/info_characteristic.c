@@ -20,5 +20,10 @@ static ssize_t info_read(struct bt_conn *conn,
     return 0;
 }
 
-TOOTHFAIRY_CHARACTERISTIC(info, (const struct bt_uuid *) &tf_info_chrc_uuid,
-                          BT_GATT_CHRC_READ, BT_GATT_PERM_READ, info_read, NULL, NULL);
+TOOTHFAIRY_CHARACTERISTIC(info,
+                          (const struct bt_uuid *) &tf_info_chrc_uuid,
+                          BT_GATT_CHRC_READ,
+                          BT_GATT_PERM_READ,
+                          info_read,
+                          NULL,
+                          NULL);

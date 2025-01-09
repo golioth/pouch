@@ -14,9 +14,12 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
 static void connected(struct bt_conn *conn, uint8_t err)
 {
-    if (err) {
+    if (err)
+    {
         LOG_DBG("Connection failed (err 0x%02x)", err);
-    } else {
+    }
+    else
+    {
         LOG_DBG("Connected");
     }
 }
@@ -46,7 +49,8 @@ int main(void)
     }
 
     int err = bt_enable(NULL);
-    if (err) {
+    if (err)
+    {
         LOG_ERR("Bluetooth init failed (err %d)", err);
         return 0;
     }
@@ -54,14 +58,16 @@ int main(void)
     LOG_DBG("Bluetooth initialized\n");
 
     err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_2, ad, ARRAY_SIZE(ad), NULL, 0);
-    if (err) {
+    if (err)
+    {
         LOG_ERR("Advertising failed to start (err %d)", err);
         return 0;
     }
 
     LOG_DBG("Advertising successfully started");
 
-    while (1) {
+    while (1)
+    {
         k_sleep(K_SECONDS(1));
     }
     return 0;
