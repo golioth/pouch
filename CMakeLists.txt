@@ -12,6 +12,7 @@ zephyr_library_sources(
     src/packetizer.c
     src/peripheral.c
     src/uplink_characteristic.c
+    src/pouch/uplink.c
 )
 
 zephyr_linker_sources(DATA_SECTIONS src/attributes.ld)
