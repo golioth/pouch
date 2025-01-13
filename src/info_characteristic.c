@@ -46,7 +46,7 @@ static ssize_t info_read(struct bt_conn *conn,
 
     if (NULL == ctx->packetizer)
     {
-        ctx->packetizer = tf_packetizer_start(ctx->buf, ctx->buf_len);
+        ctx->packetizer = tf_packetizer_start_buffer(ctx->buf, ctx->buf_len);
     }
 
     size_t buf_len = len;

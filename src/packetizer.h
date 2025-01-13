@@ -14,7 +14,7 @@ enum tf_packetizer_result
     TF_PACKETIZER_ERROR,
 };
 
-struct tf_packetizer *tf_packetizer_start(const void *src, size_t src_len);
+struct tf_packetizer *tf_packetizer_start_buffer(const void *src, size_t src_len);
 enum tf_packetizer_result tf_packetizer_get(struct tf_packetizer *packetizer,
                                             void *dst,
                                             size_t *dst_len);
