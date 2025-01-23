@@ -1,0 +1,37 @@
+menuconfig POUCH
+  bool "Golioth Pouch protocol"
+  select ZCBOR
+  select ZCBOR_CANONICAL
+  select RING_BUFFER
+  help
+    Pouch is a protocol for communicating with Golioth from devices not
+    directly connected to the internet.
+
+if POUCH
+
+config POUCH_BLOCK_SIZE
+  int "Block size"
+  default 512
+  help
+    The block size to use for Pouch transfers.
+
+config POUCH_BUF_SIZE
+  int "Buffer size"
+  default 1024
+  help
+    The buffer size to use for Pouch transfers.
+
+choice
+  prompt "Pouch uplink encryption scheme"
+  default POUCH_ENCRYPTION_NONE
+  help
+    Select the encryption method to use for uplink Pouch transfers.
+
+config POUCH_ENCRYPTION_NONE
+  bool "None"
+  help
+    No encryption.
+
+endchoice
+
+endif
