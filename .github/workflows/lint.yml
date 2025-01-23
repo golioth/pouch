@@ -1,0 +1,35 @@
+name: "Lint"
+
+on:
+  push:
+     branches:
+      - main
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch depth must be greater than the number of commits included in the push in order to
+          # compare against commit prior to merge. 15 is chosen as a reasonable default for the
+          # upper bound of commits in a single PR.
+          fetch-depth: 15
+
+      - name: Install clang-format
+        shell: bash
+        run: pip install clang-format
+
+      - name: Run linter
+        shell: bash
+        run: |
+          git fetch --no-recurse-submodules
+          if [[ $GITHUB_EVENT_NAME == 'push' ]]; then
+              BASE=${{ github.event.before }}
+          else
+              BASE=origin/$GITHUB_BASE_REF
+          fi
+          git clang-format --verbose --extensions c,h --diff --diffstat $BASE
