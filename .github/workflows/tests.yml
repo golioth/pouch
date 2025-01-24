@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 name: Tests
 
 on:
@@ -30,6 +31,7 @@ jobs:
           pip3 install \
             -r deps/zephyr/scripts/requirements-base.txt        \
             -r deps/zephyr/scripts/requirements-build-test.txt  \
+            -r zephyr/scripts/requirements-run-test.txt         \
             -r pouch/requirements.txt
 
           pip3 install            \
@@ -45,3 +47,14 @@ jobs:
         shell: bash
         run: |
           west build -p -b nrf52840dk/nrf52840 pouch/examples/toothfairy
+      - name: Run tests
+        env:
+          ZEPHYR_BASE: ${{ github.workspace }}/zephyr
+          EXTRA_ZEPHYR_MODULES: ${{ github.workspace }}/pouch
+        run: ./zephyr/scripts/twister -T pouch/tests
+
+      - name: Publish Test Report
+        uses: mikepenz/action-junit-report@v5
+        if: always()
+        with:
+          report_paths: 'twister-out/twister_suite_report.xml'
