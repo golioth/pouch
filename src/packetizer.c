@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <zephyr/toolchain.h>
 
 #include "packetizer.h"
 
