@@ -18,14 +18,16 @@
  * @param path The CoAP path to write the entry to.
  * @param content_type The content type of the entry.
  * @param data The data to write.
+ * @param len The length of the data.
+ * @param timeout The timeout for the operation.
  */
 int pouch_uplink_entry_write(const char *path,
-                             enum pouch_content_type content_type,
+                             uint16_t content_type,
                              const void *data,
                              size_t len,
                              k_timeout_t timeout);
 
 /**
- * Get the number of bytes pending in the uplink buffer.
+ * Close the current uplink session by finalizing the open pouch.
  */
-size_t pouch_uplink_pending(void);
+int pouch_uplink_close(k_timeout_t timeout);

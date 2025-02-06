@@ -4,30 +4,16 @@
 #pragma once
 
 #include <zephyr/kernel.h>
+#include "buf.h"
 
-/** Single pouch data block */
-struct block
-{
-    /** Data buffer */
-    uint8_t buf[CONFIG_POUCH_BLOCK_SIZE];
-    /** Number of bytes in the buffer */
-    size_t bytes;
-    /** Mutex to protect the block */
-    struct k_mutex mutex;
-};
+struct pouch_buf *block_alloc(k_timeout_t timeout);
+struct pouch_buf *block_alloc_stream(uint8_t stream_id, k_timeout_t timeout);
 
-/** Take the block mutex */
-int block_lock(k_timeout_t timeout);
+void block_free(struct pouch_buf *block);
 
-/** Release the block mutex */
-void block_release(void);
+size_t block_space_get(const struct pouch_buf *block);
 
-/**
- * Write data to the block.
- *
- * If the block runs out of space, it'll be encrypted and a new block is started.
- */
-int block_write(const uint8_t *data, size_t len, k_timeout_t timeout);
+void block_finish(struct pouch_buf *block);
+void block_finish_stream(struct pouch_buf *block, bool end_of_stream);
 
-/** Close out the current block, passing it on to encryption. */
-int block_flush(k_timeout_t timeout);
+size_t block_write(struct pouch_buf *block, const uint8_t *data, size_t len);

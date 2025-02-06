@@ -1,23 +1,25 @@
 /*
  * Copyright (c) 2025 Golioth, Inc.
  */
-#include "packet.h"
 #include "pouch.h"
+#include "header.h"
 #include "block.h"
+#include "entry.h"
+#include "crypto.h"
 
+#include <pouch/uplink.h>
 #include <pouch/events.h>
 #include <pouch/transport/uplink.h>
-#include <pouch/types.h>
 
+#include <stdlib.h>
 #include <zephyr/init.h>
 #include <zephyr/sys/iterable_sections.h>
 #include <zephyr/sys/ring_buffer.h>
 
 enum flags
 {
-    POUCH_READY,
     SESSION_ACTIVE,
-    FLUSHED,
+    POUCH_CLOSING,
     POUCH_CLOSED,
 };
 
@@ -25,179 +27,154 @@ struct pouch_uplink
 {
     atomic_t flags;
     int error;
-    struct ring_buf ringbuf;
-    uint8_t ringbuf_buffer[CONFIG_POUCH_BUF_SIZE];
-    struct k_mutex mutex;
-    struct k_sem sem;
+
+    struct
+    {
+        /** Blocks that are ready for processing */
+        sys_slist_t queue;
+        struct k_work work;
+    } processing;
+    struct
+    {
+        /** Blocks that are ready for transport */
+        sys_slist_t queue;
+        /** Read offset in bytes */
+        size_t offset;
+    } transport;
 };
 
 /** Single uplink session */
 static struct pouch_uplink uplink;
 
-static bool pouch_is_ready(struct pouch_uplink *uplink)
+static bool session_is_active(void)
 {
-    return atomic_get(&uplink->flags) & BIT(POUCH_READY);
+    return atomic_get(&uplink.flags) & BIT(SESSION_ACTIVE);
 }
 
-static bool session_is_active(struct pouch_uplink *uplink)
+static bool pouch_is_open(void)
 {
-    return atomic_get(&uplink->flags) & BIT(SESSION_ACTIVE);
+    return !(atomic_get(&uplink.flags) & BIT(POUCH_CLOSED));
 }
 
-static bool pouch_is_open(struct pouch_uplink *uplink)
+static bool pouch_is_closing(void)
 {
-    return !(atomic_get(&uplink->flags) & BIT(POUCH_CLOSED));
+    return (atomic_get(&uplink.flags) & BIT(POUCH_CLOSING));
 }
 
-/** Clear ring buffer and write header */
-static int initialize_ringbuf(struct pouch_uplink *uplink)
+static void process_blocks(struct k_work *work)
 {
-    ring_buf_reset(&uplink->ringbuf);
-
-    uint8_t *buf;
-    size_t max_size = ring_buf_put_claim(&uplink->ringbuf, &buf, CONFIG_POUCH_BUF_SIZE);
-
-    ssize_t res = pouch_header_write(buf, max_size);
-    if (res < 0)
+    while (session_is_active() && pouch_is_open() && !sys_slist_is_empty(&uplink.processing.queue))
     {
-        ring_buf_put_finish(&uplink->ringbuf, 0);
-        return res;
+        sys_snode_t *head = sys_slist_get(&uplink.processing.queue);
+        struct pouch_buf *encrypted = crypto_encrypt_block(POUCH_BUF_FROM_SNODE(head));
+        if (encrypted)
+        {
+            sys_slist_append(&uplink.transport.queue, &encrypted->node);
+        }
     }
 
-    ring_buf_put_finish(&uplink->ringbuf, res);
-    return 0;
+    if (pouch_is_closing())
+    {
+        atomic_set_bit(&uplink.flags, POUCH_CLOSED);
+    }
+}
+
+void uplink_enqueue(struct pouch_buf *block)
+{
+    sys_slist_append(&uplink.processing.queue, &block->node);
+    k_work_submit(&uplink.processing.work);
+}
+
+int pouch_uplink_close(k_timeout_t timeout)
+{
+    if (atomic_test_and_set_bit(&uplink.flags, POUCH_CLOSING))
+    {
+        return -EALREADY;
+    }
+
+    return entry_block_close(timeout);
 }
 
 int uplink_init(void)
 {
-    ring_buf_init(&uplink.ringbuf, sizeof(uplink.ringbuf_buffer), uplink.ringbuf_buffer);
-    k_mutex_init(&uplink.mutex);
-    k_sem_init(&uplink.sem, 0, 1);
+    k_work_init(&uplink.processing.work, process_blocks);
 
     return 0;
-}
-
-int uplink_enqueue(const uint8_t *data, size_t len, k_timeout_t timeout)
-{
-    uint32_t bytes_written = 0;
-    int err;
-
-    /* Lock the buffer while we're pushing data. The semaphore on its own is not enough, as we need
-     * to ensure that the buffer is not being written to by another thread between loops.
-     */
-    err = k_mutex_lock(&uplink.mutex, timeout);
-    if (err)
-    {
-        return err;
-    }
-
-    // Wait until a new pouch can be created if the current one is closed
-    while (!pouch_is_open(&uplink))
-    {
-        err = k_sem_take(&uplink.sem, timeout);
-        if (err)
-        {
-            return err;
-        }
-    }
-
-    if (!atomic_test_and_set_bit(&uplink.flags, POUCH_READY))
-    {
-        err = initialize_ringbuf(&uplink);
-        if (err)
-        {
-            atomic_clear_bit(&uplink.flags, POUCH_READY);
-            goto out;
-        }
-    }
-
-    while (pouch_is_open(&uplink))
-    {
-        bytes_written += ring_buf_put(&uplink.ringbuf, &data[bytes_written], len - bytes_written);
-        if (bytes_written == len)
-        {
-            break;
-        }
-
-        // wait for reader to make space
-        err = k_sem_take(&uplink.sem, timeout);
-        if (err)
-        {
-            goto out;
-        }
-    }
-
-    if (bytes_written < len)
-    {
-        // Write was abandoned due to pouch being closed
-        err = -EAGAIN;
-    }
-
-out:
-    k_mutex_unlock(&uplink.mutex);
-
-    return err;
-}
-
-size_t uplink_pending(void)
-{
-    return ring_buf_size_get(&uplink.ringbuf);
 }
 
 // Transport API:
 
 struct pouch_uplink *pouch_uplink_start(void)
 {
-    if (atomic_test_and_set_bit(&uplink.flags, SESSION_ACTIVE))
+    if (session_is_active())
     {
         return NULL;
     }
 
+    crypto_pouch_start();
+
+    struct pouch_buf *header = pouch_header_create();
+    if (!header)
+    {
+        return NULL;
+    }
+
+    sys_slist_append(&uplink.transport.queue, &header->node);
+
+    atomic_set_bit(&uplink.flags, SESSION_ACTIVE);
+
     pouch_event_emit(POUCH_EVENT_SESSION_START);
+
+    // Process any pending blocks:
+    if (!sys_slist_is_empty(&uplink.processing.queue))
+    {
+        k_work_submit(&uplink.processing.work);
+    }
 
     return &uplink;
 }
 
-enum pouch_result pouch_uplink_fill(struct pouch_uplink *uplink, void *dst, size_t *dst_len)
+enum pouch_result pouch_uplink_fill(struct pouch_uplink *uplink, uint8_t *dst, size_t *len)
 {
-    if (!session_is_active(uplink))
+    if (!session_is_active())
     {
         return POUCH_ERROR;
     }
 
-    if (!pouch_is_ready(uplink))
+    size_t maxlen = *len;
+    *len = 0;
+
+    while (*len < maxlen)
     {
-        *dst_len = 0;
-        return POUCH_NO_MORE_DATA;
+        sys_snode_t *n = sys_slist_peek_head(&uplink->transport.queue);
+        if (!n)
+        {
+            break;
+        }
+
+        struct pouch_buf *block = POUCH_BUF_FROM_SNODE(n);
+
+        size_t bytes = buf_read(block, &dst[*len], maxlen - *len, uplink->transport.offset);
+        uplink->transport.offset += bytes;
+        *len += bytes;
+
+        if (uplink->transport.offset == block->bytes)
+        {
+            sys_slist_get(&uplink->transport.queue);
+            uplink->transport.offset = 0;
+            block_free(block);
+        }
     }
 
-    uint32_t available = ring_buf_size_get(&uplink->ringbuf);
-    uint32_t bytes_read = ring_buf_get(&uplink->ringbuf, dst, *dst_len);
-
-    // Signal to writers that there is space available
-    k_sem_give(&uplink->sem);
-
-    *dst_len = bytes_read;
-
-    if (available > bytes_read)
+    if (pouch_is_open() || !sys_slist_is_empty(&uplink->transport.queue))
     {
         return POUCH_MORE_DATA;
     }
 
+    atomic_clear_bit(&uplink->flags, SESSION_ACTIVE);
+    pouch_event_emit(POUCH_EVENT_SESSION_END);
+
     return POUCH_NO_MORE_DATA;
-}
-
-void pouch_uplink_flush(struct pouch_uplink *uplink)
-{
-    if (atomic_test_and_set_bit(&uplink->flags, FLUSHED))
-    {
-        return;
-    }
-
-    // ignoring any errors here
-    block_flush(K_NO_WAIT);
-
-    atomic_set_bit(&uplink->flags, POUCH_CLOSED);
 }
 
 int pouch_uplink_error(struct pouch_uplink *uplink)
@@ -207,8 +184,12 @@ int pouch_uplink_error(struct pouch_uplink *uplink)
 
 void pouch_uplink_finish(struct pouch_uplink *uplink)
 {
-    uplink->error = 0;
+    // Free any remaining blocks, as they won't be valid in the next pouch:
+    sys_snode_t *n;
+    while ((n = sys_slist_get(&uplink->transport.queue)))
+    {
+        block_free(POUCH_BUF_FROM_SNODE(n));
+    }
+
     atomic_clear(&uplink->flags);
-    k_sem_give(&uplink->sem);
-    pouch_event_emit(POUCH_EVENT_SESSION_END);
 }

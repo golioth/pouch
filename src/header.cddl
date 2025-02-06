@@ -1,0 +1,42 @@
+pouch_header = [
+    version: uint .size 1,
+    encryption_info,
+]
+
+encryption_info = [
+    plaintext_info //
+    saead_fixed_info
+]
+
+plaintext_info = (
+    encryption_type: 0,
+    id: tstr,
+)
+
+saead_fixed_info = (
+    encryption_type: 1,
+    algorithm: saead_algorithms,
+    nonce: bstr .size 10,
+    key_info,
+)
+
+saead_algorithms = (
+    aes_gcm: 1,
+    chacha20_poly1305: 2,
+)
+
+key_info = [
+    psk //
+    ecdh
+]
+
+psk = (
+    key_type: 1,
+    psk_id: tstr,
+)
+
+ecdh = (
+    key_type: 2,
+    cert_id: tstr,
+    nonce: bstr .size 12,
+)

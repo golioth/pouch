@@ -3,6 +3,7 @@
  */
 #pragma once
 
+#include <stdint.h>
 #include <stddef.h>
 
 /**
@@ -28,7 +29,7 @@ struct pouch_uplink;
 struct pouch_uplink *pouch_uplink_start(void);
 
 /** Fill the uplink buffer */
-enum pouch_result pouch_uplink_fill(struct pouch_uplink *uplink, void *dst, size_t *dst_len);
+enum pouch_result pouch_uplink_fill(struct pouch_uplink *uplink, uint8_t *dst, size_t *dst_len);
 
 /**
  * Flush the uplink buffer, closing the current pouch.

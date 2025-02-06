@@ -2,76 +2,108 @@
  * Copyright (c) 2025 Golioth, Inc.
  */
 #include "block.h"
-#include "encrypt.h"
+#include <stdlib.h>
+#include <string.h>
+#include <zephyr/sys/byteorder.h>
 
-static struct block block;
+#define HEADER_SIZE_ENTRY_BLOCK 3
+#define HEADER_SIZE_STREAM_BLOCK 4
 
-static int finalize_block(k_timeout_t timeout)
+#define HEADER_OFFSET_SIZE 0
+#define HEADER_OFFSET_TYPE 2
+#define HEADER_OFFSET_STREAM_ID 3
+
+enum block_type
 {
-    int err = encrypt_block(&block, timeout);
-    if (err)
-    {
-        return err;
-    }
+    BLOCK_TYPE_ENTRY,
+    BLOCK_TYPE_STREAM,
+    BLOCK_TYPE_STREAM_END,
+};
 
-    block.bytes = 0;
-
-    return 0;
+static inline size_t header_size(const struct pouch_buf *block)
+{
+    return (block->buf[HEADER_OFFSET_TYPE] == BLOCK_TYPE_ENTRY) ? HEADER_SIZE_ENTRY_BLOCK
+                                                                : HEADER_SIZE_STREAM_BLOCK;
 }
 
-int block_lock(k_timeout_t timeout)
+static inline void write_block_size(struct pouch_buf *block)
 {
-    int err = k_mutex_lock(&block.mutex, timeout);
-    if (err)
-    {
-        return err;
-    }
-
-    return 0;
+    // Block size does not include its own size:
+    sys_put_be16(block->bytes - sizeof(uint16_t), &block->buf[HEADER_OFFSET_SIZE]);
 }
 
-void block_release(void)
+static void write_block_header(struct pouch_buf *block, enum block_type type, uint8_t stream_id)
 {
-    k_mutex_unlock(&block.mutex);
+    block->buf[HEADER_OFFSET_TYPE] = type;
+
+    switch (type)
+    {
+        case BLOCK_TYPE_ENTRY:
+            block->bytes = HEADER_SIZE_ENTRY_BLOCK;
+            break;
+        case BLOCK_TYPE_STREAM:
+        case BLOCK_TYPE_STREAM_END:
+            block->buf[HEADER_OFFSET_STREAM_ID] = stream_id;
+            block->bytes = HEADER_SIZE_STREAM_BLOCK;
+            break;
+    }
+
+    write_block_size(block);
 }
 
-int block_write(const uint8_t *data, size_t len, k_timeout_t timeout)
+size_t block_space_get(const struct pouch_buf *block)
 {
-    size_t offset = 0;
-    while (offset < len)
-    {
-        size_t write_len = MIN(len - offset, sizeof(block.buf) - block.bytes);
-
-        memcpy(&block.buf[block.bytes], &data[offset], write_len);
-        block.bytes += write_len;
-        offset += write_len;
-
-        if (block.bytes == sizeof(block.buf))
-        {
-            int err = finalize_block(timeout);
-            if (err)
-            {
-                return err;
-            }
-        }
-    }
-
-    return 0;
+    return header_size(block) + CONFIG_POUCH_BLOCK_SIZE - block->bytes;
 }
 
-int block_flush(k_timeout_t timeout)
+struct pouch_buf *block_alloc(k_timeout_t timeout)
 {
-    int err = block_lock(timeout);
-    if (err)
+    struct pouch_buf *block = buf_alloc(HEADER_SIZE_ENTRY_BLOCK + CONFIG_POUCH_BLOCK_SIZE, timeout);
+    if (block)
     {
-        return err;
+        write_block_header(block, BLOCK_TYPE_ENTRY, 0);
     }
 
-    if (block.bytes > 0)
+    return block;
+}
+
+struct pouch_buf *block_alloc_stream(uint8_t stream_id, k_timeout_t timeout)
+{
+    struct pouch_buf *block =
+        buf_alloc(HEADER_SIZE_STREAM_BLOCK + CONFIG_POUCH_BLOCK_SIZE, timeout);
+    if (block)
     {
-        err = finalize_block(timeout);
+        write_block_header(block, BLOCK_TYPE_STREAM, stream_id);
     }
 
-    block_release();
-    return err;
+    return block;
+}
+
+void block_free(struct pouch_buf *block)
+{
+    buf_free(block);
+}
+
+void block_finish(struct pouch_buf *block)
+{
+    write_block_size(block);
+}
+
+void block_finish_stream(struct pouch_buf *block, bool end_of_stream)
+{
+    write_block_size(block);
+    if (end_of_stream)
+    {
+        block->buf[HEADER_OFFSET_TYPE] = BLOCK_TYPE_STREAM_END;
+    }
+}
+
+size_t block_write(struct pouch_buf *block, const uint8_t *data, size_t len)
+{
+    size_t space = block_space_get(block);
+    len = MIN(len, space);
+
+    buf_write(block, data, len);
+
+    return len;
 }
