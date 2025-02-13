@@ -15,15 +15,14 @@ plaintext_info = (
 
 saead_fixed_info = (
     encryption_type: 1,
-    algorithm: saead_algorithms,
+    algorithm: aes_gcm / chacha20_poly1305,
     nonce: bstr .size 10,
     key_info,
 )
 
-saead_algorithms = (
-    aes_gcm: 1,
-    chacha20_poly1305: 2,
-)
+; Algorithm identifiers
+aes_gcm = 1
+chacha20_poly1305 = 2
 
 key_info = [
     psk //
