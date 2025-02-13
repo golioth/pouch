@@ -3,8 +3,8 @@
  */
 #pragma once
 
-#include "buf.h"
 #include "cddl/header_encode_types.h"
+#include "buf.h"
 
 /** Initialize a new pouch in the encryption engine. */
 int crypto_pouch_start(void);
