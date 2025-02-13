@@ -12,7 +12,7 @@ config POUCH_BLOCK_SIZE
   int "Block size"
   default 512
   help
-    The block size to use for Pouch transfers.
+    The maximum block size to use for Pouch transfers.
 
 choice
   prompt "Pouch uplink encryption scheme"
