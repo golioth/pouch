@@ -82,8 +82,6 @@ int pouch_uplink_entry_write(const char *path,
                              size_t len,
                              k_timeout_t timeout)
 {
-    k_timepoint_t end = sys_timepoint_calc(timeout);
-
     if (path == NULL || data == NULL || len == 0)
     {
         return -EINVAL;
@@ -97,7 +95,7 @@ int pouch_uplink_entry_write(const char *path,
 
     if (block == NULL)
     {
-        block = block_alloc(sys_timepoint_timeout(end));
+        block = block_alloc();
         if (block == NULL)
         {
             err = -ENOMEM;
@@ -120,7 +118,7 @@ int pouch_uplink_entry_write(const char *path,
         uplink_enqueue(block);
 
         // try again with a new block:
-        block = block_alloc(sys_timepoint_timeout(end));
+        block = block_alloc();
         if (block == NULL)
         {
             err = -ENOMEM;

@@ -6,8 +6,8 @@
 #include <zephyr/kernel.h>
 #include "buf.h"
 
-struct pouch_buf *block_alloc(k_timeout_t timeout);
-struct pouch_buf *block_alloc_stream(uint8_t stream_id, k_timeout_t timeout);
+struct pouch_buf *block_alloc(void);
+struct pouch_buf *block_alloc_stream(uint8_t stream_id);
 
 void block_free(struct pouch_buf *block);
 

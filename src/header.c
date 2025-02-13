@@ -39,7 +39,7 @@ static int write_header(struct pouch_buf *buf, size_t maxlen)
 struct pouch_buf *pouch_header_create(void)
 {
     // Not blocking this call:
-    struct pouch_buf *header = buf_alloc(POUCH_HEADER_MAX_LEN, K_NO_WAIT);
+    struct pouch_buf *header = buf_alloc(POUCH_HEADER_MAX_LEN);
     if (!header)
     {
         return NULL;

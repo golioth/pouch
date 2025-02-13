@@ -56,9 +56,9 @@ size_t block_space_get(const struct pouch_buf *block)
     return header_size(block) + CONFIG_POUCH_BLOCK_SIZE - block->bytes;
 }
 
-struct pouch_buf *block_alloc(k_timeout_t timeout)
+struct pouch_buf *block_alloc(void)
 {
-    struct pouch_buf *block = buf_alloc(HEADER_SIZE_ENTRY_BLOCK + CONFIG_POUCH_BLOCK_SIZE, timeout);
+    struct pouch_buf *block = buf_alloc(HEADER_SIZE_ENTRY_BLOCK + CONFIG_POUCH_BLOCK_SIZE);
     if (block)
     {
         write_block_header(block, BLOCK_TYPE_ENTRY, 0);
@@ -67,10 +67,9 @@ struct pouch_buf *block_alloc(k_timeout_t timeout)
     return block;
 }
 
-struct pouch_buf *block_alloc_stream(uint8_t stream_id, k_timeout_t timeout)
+struct pouch_buf *block_alloc_stream(uint8_t stream_id)
 {
-    struct pouch_buf *block =
-        buf_alloc(HEADER_SIZE_STREAM_BLOCK + CONFIG_POUCH_BLOCK_SIZE, timeout);
+    struct pouch_buf *block = buf_alloc(HEADER_SIZE_STREAM_BLOCK + CONFIG_POUCH_BLOCK_SIZE);
     if (block)
     {
         write_block_header(block, BLOCK_TYPE_STREAM, stream_id);

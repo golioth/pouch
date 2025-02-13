@@ -17,7 +17,7 @@ struct pouch_buf
     uint8_t buf[];
 };
 
-struct pouch_buf *buf_alloc(size_t size, k_timeout_t timeout);
+struct pouch_buf *buf_alloc(size_t size);
 
 void buf_free(struct pouch_buf *buf);
 
