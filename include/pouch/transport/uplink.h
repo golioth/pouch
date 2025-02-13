@@ -31,13 +31,6 @@ struct pouch_uplink *pouch_uplink_start(void);
 /** Fill the uplink buffer */
 enum pouch_result pouch_uplink_fill(struct pouch_uplink *uplink, uint8_t *dst, size_t *dst_len);
 
-/**
- * Flush the uplink buffer, closing the current pouch.
- * Any data will be available on the next call to pouch_uplink_fill.
- * A new pouch uplink session has to be started before calling pouch_uplink_fill again.
- */
-void pouch_uplink_flush(struct pouch_uplink *uplink);
-
 /** Get the error status of the uplink */
 int pouch_uplink_error(struct pouch_uplink *uplink);
 
