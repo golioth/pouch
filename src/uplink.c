@@ -3,7 +3,6 @@
  */
 #include "pouch.h"
 #include "header.h"
-#include "block.h"
 #include "entry.h"
 #include "crypto.h"
 
@@ -31,13 +30,13 @@ struct pouch_uplink
     struct
     {
         /** Blocks that are ready for processing */
-        sys_slist_t queue;
+        pouch_buf_queue_t queue;
         struct k_work work;
     } processing;
     struct
     {
         /** Blocks that are ready for transport */
-        sys_slist_t queue;
+        pouch_buf_queue_t queue;
         /** Read offset in bytes */
         size_t offset;
     } transport;
@@ -63,13 +62,13 @@ static bool pouch_is_closing(void)
 
 static void process_blocks(struct k_work *work)
 {
-    while (session_is_active() && pouch_is_open() && !sys_slist_is_empty(&uplink.processing.queue))
+    while (session_is_active() && pouch_is_open() && !buf_queue_is_empty(&uplink.processing.queue))
     {
-        sys_snode_t *head = sys_slist_get(&uplink.processing.queue);
-        struct pouch_buf *encrypted = crypto_encrypt_block(POUCH_BUF_FROM_SNODE(head));
+        struct pouch_buf *encrypted = crypto_encrypt_block(buf_queue_get(&uplink.processing.queue));
+
         if (encrypted)
         {
-            sys_slist_append(&uplink.transport.queue, &encrypted->node);
+            buf_queue_submit(&uplink.transport.queue, encrypted);
         }
     }
 
@@ -81,7 +80,7 @@ static void process_blocks(struct k_work *work)
 
 void uplink_enqueue(struct pouch_buf *block)
 {
-    sys_slist_append(&uplink.processing.queue, &block->node);
+    buf_queue_submit(&uplink.processing.queue, block);
     k_work_submit(&uplink.processing.work);
 }
 
@@ -97,6 +96,8 @@ int pouch_uplink_close(k_timeout_t timeout)
 
 int uplink_init(void)
 {
+    buf_queue_init(&uplink.processing.queue);
+    buf_queue_init(&uplink.transport.queue);
     k_work_init(&uplink.processing.work, process_blocks);
 
     return 0;
@@ -119,14 +120,14 @@ struct pouch_uplink *pouch_uplink_start(void)
         return NULL;
     }
 
-    sys_slist_append(&uplink.transport.queue, &header->node);
+    buf_queue_submit(&uplink.transport.queue, header);
 
     atomic_set_bit(&uplink.flags, SESSION_ACTIVE);
 
     pouch_event_emit(POUCH_EVENT_SESSION_START);
 
     // Process any pending blocks:
-    if (!sys_slist_is_empty(&uplink.processing.queue))
+    if (!buf_queue_is_empty(&uplink.processing.queue))
     {
         k_work_submit(&uplink.processing.work);
     }
@@ -146,27 +147,25 @@ enum pouch_result pouch_uplink_fill(struct pouch_uplink *uplink, uint8_t *dst, s
 
     while (*len < maxlen)
     {
-        sys_snode_t *n = sys_slist_peek_head(&uplink->transport.queue);
-        if (!n)
+        struct pouch_buf *block = buf_queue_peek(&uplink->transport.queue);
+        if (!block)
         {
             break;
         }
-
-        struct pouch_buf *block = POUCH_BUF_FROM_SNODE(n);
 
         size_t bytes = buf_read(block, &dst[*len], maxlen - *len, uplink->transport.offset);
         uplink->transport.offset += bytes;
         *len += bytes;
 
-        if (uplink->transport.offset == block->bytes)
+        if (uplink->transport.offset == buf_size_get(block))
         {
-            sys_slist_get(&uplink->transport.queue);
+            buf_queue_get(&uplink->transport.queue);
             uplink->transport.offset = 0;
-            block_free(block);
+            buf_free(block);
         }
     }
 
-    if (pouch_is_open() || !sys_slist_is_empty(&uplink->transport.queue))
+    if (pouch_is_open() || !buf_queue_is_empty(&uplink->transport.queue))
     {
         return POUCH_MORE_DATA;
     }
@@ -185,10 +184,10 @@ int pouch_uplink_error(struct pouch_uplink *uplink)
 void pouch_uplink_finish(struct pouch_uplink *uplink)
 {
     // Free any remaining blocks, as they won't be valid in the next pouch:
-    sys_snode_t *n;
-    while ((n = sys_slist_get(&uplink->transport.queue)))
+    struct pouch_buf *buf;
+    while ((buf = buf_queue_get(&uplink->transport.queue)))
     {
-        block_free(POUCH_BUF_FROM_SNODE(n));
+        buf_free(buf);
     }
 
     atomic_clear(&uplink->flags);

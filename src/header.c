@@ -33,7 +33,16 @@ static int write_header(struct pouch_buf *buf, size_t maxlen)
         return err;
     }
 
-    return cbor_encode_pouch_header(buf_next(buf), maxlen, &header, &buf->bytes);
+    size_t len = 0;
+    err = cbor_encode_pouch_header(buf_next(buf), maxlen, &header, &len);
+    if (err)
+    {
+        return err;
+    }
+
+    buf_claim(buf, len);
+
+    return 0;
 }
 
 struct pouch_buf *pouch_header_create(void)

@@ -37,41 +37,19 @@ static K_MUTEX_DEFINE(mut);
  *           +------------------------------------+
  */
 
-static int write_header(struct pouch_buf *block, const struct pouch_entry *entry)
+static int write_entry(struct pouch_buf *block, const struct pouch_entry *entry)
 {
-    uint8_t *buf = buf_next(block);
     size_t pathlen = strlen(entry->path);
-    if (block_space_get(block) < ENTRY_HEADER_OVERHEAD + pathlen)
+    if (block_space_get(block) < ENTRY_HEADER_OVERHEAD + pathlen + entry->data_len)
     {
         return -ENOMEM;
     }
 
-    sys_put_be16(entry->data_len, &buf[0]);
-    sys_put_be16(entry->content_type, &buf[2]);
-    buf[4] = pathlen;
-    memcpy(&buf[5], entry->path, pathlen);
-
-    block->bytes += ENTRY_HEADER_OVERHEAD + pathlen;
-
-    return 0;
-}
-
-static int write_entry(struct pouch_buf *block, const struct pouch_entry *entry)
-{
-    size_t original_offset = block->bytes;
-    int err = write_header(block, entry);
-    if (err)
-    {
-        block->bytes = original_offset;
-        return err;
-    }
-
-    size_t len = block_write(block, entry->data, entry->data_len);
-    if (len != entry->data_len)
-    {
-        block->bytes = original_offset;
-        return err;
-    }
+    sys_put_be16(entry->data_len, buf_claim(block, sizeof(uint16_t)));
+    sys_put_be16(entry->content_type, buf_claim(block, sizeof(uint16_t)));
+    *buf_claim(block, 1) = pathlen;
+    buf_write(block, entry->path, pathlen);
+    buf_write(block, entry->data, entry->data_len);
 
     return 0;
 }
@@ -87,6 +65,7 @@ int pouch_uplink_entry_write(const char *path,
         return -EINVAL;
     }
 
+    bool block_is_new = false;
     int err = k_mutex_lock(&mut, timeout);
     if (err)
     {
@@ -95,6 +74,7 @@ int pouch_uplink_entry_write(const char *path,
 
     if (block == NULL)
     {
+        block_is_new = true;
         block = block_alloc();
         if (block == NULL)
         {
@@ -111,7 +91,7 @@ int pouch_uplink_entry_write(const char *path,
     };
 
     err = write_entry(block, &entry);
-    if (err && block->bytes > 0)
+    if (err && !block_is_new)
     {
         // block is full
         block_finish(block);
