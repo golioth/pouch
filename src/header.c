@@ -13,7 +13,7 @@
 #include <zcbor_encode.h>
 #include <zephyr/kernel.h>
 
-#define POUCH_HEADER_VERSION 0
+#define POUCH_HEADER_VERSION 1
 
 #if defined(CONFIG_POUCH_ENCRYPTION_NONE)
 #define POUCH_HEADER_MAX_LEN 5 + sizeof(CONFIG_POUCH_DEVICE_ID)
