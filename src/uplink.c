@@ -190,5 +190,12 @@ void pouch_uplink_finish(struct pouch_uplink *uplink)
         buf_free(buf);
     }
 
-    atomic_clear(&uplink->flags);
+    if (atomic_clear(&uplink->flags) & BIT(SESSION_ACTIVE))
+    {
+        /* The transport didn't pull down all the data, so
+         * we didn't emit the end event, and need to do it
+         * here instead.
+         */
+        pouch_event_emit(POUCH_EVENT_SESSION_END);
+    }
 }
