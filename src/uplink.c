@@ -24,6 +24,7 @@ enum flags
 
 struct pouch_uplink
 {
+    struct pouch_buf *header;
     atomic_t flags;
     int error;
 
@@ -65,11 +66,18 @@ static void process_blocks(struct k_work *work)
     while (session_is_active() && pouch_is_open() && !buf_queue_is_empty(&uplink.processing.queue))
     {
         struct pouch_buf *encrypted = crypto_encrypt_block(buf_queue_get(&uplink.processing.queue));
-
-        if (encrypted)
+        if (!encrypted)
         {
-            buf_queue_submit(&uplink.transport.queue, encrypted);
+            continue;
         }
+
+        if (uplink.header)
+        {
+            buf_queue_submit(&uplink.transport.queue, uplink.header);
+            uplink.header = NULL;
+        }
+
+        buf_queue_submit(&uplink.transport.queue, encrypted);
     }
 
     if (pouch_is_closing())
@@ -114,13 +122,12 @@ struct pouch_uplink *pouch_uplink_start(void)
 
     crypto_pouch_start();
 
-    struct pouch_buf *header = pouch_header_create();
-    if (!header)
+    // Create the header, but don't push it to the queue until we have data to send:
+    uplink.header = pouch_header_create();
+    if (!uplink.header)
     {
         return NULL;
     }
-
-    buf_queue_submit(&uplink.transport.queue, header);
 
     atomic_set_bit(&uplink.flags, SESSION_ACTIVE);
 
@@ -188,6 +195,12 @@ void pouch_uplink_finish(struct pouch_uplink *uplink)
     while ((buf = buf_queue_get(&uplink->transport.queue)))
     {
         buf_free(buf);
+    }
+
+    if (uplink->header)
+    {
+        buf_free(uplink->header);
+        uplink->header = NULL;
     }
 
     if (atomic_clear(&uplink->flags) & BIT(SESSION_ACTIVE))
