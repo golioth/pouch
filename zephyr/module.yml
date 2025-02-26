@@ -1,4 +1,0 @@
-build:
-  cmake: .
-  kconfig: src/Kconfig
-
