@@ -26,3 +26,9 @@ add_custom_command(OUTPUT header_encode.c
     DEPENDS src/header.cddl)
 
 zephyr_library_include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
+
+# Transports
+
+if (CONFIG_POUCH_TRANSPORT_TOOTHFAIRY)
+    add_subdirectory(src/transport/toothfairy)
+endif()

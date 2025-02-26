@@ -10,7 +10,7 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 
-#include <toothfairy/peripheral.h>
+#include <pouch/transport/toothfairy/peripheral.h>
 
 static void connected(struct bt_conn *conn, uint8_t err)
 {

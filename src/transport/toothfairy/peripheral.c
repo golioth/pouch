@@ -8,9 +8,9 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 
-#include "toothfairy_declarations.h"
-#include <toothfairy/peripheral.h>
+#include <pouch/transport/toothfairy/peripheral.h>
 
+#include "toothfairy_declarations.h"
 #include "toothfairy_uuids.h"
 
 struct toothfairy_peripheral

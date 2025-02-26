@@ -6,7 +6,7 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 
-#include "pouch/uplink.h"
+#include <pouch/transport/uplink.h>
 
 #include "toothfairy_declarations.h"
 #include "toothfairy_uuids.h"

@@ -36,4 +36,18 @@ config POUCH_DEVICE_ID
 
 endif
 
+choice
+  prompt "Pouch transport"
+  help
+    Select the transport protocol that will carry Pouch
+
+config POUCH_TRANSPORT_TOOTHFAIRY
+  bool "Toothfairy"
+  depends on BT
+  select BT_GATT_DYNAMIC_DB
+  help
+    Toothfairy transport for Pouch over BLE GATT
+
+endchoice
+
 endif
