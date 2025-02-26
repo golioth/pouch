@@ -1,0 +1,47 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    container: golioth/golioth-zephyr-base:0.16.8-SDK-v0
+    env:
+      ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-0.16.8
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: toothfairy
+      - name: Init and update west
+        run: |
+          west init -l toothfairy
+          west update --narrow -o=--depth=1
+      - name: Install pip packages
+        run: |
+          pip3 install \
+            -r deps/zephyr/scripts/requirements-base.txt        \
+            -r deps/zephyr/scripts/requirements-build-test.txt  \
+            -r toothfairy/requirements.txt
+
+          pip3 install            \
+            cryptography==41.0.7  \
+            pyasn1                \
+            pyyaml                \
+            cbor>=1.0.0           \
+            imgtool>=1.9.0        \
+            jinja2                \
+            click
+
+      - name: Compile
+        shell: bash
+        run: |
+          west build -p -b nrf52840dk/nrf52840 toothfairy/example
