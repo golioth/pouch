@@ -3,13 +3,26 @@
  */
 #include <zephyr/ztest.h>
 #include <pouch/events.h>
-#include <pouch/events.h>
+#include <pouch/pouch.h>
 #include "mocks/transport.h"
 
 static uint32_t start_events;
 static uint32_t end_events;
 
-ZTEST_SUITE(events, NULL, NULL, NULL, NULL, NULL);
+#define DEVICE_ID "test-device-id"
+
+static const struct pouch_config pouch_config = {
+    .encryption_type = POUCH_ENCRYPTION_PLAINTEXT,
+    .encryption.plaintext.device_id = DEVICE_ID,
+};
+
+static void *init_pouch(void)
+{
+    pouch_init(&pouch_config);
+    return NULL;
+}
+
+ZTEST_SUITE(events, NULL, init_pouch, NULL, NULL, NULL);
 
 static void event_handler(enum pouch_event event, void *ctx)
 {

@@ -1,0 +1,7 @@
+source "$ZEPHYR_BASE/Kconfig"
+
+config EXAMPLE_DEVICE_ID
+    string "Device ID"
+    help
+        The device ID to use for the device in pouches sent to the
+        Golioth cloud.

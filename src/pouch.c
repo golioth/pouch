@@ -6,6 +6,7 @@
 #include <pouch/events.h>
 #include <pouch/transport/uplink.h>
 #include <pouch/types.h>
+#include <string.h>
 
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
@@ -21,9 +22,20 @@ void pouch_event_emit(enum pouch_event event)
     }
 }
 
-int pouch_init(void)
+int pouch_init(const struct pouch_config *config)
 {
-    return uplink_init();
-}
+    if (config->encryption_type != POUCH_ENCRYPTION_PLAINTEXT)
+    {
+        return -ENOTSUP;
+    }
+    if (!config->encryption.plaintext.device_id)
+    {
+        return -EINVAL;
+    }
+    if (strlen(config->encryption.plaintext.device_id) > POUCH_DEVICE_ID_MAX_LEN)
+    {
+        return -EINVAL;
+    }
 
-SYS_INIT(pouch_init, APPLICATION, 0);
+    return uplink_init(config);
+}

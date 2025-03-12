@@ -10,6 +10,7 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 
+#include <pouch/pouch.h>
 #include <pouch/events.h>
 #include <pouch/uplink.h>
 #include <pouch/transport/toothfairy/peripheral.h>
@@ -91,7 +92,7 @@ POUCH_EVENT_HANDLER(pouch_event_handler, NULL);
 int main(void)
 {
     struct toothfairy_peripheral *tf_peripheral =
-        toothfairy_peripheral_create(CONFIG_POUCH_DEVICE_ID);
+        toothfairy_peripheral_create(CONFIG_EXAMPLE_DEVICE_ID);
     if (NULL == tf_peripheral)
     {
         LOG_ERR("Failed to create toothfairy peripheral");
@@ -105,6 +106,20 @@ int main(void)
     }
 
     LOG_DBG("Bluetooth initialized\n");
+
+    struct pouch_config config = {
+        .encryption_type = POUCH_ENCRYPTION_PLAINTEXT,
+        .encryption.plaintext =
+            {
+                .device_id = CONFIG_EXAMPLE_DEVICE_ID,
+            },
+    };
+    err = pouch_init(&config);
+    if (err)
+    {
+        LOG_ERR("Pouch init failed (err %d)", err);
+        return 0;
+    }
 
     err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_2, ad, ARRAY_SIZE(ad), NULL, 0);
     if (err)
