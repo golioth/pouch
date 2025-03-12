@@ -27,15 +27,6 @@ config POUCH_ENCRYPTION_NONE
 
 endchoice
 
-if POUCH_ENCRYPTION_NONE
-
-config POUCH_DEVICE_ID
-  string "Device ID"
-  help
-    The device ID to use for Pouch transfers.
-
-endif
-
 choice
   prompt "Pouch transport"
   help

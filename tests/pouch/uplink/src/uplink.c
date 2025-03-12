@@ -5,11 +5,26 @@
 #include <zephyr/sys/byteorder.h>
 #include <zcbor_decode.h>
 #include <stdlib.h>
+
 #include "mocks/transport.h"
 
 #include <pouch/uplink.h>
+#include <pouch/pouch.h>
 
-ZTEST_SUITE(uplink, NULL, NULL, NULL, transport_reset, NULL);
+#define DEVICE_ID "test-device-id"
+
+static const struct pouch_config pouch_config = {
+    .encryption_type = POUCH_ENCRYPTION_PLAINTEXT,
+    .encryption.plaintext.device_id = DEVICE_ID,
+};
+
+static void *init_pouch(void)
+{
+    pouch_init(&pouch_config);
+    return NULL;
+}
+
+ZTEST_SUITE(uplink, NULL, init_pouch, NULL, transport_reset, NULL);
 
 K_SEM_DEFINE(write_done, 0, UINT16_MAX);
 
@@ -96,11 +111,8 @@ ZTEST(uplink, test_pouch_header)
 
     struct zcbor_string string = {0};
     zassert_true(zcbor_tstr_decode(zsd, &string));
-    zassert_equal(string.len,
-                  strlen(CONFIG_POUCH_DEVICE_ID),
-                  "Unexpected device ID length %d",
-                  string.len);
-    zassert_str_equal(string.value, CONFIG_POUCH_DEVICE_ID);
+    zassert_equal(string.len, strlen(DEVICE_ID), "Unexpected device ID length %d", string.len);
+    zassert_str_equal(string.value, DEVICE_ID);
 
     zassert_true(zcbor_list_end_decode(zsd));
 

@@ -5,12 +5,13 @@
 
 #include "cddl/header_encode_types.h"
 #include "buf.h"
+#include <pouch/types.h>
 
 /** Initialize a new pouch in the encryption engine. */
 int crypto_pouch_start(void);
 
 /** Construct the encryption info part of the pouch header */
-int crypto_header_get(struct encryption_info *encryption_info);
+int crypto_header_get(const struct pouch_config *config, struct encryption_info *encryption_info);
 
 /**
  * Encrypt a block of data.

@@ -24,6 +24,7 @@ enum flags
 
 struct pouch_uplink
 {
+    struct pouch_config config;
     struct pouch_buf *header;
     atomic_t flags;
     int error;
@@ -102,8 +103,9 @@ int pouch_uplink_close(k_timeout_t timeout)
     return entry_block_close(timeout);
 }
 
-int uplink_init(void)
+int uplink_init(const struct pouch_config *config)
 {
+    uplink.config = *config;
     buf_queue_init(&uplink.processing.queue);
     buf_queue_init(&uplink.transport.queue);
     k_work_init(&uplink.processing.work, process_blocks);
@@ -123,7 +125,7 @@ struct pouch_uplink *pouch_uplink_start(void)
     crypto_pouch_start();
 
     // Create the header, but don't push it to the queue until we have data to send:
-    uplink.header = pouch_header_create();
+    uplink.header = pouch_header_create(&uplink.config);
     if (!uplink.header)
     {
         return NULL;
