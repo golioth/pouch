@@ -3,9 +3,7 @@
  */
 #include "crypto.h"
 
-#ifndef CONFIG_POUCH_DEVICE_ID
-#error "CONFIG_POUCH_DEVICE_ID must be defined"
-#endif
+BUILD_ASSERT(1 != sizeof(CONFIG_POUCH_DEVICE_ID), "CONFIG_POUCH_DEVICE_ID must be provided");
 
 int crypto_pouch_start(void)
 {
