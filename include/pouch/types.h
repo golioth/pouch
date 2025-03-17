@@ -11,12 +11,19 @@
  * @brief Pouch type definitions
  */
 
+/**
+ * @defgroup content_types Pouch content types
+ * @{
+ */
+
 /** The content is a raw octet stream */
 #define POUCH_CONTENT_TYPE_OCTET_STREAM 42
 /** The content is a JSON encoded object */
 #define POUCH_CONTENT_TYPE_JSON 50
 /** The content is a CBOR encoded object */
 #define POUCH_CONTENT_TYPE_CBOR 60
+
+/** @} */
 
 /** The maximum length of a device ID */
 #define POUCH_DEVICE_ID_MAX_LEN 32

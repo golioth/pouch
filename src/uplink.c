@@ -27,6 +27,7 @@ struct pouch_uplink
     struct pouch_config config;
     struct pouch_buf *header;
     atomic_t flags;
+    atomic_t id;
     int error;
 
     struct
@@ -100,7 +101,11 @@ int pouch_uplink_close(k_timeout_t timeout)
         return -EALREADY;
     }
 
-    return entry_block_close(timeout);
+    int err = entry_block_close(timeout);
+
+    k_work_submit(&uplink.processing.work);
+
+    return err;
 }
 
 int uplink_init(const struct pouch_config *config)
@@ -113,11 +118,16 @@ int uplink_init(const struct pouch_config *config)
     return 0;
 }
 
+uint32_t uplink_session_id(void)
+{
+    return atomic_get(&uplink.id);
+}
+
 // Transport API:
 
 struct pouch_uplink *pouch_uplink_start(void)
 {
-    if (session_is_active())
+    if (atomic_test_and_set_bit(&uplink.flags, SESSION_ACTIVE))
     {
         return NULL;
     }
@@ -130,8 +140,6 @@ struct pouch_uplink *pouch_uplink_start(void)
     {
         return NULL;
     }
-
-    atomic_set_bit(&uplink.flags, SESSION_ACTIVE);
 
     pouch_event_emit(POUCH_EVENT_SESSION_START);
 
@@ -205,6 +213,7 @@ void pouch_uplink_finish(struct pouch_uplink *uplink)
         uplink->header = NULL;
     }
 
+    atomic_inc(&uplink->id);
     if (atomic_clear(&uplink->flags) & BIT(SESSION_ACTIVE))
     {
         /* The transport didn't pull down all the data, so

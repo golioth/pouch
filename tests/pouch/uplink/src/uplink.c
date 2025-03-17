@@ -5,8 +5,9 @@
 #include <zephyr/sys/byteorder.h>
 #include <zcbor_decode.h>
 #include <stdlib.h>
-
+#include <stdio.h>
 #include "mocks/transport.h"
+#include "utils.h"
 
 #include <pouch/uplink.h>
 #include <pouch/pouch.h>
@@ -140,22 +141,15 @@ ZTEST(uplink, test_pouch_block)
     size_t len = read_data(&buf, CONFIG_POUCH_BLOCK_SIZE);
 
     // skip the pouch header:
-    ZCBOR_STATE_D(zsd, 2, buf, len, 1, 0);
-
-    zassert_true(zcbor_list_start_decode(zsd));
-    while (!zcbor_array_at_end(zsd))
-    {
-        zcbor_any_skip(zsd, NULL);
-    }
-    zassert_true(zcbor_list_end_decode(zsd));
-
-    uint8_t *block = (uint8_t *) zsd->payload;
-    len -= (block - buf);
+    uint8_t *block = skip_pouch_header(buf, &len);
 
     int block_len = sys_get_be16(block);
     zassert_equal(block_len, len - 2, "Unexpected block length %d", block_len);
 
-    zassert_equal(block[2], 0, "Expected block type to be ENTRY, was %u", block[2]);
+    zassert_equal(block[2],
+                  0x80,
+                  "Expected block type to be ENTRY and no more data to be true, was %u",
+                  block[2]);
 }
 
 ZTEST(uplink, test_pouch_entry)
@@ -178,19 +172,9 @@ ZTEST(uplink, test_pouch_entry)
     uint8_t *buf;
     size_t len = read_data(&buf, CONFIG_POUCH_BLOCK_SIZE);
 
-    // skip the pouch header:
-    ZCBOR_STATE_D(zsd, 2, buf, len, 1, 0);
-
-    zassert_true(zcbor_list_start_decode(zsd));
-    while (!zcbor_array_at_end(zsd))
-    {
-        zcbor_any_skip(zsd, NULL);
-    }
-    zassert_true(zcbor_list_end_decode(zsd));
-
-    uint8_t *block = (uint8_t *) zsd->payload;
+    uint8_t *block = skip_pouch_header(buf, &len);
     uint8_t *block_data = &block[3];
-    len -= (block_data - buf);
+    len -= 3;
 
     zassert_equal(len, 5 + strlen(path) + sizeof(data), "Unexpected block length %d", len);
 
@@ -348,4 +332,425 @@ ZTEST(uplink, test_multithread_writer)
     uint8_t *buf;
     size_t len = read_data(&buf, CONFIG_POUCH_BLOCK_SIZE);
     zassert_true(len > 0);
+}
+
+ZTEST(uplink, test_stream_basic)
+{
+    transport_session_start();
+
+    struct pouch_stream *stream =
+        pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM);
+    zassert_not_null(stream, "Failed to open stream");
+
+    const uint8_t data[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
+    size_t written = pouch_stream_write(stream, (void *) data, sizeof(data), K_NO_WAIT);
+    zassert_equal(written, sizeof(data), "Unexpected write length %d", written);
+
+    zassert_ok(pouch_stream_close(stream, K_NO_WAIT));
+
+    // let processing run:
+    k_sleep(K_MSEC(1));
+
+    uint8_t *buf;
+    size_t len = read_data(&buf, CONFIG_POUCH_BLOCK_SIZE);
+
+    uint8_t *block = skip_pouch_header(buf, &len);
+
+    size_t block_len = sys_get_be16(block);
+    zassert_equal(block_len, len - 2, "Unexpected block length %d", block_len);
+
+    // 0x81 is the first stream ID for a closed stream:
+    uint8_t stream_id = block[2];
+    zassert_between_inclusive(stream_id, 0x81, 0xff, "Unexpected stream ID %x", stream_id);
+    zassert_equal(sys_get_be16(&block[3]),
+                  POUCH_CONTENT_TYPE_OCTET_STREAM,
+                  "Unexpected content type");
+    zassert_equal(block[5], strlen("test/path"), "Unexpected path length");
+    zassert_mem_equal(&block[6], "test/path", strlen("test/path"), "Unexpected path");
+
+    zassert_mem_equal(&block[6 + strlen("test/path")], data, sizeof(data), "Unexpected data");
+}
+
+ZTEST(uplink, test_stream_multiblock)
+{
+    transport_session_start();
+
+    struct pouch_stream *stream =
+        pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM);
+    zassert_not_null(stream, "Failed to open stream");
+
+    // write more data than a single block can hold:
+    uint8_t data[CONFIG_POUCH_BLOCK_SIZE + 50];
+    for (int i = 0; i < sizeof(data); i++)
+    {
+        data[i] = i & 0xff;  // dummy data
+    }
+
+    size_t written = pouch_stream_write(stream, (void *) data, sizeof(data), K_NO_WAIT);
+    zassert_equal(written, sizeof(data), "Unexpected write length %d", written);
+
+    zassert_ok(pouch_stream_close(stream, K_NO_WAIT));
+
+    zassert_ok(pouch_uplink_close(K_FOREVER));
+
+    // let processing run:
+    k_sleep(K_MSEC(1));
+
+    uint8_t buf[CONFIG_POUCH_BLOCK_SIZE + 200];
+    size_t len = sizeof(buf);
+    enum pouch_result result = transport_pull_data(buf, &len);
+    zassert_equal(result, POUCH_NO_MORE_DATA, "Unexpected result %d", result);
+
+    uint8_t *blockbuf = skip_pouch_header(buf, &len);
+    struct stream_block first_block;
+    pull_stream_block(&blockbuf, &first_block);
+
+    zassert_between_inclusive(first_block.block.data_len,
+                              1,
+                              CONFIG_POUCH_BLOCK_SIZE - 1,
+                              "Unexpected block length %d",
+                              first_block.block.data_len);
+
+    // 0x01 is the first stream ID for an open stream:
+    zassert_between_inclusive(first_block.block.id,
+                              0x01,
+                              0x7f,
+                              "Unexpected stream ID %#x",
+                              first_block.block.id);
+    zassert_true(first_block.block.more_data, "Unexpected no more data");
+    zassert_equal(first_block.content_type,
+                  POUCH_CONTENT_TYPE_OCTET_STREAM,
+                  "Unexpected content type");
+    size_t path_len = strlen("test/path");
+    zassert_equal(first_block.path_len, path_len, "Unexpected path length");
+    zassert_mem_equal(first_block.path, "test/path", path_len, "Unexpected path");
+    zassert_mem_equal(first_block.data, data, first_block.data_len, "Unexpected data");
+
+    // next block:
+    struct block second_block;
+    pull_block(&blockbuf, &second_block);
+
+    zassert_between_inclusive(second_block.data_len,
+                              1,
+                              sizeof(buf) - first_block.data_len - 3,
+                              "Unexpected block length %d",
+                              second_block.data_len);
+
+    // 0x01 is the first stream ID for an open stream:
+    zassert_between_inclusive(second_block.id,
+                              0x01,
+                              0x7f,
+                              "Unexpected stream ID %#x",
+                              second_block.id);
+    zassert_equal(second_block.id, first_block.block.id, "Unexpected stream ID");
+    zassert_false(second_block.more_data, "Unexpected more data");
+    zassert_mem_equal(second_block.data,
+                      &data[first_block.data_len],
+                      second_block.data_len,
+                      "Unexpected data");
+}
+
+ZTEST(uplink, test_stream_multi_stream)
+{
+    transport_session_start();
+
+    struct pouch_stream *stream1 =
+        pouch_uplink_stream_open("test/path1", POUCH_CONTENT_TYPE_OCTET_STREAM);
+    zassert_not_null(stream1, "Failed to open stream");
+
+    struct pouch_stream *stream2 =
+        pouch_uplink_stream_open("test/path2", POUCH_CONTENT_TYPE_OCTET_STREAM);
+    zassert_not_null(stream2, "Failed to open stream");
+
+    const uint8_t data1[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
+    size_t written = pouch_stream_write(stream1, data1, sizeof(data1), K_NO_WAIT);
+    zassert_equal(written, sizeof(data1), "Unexpected write length %d", written);
+
+    const uint8_t data2[] = {0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
+    written = pouch_stream_write(stream2, data2, sizeof(data2), K_NO_WAIT);
+    zassert_equal(written, sizeof(data2), "Unexpected write length %d", written);
+
+    zassert_ok(pouch_stream_close(stream1, K_NO_WAIT));
+    zassert_ok(pouch_stream_close(stream2, K_NO_WAIT));
+
+    // let processing run:
+    k_sleep(K_MSEC(1));
+    uint8_t *buf;
+    size_t len = read_data(&buf, CONFIG_POUCH_BLOCK_SIZE);
+
+    buf = skip_pouch_header(buf, &len);
+    struct stream_block blocks[2];
+    pull_stream_block(&buf, &blocks[0]);
+
+    zassert_false(blocks[0].block.more_data, "Unexpected more data");
+    zassert_not_equal(blocks[0].block.id, 0, "Unexpected stream ID");
+    zassert_equal(blocks[0].data_len,
+                  sizeof(data1),
+                  "Unexpected data length %d",
+                  blocks[0].data_len);
+    zassert_mem_equal(blocks[0].data, data1, sizeof(data1), "Unexpected data");
+    zassert_equal(blocks[0].path_len, strlen("test/path1"), "Unexpected path length");
+    zassert_mem_equal(blocks[0].path, "test/path1", strlen("test/path1"), "Unexpected path");
+
+    pull_stream_block(&buf, &blocks[1]);
+
+    zassert_false(blocks[1].block.more_data, "Unexpected more data");
+    zassert_not_equal(blocks[1].block.id, 0, "Unexpected stream ID");
+    zassert_equal(blocks[1].data_len,
+                  sizeof(data2),
+                  "Unexpected data length %d",
+                  blocks[1].data_len);
+    zassert_mem_equal(blocks[1].data, data2, sizeof(data2), "Unexpected data");
+    zassert_equal(blocks[1].path_len, strlen("test/path2"), "Unexpected path length");
+    zassert_mem_equal(blocks[1].path, "test/path2", strlen("test/path2"), "Unexpected path");
+}
+
+ZTEST(uplink, test_stream_multi_block_multi_stream)
+{
+    transport_session_start();
+
+    struct pouch_stream *stream1 =
+        pouch_uplink_stream_open("test/path1", POUCH_CONTENT_TYPE_OCTET_STREAM);
+    zassert_not_null(stream1, "Failed to open stream");
+
+    struct pouch_stream *stream2 =
+        pouch_uplink_stream_open("test/path2", POUCH_CONTENT_TYPE_OCTET_STREAM);
+    zassert_not_null(stream2, "Failed to open stream");
+
+    // write more data than a single block can hold:
+    uint8_t data[CONFIG_POUCH_BLOCK_SIZE * 2];
+    for (int i = 0; i < sizeof(data); i++)
+    {
+        data[i] = i & 0xff;  // dummy data
+    }
+
+    // write the data in chunks to both streams:
+    size_t chunk_len = 8;
+    for (int i = 0; i < sizeof(data); i += chunk_len)
+    {
+        size_t written = pouch_stream_write(stream1, &data[i], chunk_len, K_NO_WAIT);
+        zassert_equal(written, chunk_len, "Unexpected write length %d", written);
+
+        written = pouch_stream_write(stream2, &data[i], chunk_len, K_NO_WAIT);
+        zassert_equal(written, chunk_len, "Unexpected write length %d", written);
+    }
+
+    zassert_ok(pouch_stream_close(stream1, K_NO_WAIT));
+    zassert_ok(pouch_stream_close(stream2, K_NO_WAIT));
+
+    pouch_uplink_close(K_NO_WAIT);
+
+    // let processing run:
+    k_sleep(K_MSEC(1));
+
+    uint8_t buf[CONFIG_POUCH_BLOCK_SIZE * 5];
+    size_t len = sizeof(buf);
+    enum pouch_result result = transport_pull_data(buf, &len);
+    zassert_equal(result, POUCH_NO_MORE_DATA, "Unexpected result %d", result);
+
+    uint8_t *blockbuf = skip_pouch_header(buf, &len);
+
+    struct
+    {
+        uint8_t id;
+        size_t data_len;
+        uint8_t data[CONFIG_POUCH_BLOCK_SIZE * 4];
+    } streams[2];
+
+    // pull the first two blocks, which includes path and content type:
+    for (int i = 0; i < 2; i++)
+    {
+        struct stream_block block;
+        pull_stream_block(&blockbuf, &block);
+        streams[i].id = block.block.id;
+        streams[i].data_len = block.data_len;
+        char expected_path[12];
+        sprintf(expected_path, "test/path%d", i + 1);
+        zassert_mem_equal(block.path, expected_path, strlen(expected_path));
+        zassert_equal(block.content_type, POUCH_CONTENT_TYPE_OCTET_STREAM);
+        memcpy(streams[i].data, block.data, block.data_len);
+    }
+
+    // should have pushed the blocks in alternating order:
+    zassert_not_equal(streams[0].id, streams[1].id, "Unexpected stream ID");
+
+    for (int i = 0; i < 4; i++)
+    {
+        struct block block;
+        pull_block(&blockbuf, &block);
+
+        zassert_equal(block.id, streams[i % 2].id, "Unexpected stream ID");
+
+        zassert_true(streams[i % 2].data_len + block.data_len <= CONFIG_POUCH_BLOCK_SIZE * 2,
+                     "Unexpected total data length %d",
+                     streams[i % 2].data_len + block.data_len);
+        memcpy(&streams[i % 2].data[streams[i % 2].data_len], block.data, block.data_len);
+
+        streams[i % 2].data_len += block.data_len;
+
+        bool more_data = streams[i % 2].data_len < CONFIG_POUCH_BLOCK_SIZE * 2;
+        zassert_equal(block.more_data, more_data, "Unexpected more data");
+    }
+
+    for (int i = 0; i < 2; i++)
+    {
+        zassert_equal(streams[i].data_len,
+                      CONFIG_POUCH_BLOCK_SIZE * 2,
+                      "stream %d: Unexpected data length %d",
+                      i,
+                      streams[i].data_len);
+        zassert_mem_equal(streams[i].data, data, CONFIG_POUCH_BLOCK_SIZE * 2);
+    }
+}
+
+
+ZTEST(uplink, test_stream_max_count)
+{
+    transport_session_start();
+
+    struct pouch_stream *streams[POUCH_STREAMS_MAX];
+    for (int i = 0; i < POUCH_STREAMS_MAX; i++)
+    {
+        streams[i] = pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM);
+        zassert_not_null(streams[i], "Failed to open stream");
+    }
+
+    struct pouch_stream *stream =
+        pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM);
+    zassert_is_null(stream, "Expected to fail to open stream");
+
+    for (int i = 0; i < POUCH_STREAMS_MAX; i++)
+    {
+        zassert_ok(pouch_stream_close(streams[i], K_NO_WAIT));
+    }
+}
+
+ZTEST(uplink, test_stream_empty)
+{
+    transport_session_start();
+
+    struct pouch_stream *stream =
+        pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM);
+    zassert_not_null(stream, "Failed to open stream");
+
+    zassert_ok(pouch_stream_close(stream, K_NO_WAIT));
+
+    pouch_uplink_close(K_FOREVER);
+
+    // let processing run:
+    k_sleep(K_MSEC(1));
+
+    uint8_t *buf;
+    size_t len = read_data(&buf, CONFIG_POUCH_BLOCK_SIZE);
+    zassert_equal(len, 0, "Unexpected block");
+}
+
+ZTEST(uplink, test_stream_fail_to_close_stream)
+{
+    struct pouch_stream *stream =
+        pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM);
+    zassert_not_null(stream, "Failed to open stream");
+
+    zassert_true(pouch_stream_is_valid(stream), "Expected stream to be valid");
+
+    transport_session_start();
+
+    zassert_true(pouch_stream_is_valid(stream), "Expected stream to be valid");
+
+    uint8_t data1[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
+    size_t written = pouch_stream_write(stream, data1, sizeof(data1), K_NO_WAIT);
+    zassert_equal(written, sizeof(data1), "Unexpected write length %d", written);
+
+    // close the pouch, but the stream is still open:
+    zassert_ok(pouch_uplink_close(K_FOREVER));
+
+    transport_session_end();
+
+    // the stream should no longer be valid:
+    zassert_false(pouch_stream_is_valid(stream), "Expected stream to be invalid");
+
+    // closing the stream should succeed, but data should not be sent:
+    zassert_ok(pouch_stream_close(stream, K_NO_WAIT));
+
+    transport_session_start();
+
+    // let processing run:
+    k_sleep(K_MSEC(1));
+
+    uint8_t *buf;
+    size_t len = read_data(&buf, CONFIG_POUCH_BLOCK_SIZE);
+    zassert_equal(len, 0, "Unexpected block");
+}
+
+ZTEST(uplink, test_stream_length_aligned_to_block_size)
+{
+    transport_session_start();
+
+    struct pouch_stream *stream =
+        pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM);
+    zassert_not_null(stream, "Failed to open stream");
+
+    // Write data that is exactly aligned to the size of two blocks. Need to account for the ID in
+    // both blocks, as well as the size of the content_type, path_length and path in the first
+    // block.
+    size_t data_len = (CONFIG_POUCH_BLOCK_SIZE - 1) * 2 - (2 + 1 + strlen("test/path"));
+    uint8_t *data = malloc(data_len);
+    for (int i = 0; i < sizeof(data); i++)
+    {
+        data[i] = i & 0xff;  // dummy data
+    }
+
+    size_t written = pouch_stream_write(stream, (void *) data, data_len, K_NO_WAIT);
+    zassert_equal(written, data_len, "Unexpected write length %d", written);
+
+    zassert_ok(pouch_stream_close(stream, K_NO_WAIT));
+
+    zassert_ok(pouch_uplink_close(K_FOREVER));
+
+    // let processing run:
+    k_sleep(K_MSEC(1));
+
+    uint8_t buf[2 * CONFIG_POUCH_BLOCK_SIZE + 100];
+    size_t len = sizeof(buf);
+    enum pouch_result result = transport_pull_data(buf, &len);
+    zassert_equal(result, POUCH_NO_MORE_DATA, "Unexpected result %d", result);
+
+    uint8_t *start_of_blocks = skip_pouch_header(buf, &len);
+    uint8_t *blockbuf = start_of_blocks;
+
+    struct stream_block block1;
+    pull_stream_block(&blockbuf, &block1);
+
+    zassert_true(block1.block.more_data, "Unexpected no more data");
+    zassert_not_equal(block1.block.id, 0, "Unexpected stream ID");
+    zassert_equal(block1.block.data_len,
+                  CONFIG_POUCH_BLOCK_SIZE - 1,  // 1 for the id
+                  "Unexpected block length %d",
+                  block1.data_len);
+    zassert_mem_equal(block1.data, data, block1.data_len);
+
+    struct block block2;
+    pull_block(&blockbuf, &block2);
+
+    zassert_false(block2.more_data, "Unexpected more data");
+    zassert_equal(block2.id, block1.block.id, "Unexpected stream ID");
+    zassert_equal(block2.data_len,
+                  CONFIG_POUCH_BLOCK_SIZE - 1,  // 1 for the id
+                  "Unexpected block length %d",
+                  block2.data_len);
+    zassert_mem_equal(block2.data, &data[block1.data_len], block2.data_len);
+
+    // Should include entire data length:
+    zassert_equal(block1.data_len + block2.data_len,
+                  data_len,
+                  "Unexpected data length %d, expected %d",
+                  block1.data_len + block2.data_len,
+                  data_len);
+
+    // should have consumed all the data:
+    zassert_equal(blockbuf - start_of_blocks,
+                  len,
+                  "Unexpected buf length %d, expected %d",
+                  blockbuf - start_of_blocks,
+                  len);
 }
