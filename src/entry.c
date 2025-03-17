@@ -121,7 +121,7 @@ int entry_block_close(k_timeout_t timeout)
         return err;
     }
 
-    if (block)
+    if (block && block_size_get(block) > 0)
     {
         block_finish(block);
         uplink_enqueue(block);

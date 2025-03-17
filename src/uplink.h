@@ -10,3 +10,6 @@
 int uplink_init(const struct pouch_config *config);
 
 void uplink_enqueue(struct pouch_buf *block);
+
+/** Get the current uplink session ID */
+uint32_t uplink_session_id(void);

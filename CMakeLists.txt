@@ -14,6 +14,7 @@ zephyr_library_sources(
   src/buf.c
   src/block.c
   src/entry.c
+  src/stream.c
 )
 
 zephyr_library_sources_ifdef(CONFIG_POUCH_ENCRYPTION_NONE src/crypto_none.c)
