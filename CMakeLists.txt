@@ -30,6 +30,6 @@ zephyr_library_include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
 
 # Transports
 
-if (CONFIG_POUCH_TRANSPORT_TOOTHFAIRY)
-    add_subdirectory(src/transport/toothfairy)
+if (CONFIG_POUCH_TRANSPORT_BLE_GATT)
+    add_subdirectory(src/transport/ble_gatt)
 endif()

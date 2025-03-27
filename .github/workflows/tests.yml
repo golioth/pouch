@@ -45,7 +45,7 @@ jobs:
       - name: Compile
         shell: bash
         run: |
-          west build -p -b nrf52840dk/nrf52840 pouch/examples/toothfairy
+          west build -p -b nrf52840dk/nrf52840 pouch/examples/ble_gatt
       - name: Run tests
         env:
           ZEPHYR_BASE: ${{ github.workspace }}/deps/zephyr

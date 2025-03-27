@@ -1,4 +1,4 @@
-tf_info = {
+golioth_ble_gatt_info = {
     "enc_type" => "plaintext" / "other",
     "device_id" => tstr,
 }

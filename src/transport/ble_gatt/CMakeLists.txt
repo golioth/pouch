@@ -12,7 +12,8 @@ zephyr_linker_sources(DATA_SECTIONS attributes.ld)
 zephyr_linker_sources(SECTIONS characteristics.ld)
 
 add_custom_command(OUTPUT info_encode.c
-    COMMAND zcbor code -c ${CMAKE_CURRENT_LIST_DIR}/info.cddl -t tf_info -e --include-prefix cddl/ --output-c ${CMAKE_CURRENT_BINARY_DIR}/info_encode.c --output-h ${CMAKE_CURRENT_BINARY_DIR}/include/cddl/info_encode.h
+    COMMAND zcbor code -c ${CMAKE_CURRENT_LIST_DIR}/info.cddl -t
+    golioth_ble_gatt_info -e --include-prefix cddl/ --output-c ${CMAKE_CURRENT_BINARY_DIR}/info_encode.c --output-h ${CMAKE_CURRENT_BINARY_DIR}/include/cddl/info_encode.h
     BYPRODUCTS include/cddl/info_encode.h include/cddl/info_encode_types.h
     DEPENDS info.cddl)
 
