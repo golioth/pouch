@@ -13,11 +13,11 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 #include <pouch/pouch.h>
 #include <pouch/events.h>
 #include <pouch/uplink.h>
-#include <pouch/transport/toothfairy/peripheral.h>
+#include <pouch/transport/ble_gatt/peripheral.h>
 
 #define SYNC_PERIOD_S 20
 
-static uint8_t service_data[] = {TF_UUID_GOLIOTH_SVC_VAL, 0x00};
+static uint8_t service_data[] = {GOLIOTH_BLE_GATT_UUID_SVC_VAL, 0x00};
 
 static struct bt_data ad[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
@@ -91,11 +91,11 @@ POUCH_EVENT_HANDLER(pouch_event_handler, NULL);
 
 int main(void)
 {
-    struct toothfairy_peripheral *tf_peripheral =
-        toothfairy_peripheral_create(CONFIG_EXAMPLE_DEVICE_ID);
-    if (NULL == tf_peripheral)
+    struct golioth_ble_gatt_peripheral *peripheral =
+        golioth_ble_gatt_peripheral_create(CONFIG_EXAMPLE_DEVICE_ID);
+    if (NULL == peripheral)
     {
-        LOG_ERR("Failed to create toothfairy peripheral");
+        LOG_ERR("Failed to create peripheral");
     }
 
     int err = bt_enable(NULL);
