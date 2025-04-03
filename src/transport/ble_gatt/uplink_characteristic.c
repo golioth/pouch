@@ -12,7 +12,7 @@
 #include "golioth_ble_gatt_uuids.h"
 #include "packetizer.h"
 
-static const struct bt_uuid_128 golioth_ble_gatt_info_chrc_uuid =
+static const struct bt_uuid_128 golioth_ble_gatt_uplink_chrc_uuid =
     BT_UUID_INIT_128(GOLIOTH_BLE_GATT_UUID_UPLINK_CHRC_VAL);
 
 static struct golioth_ble_gatt_uplink_ctx
@@ -84,7 +84,7 @@ static ssize_t uplink_read(struct bt_conn *conn,
 }
 
 GOLIOTH_BLE_GATT_CHARACTERISTIC(uplink,
-                                (const struct bt_uuid *) &golioth_ble_gatt_info_chrc_uuid,
+                                (const struct bt_uuid *) &golioth_ble_gatt_uplink_chrc_uuid,
                                 BT_GATT_CHRC_READ,
                                 BT_GATT_PERM_READ,
                                 NULL,
