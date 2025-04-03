@@ -10,13 +10,12 @@
 
 #include "packetizer.h"
 
-#define GOLIOTH_BLE_GATT_PACKET_START 0x01
-#define GOLIOTH_BLE_GATT_PACKET_MORE 0x02
-#define GOLIOTH_BLE_GATT_PACKET_END 0x03
+#define GOLIOTH_BLE_GATT_PACKET_FIRST (1 << 0)
+#define GOLIOTH_BLE_GATT_PACKET_LAST (1 << 1)
 
 struct golioth_ble_gatt_packet
 {
-    uint8_t ctrl;
+    uint8_t flags;
     uint8_t data[];
 } __packed;
 
@@ -88,6 +87,7 @@ enum golioth_ble_gatt_packetizer_result golioth_ble_gatt_packetizer_get(
     size_t *dst_len)
 {
     struct golioth_ble_gatt_packet *pkt = dst;
+    pkt->flags = 0;
     enum golioth_ble_gatt_packetizer_result ret = GOLIOTH_BLE_GATT_PACKETIZER_MORE_DATA;
 
     if (*dst_len <= sizeof(struct golioth_ble_gatt_packet))
@@ -99,12 +99,8 @@ enum golioth_ble_gatt_packetizer_result golioth_ble_gatt_packetizer_get(
 
     if (packetizer->is_first)
     {
-        pkt->ctrl = GOLIOTH_BLE_GATT_PACKET_START;
+        pkt->flags |= GOLIOTH_BLE_GATT_PACKET_FIRST;
         packetizer->is_first = false;
-    }
-    else
-    {
-        pkt->ctrl = GOLIOTH_BLE_GATT_PACKET_MORE;
     }
 
     if (GOLIOTH_BLE_GATT_PACKETIZER_FILL_BUFFER == packetizer->type)
@@ -113,7 +109,7 @@ enum golioth_ble_gatt_packetizer_result golioth_ble_gatt_packetizer_get(
         if (bytes_to_copy >= packetizer->buf.len)
         {
             bytes_to_copy = packetizer->buf.len;
-            pkt->ctrl = GOLIOTH_BLE_GATT_PACKET_END;
+            pkt->flags |= GOLIOTH_BLE_GATT_PACKET_LAST;
             ret = GOLIOTH_BLE_GATT_PACKETIZER_NO_MORE_DATA;
         }
 
@@ -142,7 +138,7 @@ enum golioth_ble_gatt_packetizer_result golioth_ble_gatt_packetizer_get(
 
         if (GOLIOTH_BLE_GATT_PACKETIZER_NO_MORE_DATA == cb_result)
         {
-            pkt->ctrl = GOLIOTH_BLE_GATT_PACKET_END;
+            pkt->flags |= GOLIOTH_BLE_GATT_PACKET_LAST;
             ret = GOLIOTH_BLE_GATT_PACKETIZER_NO_MORE_DATA;
         }
     }
