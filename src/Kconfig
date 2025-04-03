@@ -2,6 +2,9 @@ menuconfig POUCH
   bool "Golioth Pouch protocol"
   select ZCBOR
   select ZCBOR_CANONICAL
+  select MBEDTLS
+  select MBEDTLS_PSA_CRYPTO_C
+  select PSA_WANT_ALG_SHA_256
   help
     Pouch is a protocol for communicating with Golioth from devices not
     directly connected to the internet.
