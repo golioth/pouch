@@ -13,6 +13,7 @@ if(CONFIG_POUCH)
       src/block.c
       src/entry.c
       src/stream.c
+      src/downlink.c
     )
 
     zephyr_library_sources_ifdef(CONFIG_POUCH_ENCRYPTION_NONE src/crypto_none.c)
@@ -25,6 +26,8 @@ if(CONFIG_POUCH)
         DEPENDS src/header.cddl)
 
     zephyr_library_include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
+
+    zephyr_library_link_libraries(mbedTLS)
 
     # Transports
 
