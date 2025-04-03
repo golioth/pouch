@@ -28,3 +28,9 @@ enum golioth_ble_gatt_packetizer_result golioth_ble_gatt_packetizer_get(
     size_t *dst_len);
 int golioth_ble_gatt_packetizer_error(struct golioth_ble_gatt_packetizer *packetizer);
 void golioth_ble_gatt_packetizer_finish(struct golioth_ble_gatt_packetizer *packetizer);
+
+int golioth_ble_gatt_packetizer_decode(const void *buf,
+                                       size_t buf_len,
+                                       const void **payload,
+                                       bool *is_first,
+                                       bool *is_last);
