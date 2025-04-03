@@ -1,6 +1,7 @@
 zephyr_library()
 
 zephyr_library_sources(
+    downlink_characteristic.c
     info_encode.c
     info_characteristic.c
     peripheral.c
