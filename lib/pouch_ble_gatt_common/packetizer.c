@@ -8,7 +8,7 @@
 #include <string.h>
 #include <zephyr/toolchain.h>
 
-#include "packetizer.h"
+#include <pouch/transport/ble_gatt/common/packetizer.h>
 
 #define GOLIOTH_BLE_GATT_PACKET_FIRST (1 << 0)
 #define GOLIOTH_BLE_GATT_PACKET_LAST (1 << 1)

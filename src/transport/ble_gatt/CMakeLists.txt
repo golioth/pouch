@@ -3,7 +3,6 @@ zephyr_library()
 zephyr_library_sources(
     info_encode.c
     info_characteristic.c
-    packetizer.c
     peripheral.c
     uplink_characteristic.c
 )

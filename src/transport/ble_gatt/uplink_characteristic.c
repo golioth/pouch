@@ -7,10 +7,10 @@
 #include <zephyr/bluetooth/uuid.h>
 
 #include <pouch/transport/uplink.h>
+#include <pouch/transport/ble_gatt/common/packetizer.h>
+#include <pouch/transport/ble_gatt/common/uuids.h>
 
 #include "golioth_ble_gatt_declarations.h"
-#include "golioth_ble_gatt_uuids.h"
-#include "packetizer.h"
 
 static const struct bt_uuid_128 golioth_ble_gatt_uplink_chrc_uuid =
     BT_UUID_INIT_128(GOLIOTH_BLE_GATT_UUID_UPLINK_CHRC_VAL);

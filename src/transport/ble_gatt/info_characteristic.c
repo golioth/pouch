@@ -9,9 +9,10 @@ LOG_MODULE_REGISTER(info_chrc, LOG_LEVEL_DBG);
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 
+#include <pouch/transport/ble_gatt/common/packetizer.h>
+#include <pouch/transport/ble_gatt/common/uuids.h>
+
 #include "golioth_ble_gatt_declarations.h"
-#include "golioth_ble_gatt_uuids.h"
-#include "packetizer.h"
 #include "peripheral_int.h"
 
 #include <cddl/info_encode.h>

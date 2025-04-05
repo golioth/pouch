@@ -36,9 +36,17 @@ config POUCH_TRANSPORT_BLE_GATT
   bool "BLE GATT"
   depends on BT
   select BT_GATT_DYNAMIC_DB
+  select POUCH_TRANSPORT_BLE_GATT_COMMON
   help
     BLE GATT transport for Pouch
 
 endchoice
 
 endif
+
+# Libraries
+menu "Pouch libraries"
+
+rsource "../lib/Kconfig"
+
+endmenu

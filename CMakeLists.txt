@@ -33,3 +33,7 @@ zephyr_library_include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
 if (CONFIG_POUCH_TRANSPORT_BLE_GATT)
     add_subdirectory(src/transport/ble_gatt)
 endif()
+
+# Libraries
+
+add_subdirectory(lib)

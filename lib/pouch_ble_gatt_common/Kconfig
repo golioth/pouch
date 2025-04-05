@@ -1,0 +1,2 @@
+config POUCH_TRANSPORT_BLE_GATT_COMMON
+    bool "Pouch BLE GATT transport common library"
