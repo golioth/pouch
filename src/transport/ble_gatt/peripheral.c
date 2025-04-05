@@ -9,9 +9,9 @@
 #include <zephyr/bluetooth/uuid.h>
 
 #include <pouch/transport/ble_gatt/peripheral.h>
+#include <pouch/transport/ble_gatt/common/uuids.h>
 
 #include "golioth_ble_gatt_declarations.h"
-#include "golioth_ble_gatt_uuids.h"
 
 struct golioth_ble_gatt_peripheral
 {
