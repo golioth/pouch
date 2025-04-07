@@ -157,12 +157,22 @@ void golioth_ble_gatt_packetizer_finish(struct golioth_ble_gatt_packetizer *pack
     free(packetizer);
 }
 
-int golioth_ble_gatt_packetizer_decode(const void *buf,
-                                       size_t buf_len,
-                                       const void **payload,
-                                       bool *is_first,
-                                       bool *is_last)
+ssize_t golioth_ble_gatt_packetizer_decode(const void *buf,
+                                           size_t buf_len,
+                                           const void **payload,
+                                           bool *is_first,
+                                           bool *is_last)
 {
+    if (buf == NULL || payload == NULL || is_first == NULL || is_last == NULL)
+    {
+        return -EINVAL;
+    }
+
+    if (buf_len < sizeof(struct golioth_ble_gatt_packet))
+    {
+        return -EINVAL;
+    }
+
     const struct golioth_ble_gatt_packet *pkt = buf;
 
     *is_first = (0 != (pkt->flags & GOLIOTH_BLE_GATT_PACKET_FIRST));
