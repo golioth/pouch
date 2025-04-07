@@ -4,6 +4,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <sys/types.h>
 
 struct golioth_ble_gatt_packetizer;
 
@@ -29,8 +30,8 @@ enum golioth_ble_gatt_packetizer_result golioth_ble_gatt_packetizer_get(
 int golioth_ble_gatt_packetizer_error(struct golioth_ble_gatt_packetizer *packetizer);
 void golioth_ble_gatt_packetizer_finish(struct golioth_ble_gatt_packetizer *packetizer);
 
-int golioth_ble_gatt_packetizer_decode(const void *buf,
-                                       size_t buf_len,
-                                       const void **payload,
-                                       bool *is_first,
-                                       bool *is_last);
+ssize_t golioth_ble_gatt_packetizer_decode(const void *buf,
+                                           size_t buf_len,
+                                           const void **payload,
+                                           bool *is_first,
+                                           bool *is_last);
