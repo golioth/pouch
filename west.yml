@@ -6,7 +6,7 @@ manifest:
 
   projects:
     - name: zephyr
-      revision: v4.0.0
+      revision: v4.1.0
       url: https://github.com/zephyrproject-rtos/zephyr
       west-commands: scripts/west-commands.yml
       import:
@@ -19,6 +19,5 @@ manifest:
           - mcuboot
           - segger
           - tfm-mcuboot
-          - tinycrypt
           - trusted-firmware-m
           - zcbor
