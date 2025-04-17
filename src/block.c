@@ -6,7 +6,19 @@
 #include <string.h>
 #include <zephyr/sys/byteorder.h>
 
-#define HEADER_OVERHEAD 2
+/* Block format:
+ *
+ * Multi byte fields are big-endian
+ *
+ *    |   0   |   1   |   2   |
+ *    +-----------------------+
+ *  0 |      size     |   id  |
+ *    +-----------------------+
+ *  3 | data         ...      |
+ *    +-----------------------+
+ */
+
+#define HEADER_OVERHEAD 3
 
 #define BLOCK_SIZE (HEADER_OVERHEAD + CONFIG_POUCH_BLOCK_SIZE)
 
