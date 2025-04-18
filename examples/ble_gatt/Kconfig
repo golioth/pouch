@@ -5,3 +5,10 @@ config EXAMPLE_DEVICE_ID
     help
         The device ID to use for the device in pouches sent to the
         Golioth cloud.
+
+config EXAMPLE_SYNC_PERIOD_S
+    int "Sync Period"
+    default 20
+    help
+	The time, in seconds, after a sync to wait before requesting a sync from
+	a gateway.

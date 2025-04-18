@@ -15,8 +15,6 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 #include <pouch/uplink.h>
 #include <pouch/transport/ble_gatt/peripheral.h>
 
-#define SYNC_PERIOD_S 20
-
 static uint8_t service_data[] = {GOLIOTH_BLE_GATT_UUID_SVC_VAL, 0x00};
 
 static struct bt_data ad[] = {
@@ -83,7 +81,7 @@ static void pouch_event_handler(enum pouch_event event, void *ctx)
     if (POUCH_EVENT_SESSION_END == event)
     {
         service_data[ARRAY_SIZE(service_data) - 1] = 0x00;
-        k_work_schedule(&sync_request_work, K_SECONDS(SYNC_PERIOD_S));
+        k_work_schedule(&sync_request_work, K_SECONDS(CONFIG_EXAMPLE_SYNC_PERIOD_S));
     }
 }
 
@@ -130,7 +128,7 @@ int main(void)
 
     LOG_DBG("Advertising successfully started");
 
-    k_work_schedule(&sync_request_work, K_SECONDS(SYNC_PERIOD_S));
+    k_work_schedule(&sync_request_work, K_SECONDS(CONFIG_EXAMPLE_SYNC_PERIOD_S));
 
     while (1)
     {
