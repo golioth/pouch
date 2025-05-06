@@ -66,15 +66,22 @@ void sync_request_work_handler(struct k_work *work)
 
 K_WORK_DELAYABLE_DEFINE(sync_request_work, sync_request_work_handler);
 
+static const char lorem[] = "{\"lorem\":\"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum sit amet sodales ligula. Vestibulum vel erat dolor. In in elementum orci. Nunc at varius nisi. Nulla maximus sapien nisl, at gravida metus mollis a. Nam nec augue turpis. Vivamus aliquam velit sit amet ante ultricies lacinia. Pellentesque et arcu quis metus porttitor hendrerit. Donec ex justo, pellentesque ut accumsan accumsan, viverra ac nunc. Sed dapibus ipsum nec interdum sodales. Maecenas auctor augue ut arcu interdum maximus. Proin massa neque, pulvinar consequat nunc in, hendrerit pharetra dolor. Ut ac urna eget magna gravida accumsan. Mauris at sagittis purus. Nam congue libero sed sodales dignissim. Nullam ullamcorper risus quam, eu tristique velit congue eu. Proin pulvinar luctus nulla, sit amet fringilla sapien rhoncus quis. Pellentesque faucibus iaculis nisl. Nulla in nulla at purus mollis ultrices vehicula eget arcu. Donec metus ex, condimentum aliquet sollicitudin eu, dapibus non tellus. Donec ornare porttitor odio, cursus nullam. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum sit amet sodales ligula. Vestibulum vel erat dolor. In in elementum orci. Nunc at varius nisi. Nulla maximus sapien nisl, at gravida metus mollis a. Nam nec augue turpis. Vivamus aliquam velit sit amet ante ultricies lacinia. Pellentesque et arcu quis metus porttitor hendrerit. Donec ex justo, pellentesque ut accumsan accumsan, viverra ac nunc. Sed dapibus ipsum nec interdum sodales. Maecenas auctor augue ut arcu interdum maximus. Proin massa neque, pulvinar consequat nunc in, hendrerit pharetra dolor. Ut ac urna eget magna gravida accumsan. Mauris at sagittis purus. Nam congue libero sed sodales dignissim. Nullam ullamcorper risus quam, eu tristique velit congue eu. Proin pulvinar luctus nulla, sit amet fringilla sapien rhoncus quis. Pellentesque faucibus iaculis nisl. Nulla in nulla at purus mollis ultrices vehicula eget arcu. Donec metus ex, condimentum aliquet sollicitudin eu, dapibus non tellus. Donec ornare porttitor odio, cursus nullam.\"}";
+
 static void pouch_event_handler(enum pouch_event event, void *ctx)
 {
+	int err;
+
     if (POUCH_EVENT_SESSION_START == event)
     {
-        pouch_uplink_entry_write(".s/sensor",
+        err = pouch_uplink_entry_write(".s/sensor",
                                  POUCH_CONTENT_TYPE_JSON,
-                                 "{\"temp\":22}",
-                                 sizeof("{\"temp\":22}") - 1,
+                                 lorem,
+                                 sizeof(lorem) - 1,
                                  K_FOREVER);
+	if (err) {
+		LOG_ERR("Failed to write pouch entry: %d", err);
+	}
         pouch_uplink_close(K_FOREVER);
     }
 
