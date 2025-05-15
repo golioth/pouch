@@ -4,6 +4,7 @@ if(CONFIG_POUCH)
     zephyr_library_named(pouch)
 
     zephyr_library_sources(
+      ${CMAKE_CURRENT_BINARY_DIR}/header_decode.c
       ${CMAKE_CURRENT_BINARY_DIR}/header_encode.c
       src/pouch.c
       src/uplink.c
@@ -34,9 +35,9 @@ if(CONFIG_POUCH)
 
     zephyr_linker_sources(SECTIONS src/event_handlers.ld)
 
-    add_custom_command(OUTPUT header_encode.c
-        COMMAND zcbor code -c ${CMAKE_CURRENT_LIST_DIR}/src/header.cddl -t pouch_header -se --include-prefix cddl/ --oc header_encode.c --oh include/cddl/header_encode.h
-        BYPRODUCTS include/cddl/header_encode.h include/cddl/header_types.h
+    add_custom_command(OUTPUT header_decode.c header_encode.c
+        COMMAND zcbor code -c ${CMAKE_CURRENT_LIST_DIR}/src/header.cddl -t pouch_header -sde --include-prefix cddl/ --oc header.c --oh include/cddl/header.h
+        BYPRODUCTS include/cddl/header_decode.h include/cddl/header_encode.h include/cddl/header_types.h
         DEPENDS src/header.cddl)
 
     zephyr_library_include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
