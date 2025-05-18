@@ -33,6 +33,7 @@ if(CONFIG_POUCH)
             ${ZEPHYR_BINARY_DIR}/include/generated/golioth_ca_cert.inc)
     endif()
 
+    zephyr_linker_sources(SECTIONS src/downlink_handlers.ld)
     zephyr_linker_sources(SECTIONS src/event_handlers.ld)
 
     add_custom_command(OUTPUT header_decode.c header_encode.c
