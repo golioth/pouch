@@ -2,9 +2,13 @@
  * Copyright (c) 2025 Golioth, Inc.
  */
 #include "block.h"
+#include "entry.h"
 #include <stdlib.h>
 #include <string.h>
 #include <zephyr/sys/byteorder.h>
+
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(block);
 
 /* Block format:
  *
@@ -26,6 +30,105 @@
 
 /** Mask for ID field indicating that this is the last block in the stream */
 #define NO_MORE_DATA_MASK 0x80
+
+static size_t block_downlink_push_one(struct pouch_block *block, const uint8_t *buf, size_t buf_len)
+{
+    const uint8_t *buf_start = buf;
+
+    /* Header */
+    while (buf_len)
+    {
+        if (block->header_len >= sizeof(block->header))
+        {
+            break;
+        }
+
+        block->header[block->header_len] = *buf;
+        block->header_len++;
+
+        buf++;
+        buf_len--;
+
+        if (block->header_len == sizeof(block->header))
+        {
+            /* Header complete */
+            LOG_HEXDUMP_DBG(block->header, sizeof(block->header), "block header raw");
+
+            block->size = sys_be16_to_cpu(block->size);
+            LOG_DBG("size %d", block->size);
+            LOG_DBG("id 0x%x", block->id);
+
+            block->stream_id = (block->id & ~NO_MORE_DATA_MASK);
+
+            break;
+        }
+    }
+
+    /* Data */
+    while (buf_len)
+    {
+        size_t remaining_length = block->size - block->data_len - sizeof(block->id);
+        size_t to_consume = MIN(remaining_length, buf_len);
+
+        LOG_DBG("block data chunk [%2d : %2d]",
+                (int) block->data_len,
+                (int) block->data_len + to_consume);
+        LOG_HEXDUMP_DBG(buf, to_consume, "block data chunk");
+
+        memcpy(&block->data[block->data_len], buf, to_consume);
+        block->data_len += to_consume;
+
+        buf += to_consume;
+        buf_len -= to_consume;
+
+        if (block->data_len + sizeof(block->id) >= block->size)
+        {
+            uint8_t stream_id = block->id & ~NO_MORE_DATA_MASK;
+            bool is_last = block->id & NO_MORE_DATA_MASK;
+
+            pouch_downlink_entries_push(block->data,
+                                        block->data_len,
+                                        stream_id != BLOCK_ID_ENTRY,
+                                        is_last);
+
+            LOG_DBG("Finished block");
+
+            if (is_last && stream_id != BLOCK_ID_ENTRY)
+            {
+                block->stream_id = BLOCK_ID_ENTRY;
+            }
+
+            block->header_len = 0;
+            block->data_len = 0;
+            break;
+        }
+    }
+
+    return buf - buf_start;
+}
+
+size_t block_downlink_push(struct pouch_block *block, const uint8_t *buf, size_t buf_len)
+{
+    const uint8_t *buf_start = buf;
+    size_t consumed;
+
+    while (buf_len)
+    {
+        consumed = block_downlink_push_one(block, buf, buf_len);
+
+        buf += consumed;
+        buf_len -= consumed;
+    }
+
+    return buf - buf_start;
+}
+
+void block_downlink_start(struct pouch_block *block)
+{
+    block->header_len = 0;
+}
+
+void block_downlink_finish(struct pouch_block *block) {}
 
 static void write_block_header(struct pouch_buf *block, size_t size, uint8_t id, bool more_data)
 {
