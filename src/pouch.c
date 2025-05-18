@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2025 Golioth, Inc.
  */
+#include "downlink.h"
 #include "uplink.h"
 
 #include <pouch/events.h>
@@ -24,6 +25,8 @@ void pouch_event_emit(enum pouch_event event)
 
 int pouch_init(const struct pouch_config *config)
 {
+    int err;
+
     if (config->encryption_type != POUCH_ENCRYPTION_PLAINTEXT)
     {
         return -ENOTSUP;
@@ -35,6 +38,12 @@ int pouch_init(const struct pouch_config *config)
     if (strlen(config->encryption.plaintext.device_id) > POUCH_DEVICE_ID_MAX_LEN)
     {
         return -EINVAL;
+    }
+
+    err = downlink_init(config);
+    if (err)
+    {
+        return err;
     }
 
     return uplink_init(config);
