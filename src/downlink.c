@@ -4,8 +4,6 @@
 
 #include <stdlib.h>
 
-#include <psa/crypto.h>
-
 #include <pouch/types.h>
 #include <pouch/transport/downlink.h>
 #include "cddl/header_decode.h"
@@ -15,9 +13,7 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(downlink, LOG_LEVEL_DBG);
 
-static psa_hash_operation_t hash;
 static uint32_t byte_counter = 0;
-
 static struct pouch_block pouch_block;
 static struct pouch_buf *pouch_buf;
 static pouch_buf_state_t pouch_buf_initial_state;
@@ -63,9 +59,6 @@ void pouch_downlink_start(void)
 
     byte_counter = 0;
     buf_restore(pouch_buf, pouch_buf_initial_state);
-
-    hash = psa_hash_operation_init();
-    psa_hash_setup(&hash, PSA_ALG_SHA_256);
 
     block_downlink_start(&pouch_block);
 }
@@ -116,17 +109,10 @@ void pouch_downlink_push(const void *buf, size_t buf_len)
     }
 
     byte_counter += buf_len;
-
-    psa_hash_update(&hash, buf, buf_len);
 }
 
 void pouch_downlink_finish(void)
 {
-    uint8_t hash_out[32];
-    size_t hash_length;
-    psa_hash_finish(&hash, hash_out, 32, &hash_length);
-    LOG_HEXDUMP_DBG(hash_out, sizeof(hash_out), "Pouch downlink finish: ");
-
     block_downlink_finish(&pouch_block);
 
     LOG_DBG("Total bytes: %d", byte_counter);
