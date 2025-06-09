@@ -28,6 +28,24 @@
 /** The maximum length of a device ID */
 #define POUCH_DEVICE_ID_MAX_LEN 32
 
+/** Create a pouch certificate from a raw byte array of a DER encoded x509 certificate */
+#define POUCH_CERTIFICATE(_raw_cert_der) \
+    {                                    \
+        .der = _raw_cert_der,            \
+        .size = sizeof(_raw_cert_der),   \
+    }
+
+/** Certificate definition */
+struct pouch_cert
+{
+    /**
+     * The certificate in DER format.
+     */
+    const uint8_t *der;
+    /** The length of the certificate */
+    size_t size;
+};
+
 /** Encryption scheme for pouches */
 enum pouch_encryption
 {
