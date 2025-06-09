@@ -1,0 +1,20 @@
+manifest:
+  projects:
+    - name: nrf
+      revision: v3.0.1
+      url: http://github.com/nrfconnect/sdk-nrf
+      import:
+        path-prefix: deps
+        name-allowlist:
+          - nrf
+          - zephyr
+          - cmsis
+          - hal_nordic
+          - nrfxlib
+          - mbedtls
+          - mcuboot
+          - segger
+          - tfm-mcuboot
+          - oberon-psa-crypto
+          - trusted-firmware-m
+          - zcbor
