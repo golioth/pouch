@@ -19,9 +19,23 @@ config POUCH_BLOCK_SIZE
 
 choice
   prompt "Pouch uplink encryption scheme"
-  default POUCH_ENCRYPTION_NONE
+  default POUCH_ENCRYPTION_NONE # NOTE: This will change once SAEAD encryption is available.
   help
     Select the encryption method to use for uplink Pouch transfers.
+
+config POUCH_ENCRYPTION_SAEAD
+  bool "Streaming AEAD"
+  select PSA_WANT_ALG_ECDSA
+  select PSA_WANT_ALG_ECDH
+  select PSA_WANT_ALG_HKDF
+  select PSA_WANT_ALG_STREAM_CIPHER
+  select PSA_WANT_ALG_SHA_256
+  select MBEDTLS_X509_LIBRARY
+  select MBEDTLS_X509_CRT_PARSE_C
+  select MBEDTLS_PK_PARSE_C
+  select BASE64
+  help
+    Use a streaming AEAD encryption scheme for uplink Pouch transfers.
 
 config POUCH_ENCRYPTION_NONE
   bool "Plaintext"
@@ -29,6 +43,53 @@ config POUCH_ENCRYPTION_NONE
     No encryption.
 
 endchoice
+
+menu "Streaming AEAD encryption"
+  depends on POUCH_ENCRYPTION_SAEAD
+
+choice
+  prompt "Encryption algorithm"
+  help
+    Select the encryption algorithm to use for Pouch.
+    This will be used for both uplink and downlink transfers.
+
+config POUCH_ENCRYPTION_CHACHA20_POLY1305
+  bool "ChaCha20-Poly1305"
+  select PSA_WANT_ALG_CHACHA20_POLY1305
+  select PSA_WANT_KEY_TYPE_CHACHA20
+  help
+    Support ChaCha20-Poly1305 for encryption and decryption.
+
+config POUCH_ENCRYPTION_AES_GCM
+  bool "AES-GCM"
+  select PSA_WANT_ALG_GCM
+  select PSA_WANT_KEY_TYPE_AES
+  help
+    Support AES-GCM for encryption and decryption.
+
+endchoice
+
+menuconfig POUCH_VALIDATE_SERVER_CERT
+  bool "Validate server's certificate"
+  default y
+  select PSA_WANT_ALG_SHA_384
+  select PSA_WANT_ECC_SECP_R1_384
+  help
+    Disabling this will disable the server certificate validation.
+    This should never be disabled in production.
+
+if POUCH_VALIDATE_SERVER_CERT
+
+config POUCH_CA_CERT_FILENAME
+  string "CA certificate filename"
+  default "src/goliothrootx1.der"
+  help
+    The filename of the CA certificate to use for Pouch.
+    This is used to verify the server's identity.
+
+endif
+
+endmenu
 
 choice
   prompt "Pouch transport"
