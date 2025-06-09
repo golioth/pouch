@@ -1,8 +1,7 @@
 if(CONFIG_POUCH)
-
     zephyr_include_directories(include)
 
-    zephyr_library()
+    zephyr_library_named(pouch)
 
     zephyr_library_sources(
       ${CMAKE_CURRENT_BINARY_DIR}/header_encode.c
@@ -17,6 +16,21 @@ if(CONFIG_POUCH)
     )
 
     zephyr_library_sources_ifdef(CONFIG_POUCH_ENCRYPTION_NONE src/crypto_none.c)
+    zephyr_library_sources_ifdef(CONFIG_POUCH_ENCRYPTION_SAEAD
+        src/cert.c
+    )
+
+    if (DEFINED CONFIG_POUCH_CA_CERT_FILENAME)
+        find_file(ca_cert ${CONFIG_POUCH_CA_CERT_FILENAME}
+            PATHS
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${APP_DIR}
+            REQUIRED)
+
+        generate_inc_file_for_target(pouch
+            ${ca_cert}
+            ${ZEPHYR_BINARY_DIR}/include/generated/golioth_ca_cert.inc)
+    endif()
 
     zephyr_linker_sources(SECTIONS src/event_handlers.ld)
 
