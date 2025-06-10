@@ -13,6 +13,11 @@ concurrency:
 jobs:
   build:
     container: golioth/golioth-zephyr-base:0.16.8-SDK-v0
+    strategy:
+      matrix:
+        manifest:
+          - west.yml
+          - west-ncs.yml
     env:
       ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-0.16.8
     runs-on: ubuntu-24.04
@@ -23,7 +28,7 @@ jobs:
           path: pouch
       - name: Init and update west
         run: |
-          west init -l pouch
+          west init -l pouch --mf ${{ matrix.manifest }}
           west update --narrow -o=--depth=1
       - name: Install pip packages
         run: |
