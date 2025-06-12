@@ -5,6 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(pouch_buf, LOG_LEVEL_DBG);
+
 static atomic_t bufs;
 
 struct pouch_buf
@@ -67,6 +70,8 @@ struct pouch_buf *buf_alloc(size_t size)
         buf->bytes = 0;
     }
 
+    LOG_INF("Allocating %p. TOTAL: %d", buf, buf_active_count());
+
     return buf;
 }
 
@@ -74,9 +79,10 @@ void buf_free(struct pouch_buf *buf)
 {
     free(buf);
     atomic_dec(&bufs);
+    LOG_INF("Freeing %p. TOTAL: %d", buf, buf_active_count());
 }
 
-size_t buf_read(struct pouch_buf *buf, uint8_t *data, size_t len, size_t offset)
+size_t buf_read(const struct pouch_buf *buf, uint8_t *data, size_t len, size_t offset)
 {
     size_t bytes_to_copy = MIN(len, buf->bytes - offset);
     memcpy(data, &buf->buf[offset], bytes_to_copy);

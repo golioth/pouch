@@ -5,6 +5,7 @@ if(CONFIG_POUCH)
 
     zephyr_library_sources(
       ${CMAKE_CURRENT_BINARY_DIR}/header_encode.c
+      ${CMAKE_CURRENT_BINARY_DIR}/session_info.c
       src/pouch.c
       src/uplink.c
       src/header.c
@@ -17,6 +18,10 @@ if(CONFIG_POUCH)
 
     zephyr_library_sources_ifdef(CONFIG_POUCH_ENCRYPTION_NONE src/crypto_none.c)
     zephyr_library_sources_ifdef(CONFIG_POUCH_ENCRYPTION_SAEAD
+        src/crypto_saead.c
+        src/saead/downlink.c
+        src/saead/session.c
+        src/saead/uplink.c
         src/cert.c
     )
 

@@ -52,6 +52,8 @@ enum pouch_encryption
 {
     /** No encryption */
     POUCH_ENCRYPTION_PLAINTEXT,
+    /** Streaming AEAD encryption */
+    POUCH_ENCRYPTION_SAEAD,
 };
 
 /** Pouch configuration for plaintext encryption */
@@ -65,6 +67,26 @@ struct pouch_encryption_config_plaintext
     const char *device_id;
 };
 
+/** Pouch configuration for saead encryption */
+struct pouch_encryption_config_saead
+{
+    /**
+     * The device certificate in DER format.
+     *
+     * The memory pointed to by this field must remain valid while the pouch stack is in use.
+     *
+     * The certificate must be a valid X.509 certificate.
+     * The certificate must be signed by a trusted CA.
+     * The certificate must contain the public key that corresponds to the provided private key.
+     */
+    struct pouch_cert certificate;
+
+    /**
+     * The ID of the device's private key in the PSA key store.
+     */
+    psa_key_id_t private_key;
+};
+
 /** Pouch configuration */
 struct pouch_config
 {
@@ -75,5 +97,7 @@ struct pouch_config
     {
         /** Plaintext configuration */
         struct pouch_encryption_config_plaintext plaintext;
+        /** Streaming AEAD configuration */
+        struct pouch_encryption_config_saead saead;
     } encryption;
 };

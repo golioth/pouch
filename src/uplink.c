@@ -14,6 +14,10 @@
 #include <zephyr/init.h>
 #include <zephyr/sys/iterable_sections.h>
 #include <zephyr/sys/ring_buffer.h>
+#include <zephyr/sys/byteorder.h>
+
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(uplink, LOG_LEVEL_DBG);
 
 enum flags
 {
@@ -24,7 +28,6 @@ enum flags
 
 struct pouch_uplink
 {
-    struct pouch_config config;
     struct pouch_buf *header;
     atomic_t flags;
     atomic_t id;
@@ -70,6 +73,7 @@ static void process_blocks(struct k_work *work)
         struct pouch_buf *encrypted = crypto_encrypt_block(buf_queue_get(&uplink.processing.queue));
         if (!encrypted)
         {
+            LOG_ERR("Failed encryption");
             continue;
         }
 
@@ -90,6 +94,7 @@ static void process_blocks(struct k_work *work)
 
 void uplink_enqueue(struct pouch_buf *block)
 {
+    LOG_DBG("Enqueueing block");
     buf_queue_submit(&uplink.processing.queue, block);
     k_work_submit(&uplink.processing.work);
 }
@@ -110,7 +115,6 @@ int pouch_uplink_close(k_timeout_t timeout)
 
 int uplink_init(const struct pouch_config *config)
 {
-    uplink.config = *config;
     buf_queue_init(&uplink.processing.queue);
     buf_queue_init(&uplink.transport.queue);
     k_work_init(&uplink.processing.work, process_blocks);
@@ -127,21 +131,26 @@ uint32_t uplink_session_id(void)
 
 struct pouch_uplink *pouch_uplink_start(void)
 {
-    if (atomic_test_and_set_bit(&uplink.flags, SESSION_ACTIVE))
+    int err;
+    if (!atomic_test_and_set_bit(&uplink.flags, SESSION_ACTIVE))
     {
-        return NULL;
+        err = crypto_session_start();
+        if (err)
+        {
+            LOG_ERR("Failed to start crypto session (err: %d)", err);
+            return NULL;
+        }
     }
 
-    crypto_pouch_start();
-
-    // Create the header, but don't push it to the queue until we have data to send:
-    uplink.header = pouch_header_create(&uplink.config);
+    // Create the session info packet, but don't push it to the queue until we have data to send:
+    uplink.header = pouch_header_create(crypto_pouch_start());
     if (!uplink.header)
     {
+        LOG_ERR("Failed to create pouch header (err: %d)", err);
         return NULL;
     }
 
-    pouch_event_emit(POUCH_EVENT_SESSION_START);
+    pouch_event_emit(POUCH_EVENT_UPLINK_READY);
 
     // Process any pending blocks:
     if (!buf_queue_is_empty(&uplink.processing.queue))
@@ -187,8 +196,7 @@ enum pouch_result pouch_uplink_fill(struct pouch_uplink *uplink, uint8_t *dst, s
         return POUCH_MORE_DATA;
     }
 
-    atomic_clear_bit(&uplink->flags, SESSION_ACTIVE);
-    pouch_event_emit(POUCH_EVENT_SESSION_END);
+    pouch_event_emit(POUCH_EVENT_UPLINK_COMPLETE);
 
     return POUCH_NO_MORE_DATA;
 }
@@ -213,13 +221,8 @@ void pouch_uplink_finish(struct pouch_uplink *uplink)
         uplink->header = NULL;
     }
 
+    crypto_session_end();
+
     atomic_inc(&uplink->id);
-    if (atomic_clear(&uplink->flags) & BIT(SESSION_ACTIVE))
-    {
-        /* The transport didn't pull down all the data, so
-         * we didn't emit the end event, and need to do it
-         * here instead.
-         */
-        pouch_event_emit(POUCH_EVENT_SESSION_END);
-    }
+    atomic_clear(&uplink->flags);
 }

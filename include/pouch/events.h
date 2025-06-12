@@ -15,10 +15,10 @@
  */
 enum pouch_event
 {
-    /** A new session has started */
-    POUCH_EVENT_SESSION_START,
-    /** A session has ended */
-    POUCH_EVENT_SESSION_END,
+    /** Ready to push uplink pouches. */
+    POUCH_EVENT_UPLINK_READY,
+    /** All uplink pouch data has been sent to the gateway */
+    POUCH_EVENT_UPLINK_COMPLETE,
 };
 
 /**

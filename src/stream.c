@@ -111,7 +111,7 @@ size_t pouch_stream_write(struct pouch_stream *stream,
                 break;
             }
 
-            block_finish_stream(stream->buf, stream->id, true);
+            block_finish(stream->buf, true);
             uplink_enqueue(stream->buf);
 
             stream->buf = buf;
@@ -137,7 +137,7 @@ int pouch_stream_close(struct pouch_stream *stream, k_timeout_t timeout)
 
     if (pouch_stream_is_valid(stream) && stream->bytes > 0)
     {
-        block_finish_stream(stream->buf, stream->id, false);
+        block_finish(stream->buf, false);
         uplink_enqueue(stream->buf);
     }
     else

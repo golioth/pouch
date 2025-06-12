@@ -43,7 +43,7 @@ size_t buf_size_get(const struct pouch_buf *buf);
 /** Get pointer to the next byte to write to */
 uint8_t *buf_next(struct pouch_buf *buf);
 
-size_t buf_read(struct pouch_buf *buf, uint8_t *data, size_t len, size_t offset);
+size_t buf_read(const struct pouch_buf *buf, uint8_t *data, size_t len, size_t offset);
 
 /** Get the number of buffers currently in flight */
 int buf_active_count(void);

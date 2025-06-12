@@ -1,0 +1,37 @@
+session_info = [
+    version: uint .size 1,
+    algorithm: aes_gcm / chacha20_poly1305,
+    session_id,
+    key_info,
+]
+
+session_id = [
+    session_id_sequential //
+    session_id_random
+]
+
+session_id_sequential = (
+    tag: bstr .size 8,
+    sequence_number: uint .size 8,
+)
+
+session_id_random = bstr .size 16
+
+; Algorithm identifiers
+aes_gcm = 1
+chacha20_poly1305 = 2
+
+key_info = [
+    psk //
+    ecdh
+]
+
+psk = (
+    key_type: 1,
+    psk_id: tstr,
+)
+
+ecdh = (
+    key_type: 2,
+    cert_id: bstr .size 6,
+)

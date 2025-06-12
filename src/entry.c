@@ -94,7 +94,7 @@ int pouch_uplink_entry_write(const char *path,
     if (err && !block_is_new)
     {
         // block is full
-        block_finish(block);
+        block_finish(block, false);
         uplink_enqueue(block);
 
         // try again with a new block:
@@ -123,7 +123,7 @@ int entry_block_close(k_timeout_t timeout)
 
     if (block && block_size_get(block) > 0)
     {
-        block_finish(block);
+        block_finish(block, false);
         uplink_enqueue(block);
         block = NULL;
     }
