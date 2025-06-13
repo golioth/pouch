@@ -40,8 +40,8 @@ struct pouch_uplink
     {
         /** Blocks that are ready for transport */
         pouch_buf_queue_t queue;
-        /** Read offset in bytes */
-        size_t offset;
+        /** Buffer reader for the buffer currently being processed. */
+        struct pouch_bufview reader;
     } transport;
 };
 
@@ -164,25 +164,27 @@ enum pouch_result pouch_uplink_fill(struct pouch_uplink *uplink, uint8_t *dst, s
 
     while (*len < maxlen)
     {
-        struct pouch_buf *block = buf_queue_peek(&uplink->transport.queue);
-        if (!block)
+        if (!pouch_bufview_is_ready(&uplink->transport.reader))
         {
-            break;
+            struct pouch_buf *buf = buf_queue_get(&uplink->transport.queue);
+            if (buf == NULL)
+            {
+                break;
+            }
+
+            pouch_bufview_init(&uplink->transport.reader, buf);
         }
 
-        size_t bytes = buf_read(block, &dst[*len], maxlen - *len, uplink->transport.offset);
-        uplink->transport.offset += bytes;
-        *len += bytes;
+        *len += pouch_bufview_memcpy(&uplink->transport.reader, &dst[*len], maxlen - *len);
 
-        if (uplink->transport.offset == buf_size_get(block))
+        if (!pouch_bufview_available(&uplink->transport.reader))
         {
-            buf_queue_get(&uplink->transport.queue);
-            uplink->transport.offset = 0;
-            buf_free(block);
+            pouch_bufview_free(&uplink->transport.reader);
         }
     }
 
-    if (pouch_is_open() || !buf_queue_is_empty(&uplink->transport.queue))
+    if (pouch_is_open() || pouch_bufview_available(&uplink->transport.reader)
+        || !buf_queue_is_empty(&uplink->transport.queue))
     {
         return POUCH_MORE_DATA;
     }
@@ -206,6 +208,8 @@ void pouch_uplink_finish(struct pouch_uplink *uplink)
     {
         buf_free(buf);
     }
+
+    pouch_bufview_free(&uplink->transport.reader);
 
     if (uplink->header)
     {
