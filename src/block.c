@@ -34,7 +34,7 @@ static void write_block_header(struct pouch_buf *block, size_t size, uint8_t id,
         id |= NO_MORE_DATA_MASK;
     }
 
-    sys_put_be16(size, buf_claim(block, sizeof(uint16_t)));
+    block_size_write(block, size);
     *buf_claim(block, 1) = id;
 }
 
@@ -46,6 +46,11 @@ size_t block_space_get(const struct pouch_buf *block)
 size_t block_size_get(const struct pouch_buf *block)
 {
     return buf_size_get(block);
+}
+
+void block_size_write(struct pouch_buf *block, uint16_t size)
+{
+    sys_put_be16(size, buf_claim(block, sizeof(uint16_t)));
 }
 
 struct pouch_buf *block_alloc(void)
