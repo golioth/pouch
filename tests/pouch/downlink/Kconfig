@@ -1,0 +1,13 @@
+menu "Downlink test configuration"
+
+config POUCH_DEVICE_NAME
+	string "Device name used in encoded pouches"
+	default "id123"
+
+config POUCH_TRANSPORT_MTU
+	int "Transport MTU"
+	default 19
+
+endmenu
+
+source "Kconfig.zephyr"
