@@ -12,6 +12,13 @@
 /** Single pouch buffer */
 struct pouch_buf;
 
+/** Buffer view for reading data out of a buffer. */
+struct pouch_bufview
+{
+    const struct pouch_buf *buf;
+    size_t offset;
+};
+
 /** Buffer state */
 typedef size_t pouch_buf_state_t;
 
@@ -43,8 +50,6 @@ size_t buf_size_get(const struct pouch_buf *buf);
 /** Get pointer to the next byte to write to */
 uint8_t *buf_next(struct pouch_buf *buf);
 
-size_t buf_read(struct pouch_buf *buf, uint8_t *data, size_t len, size_t offset);
-
 /** Get the number of buffers currently in flight */
 int buf_active_count(void);
 
@@ -64,4 +69,46 @@ struct pouch_buf *buf_queue_peek(pouch_buf_queue_t *queue);
 static inline bool buf_queue_is_empty(pouch_buf_queue_t *queue)
 {
     return buf_queue_peek(queue) == NULL;
+}
+
+/** Initialize a buffer view */
+static inline void pouch_bufview_init(struct pouch_bufview *v, const struct pouch_buf *buf)
+{
+    v->buf = buf;
+    v->offset = 0;
+}
+
+/** Read data from the buffer view */
+size_t pouch_bufview_memcpy(struct pouch_bufview *v, void *dst, size_t bytes);
+
+/** Read available data, if the requested amount is available. */
+const void *pouch_bufview_read(struct pouch_bufview *v, size_t bytes);
+
+/** Read a byte from the buffer view */
+uint8_t pouch_bufview_read_byte(struct pouch_bufview *v);
+
+/** Read a big endian uint16_t from the buffer view */
+uint16_t pouch_bufview_read_be16(struct pouch_bufview *v);
+
+/** Read a big endian uint32_t from the buffer view */
+uint32_t pouch_bufview_read_be32(struct pouch_bufview *v);
+
+/** Read a big endian uint64_t from the buffer view */
+uint64_t pouch_bufview_read_be64(struct pouch_bufview *v);
+
+/** Get the number of bytes available for reading */
+size_t pouch_bufview_available(const struct pouch_bufview *v);
+
+/** Check whether the buffer view is initialized and has data */
+static inline bool pouch_bufview_is_ready(const struct pouch_bufview *v)
+{
+    return v->buf != NULL && pouch_bufview_available(v) > 0;
+}
+
+/** Free the associated buffer and reset the bufview. */
+static inline void pouch_bufview_free(struct pouch_bufview *v)
+{
+    buf_free((struct pouch_buf *) v->buf);
+    v->buf = NULL;
+    v->offset = 0;
 }

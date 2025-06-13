@@ -4,6 +4,7 @@
 #include "buf.h"
 #include <stdlib.h>
 #include <string.h>
+#include <zephyr/sys/byteorder.h>
 
 static atomic_t bufs;
 
@@ -73,15 +74,10 @@ struct pouch_buf *buf_alloc(size_t size)
 void buf_free(struct pouch_buf *buf)
 {
     free(buf);
-    atomic_dec(&bufs);
-}
-
-size_t buf_read(struct pouch_buf *buf, uint8_t *data, size_t len, size_t offset)
-{
-    size_t bytes_to_copy = MIN(len, buf->bytes - offset);
-    memcpy(data, &buf->buf[offset], bytes_to_copy);
-
-    return bytes_to_copy;
+    if (buf)
+    {
+        atomic_dec(&bufs);
+    }
 }
 
 int buf_active_count(void)
@@ -109,4 +105,59 @@ struct pouch_buf *buf_queue_peek(pouch_buf_queue_t *queue)
 {
     sys_snode_t *n = sys_slist_peek_head(queue);
     return n ? CONTAINER_OF(n, struct pouch_buf, node) : NULL;
+}
+
+static const uint8_t *bufview_read(struct pouch_bufview *v, size_t bytes)
+{
+    const uint8_t *data = &v->buf->buf[v->offset];
+    v->offset += bytes;
+
+    return data;
+}
+
+size_t pouch_bufview_memcpy(struct pouch_bufview *v, void *dst, size_t bytes)
+{
+    bytes = MIN(bytes, pouch_bufview_available(v));
+    memcpy(dst, bufview_read(v, bytes), bytes);
+    return bytes;
+}
+
+const void *pouch_bufview_read(struct pouch_bufview *v, size_t bytes)
+{
+    if (pouch_bufview_available(v) < bytes)
+    {
+        return NULL;
+    }
+
+    return bufview_read(v, bytes);
+}
+
+uint8_t pouch_bufview_read_byte(struct pouch_bufview *v)
+{
+    return *bufview_read(v, 1);
+}
+
+uint16_t pouch_bufview_read_be16(struct pouch_bufview *v)
+{
+    return sys_get_be16(bufview_read(v, sizeof(uint16_t)));
+}
+
+uint32_t pouch_bufview_read_be32(struct pouch_bufview *v)
+{
+    return sys_get_be32(bufview_read(v, sizeof(uint32_t)));
+}
+
+uint64_t pouch_bufview_read_be64(struct pouch_bufview *v)
+{
+    return sys_get_be64(bufview_read(v, sizeof(uint64_t)));
+}
+
+size_t pouch_bufview_available(const struct pouch_bufview *v)
+{
+    if (v->buf == NULL)
+    {
+        return 0;
+    }
+
+    return v->buf->bytes - v->offset;
 }
