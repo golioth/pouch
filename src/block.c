@@ -37,6 +37,8 @@ void block_decode_hdr(struct pouch_bufview *v,
                       bool *is_first,
                       bool *is_last)
 {
+    __ASSERT_NO_MSG(v->offset == 0);
+
     *block_size = pouch_bufview_read_be16(v);
 
     uint8_t id = pouch_bufview_read_byte(v);

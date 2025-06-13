@@ -1,0 +1,18 @@
+common:
+  platform_allow:
+    - native_sim
+    - native_sim/native/64
+  integration_platforms:
+    - native_sim
+    - native_sim/native/64
+  tags: test_framework
+tests:
+  pouch.downlink.id123:
+    extra_configs:
+      - CONFIG_POUCH_DEVICE_NAME="id123"
+  pouch.downlink.very-long-device-name-with-id123:
+    extra_configs:
+      - CONFIG_POUCH_DEVICE_NAME="very-long-device-name-with-id123"
+  pouch.downlink.id123.mtu.250:
+    extra_configs:
+      - CONFIG_POUCH_TRANSPORT_MTU=250
