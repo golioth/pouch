@@ -23,6 +23,7 @@ void block_free(struct pouch_buf *block);
 
 size_t block_space_get(const struct pouch_buf *block);
 size_t block_size_get(const struct pouch_buf *block);
+void block_size_write(struct pouch_buf *block, uint16_t size);
 
 void block_finish(struct pouch_buf *block);
 void block_finish_stream(struct pouch_buf *block, uint8_t stream_id, bool last);
