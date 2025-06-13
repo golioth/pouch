@@ -71,6 +71,11 @@ size_t block_size_get(const struct pouch_buf *block)
     return buf_size_get(block);
 }
 
+void block_size_write(struct pouch_buf *block, uint16_t size)
+{
+    sys_put_be16(size, buf_claim(block, sizeof(uint16_t)));
+}
+
 struct pouch_buf *block_alloc(void)
 {
     struct pouch_buf *block = buf_alloc(CONFIG_POUCH_BLOCK_SIZE);
