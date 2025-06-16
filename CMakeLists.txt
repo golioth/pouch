@@ -20,6 +20,7 @@ if(CONFIG_POUCH)
     zephyr_library_sources_ifdef(CONFIG_POUCH_ENCRYPTION_SAEAD
         src/cert.c
         src/saead/session.c
+        src/saead/uplink.c
     )
 
     if (DEFINED CONFIG_POUCH_CA_CERT_FILENAME)
