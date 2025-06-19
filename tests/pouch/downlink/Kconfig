@@ -1,0 +1,9 @@
+menu "Downlink test configuration"
+
+config POUCH_DEVICE_NAME
+	string "Device name used in encoded pouches"
+	default "id123"
+
+endmenu
+
+source "Kconfig.zephyr"

@@ -9,6 +9,10 @@
 #include <stdio.h>
 
 #include <zephyr/sys/byteorder.h>
+#include <pouch/downlink.h>
+
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(entry);
 
 #define ENTRY_HEADER_OVERHEAD 5
 
@@ -36,6 +40,190 @@ static K_MUTEX_DEFINE(mut);
  * 5 + p_len | data              ...              |
  *           +------------------------------------+
  */
+
+struct pouch_downlink_entry
+{
+    union
+    {
+        uint8_t header[5];
+        struct
+        {
+            uint16_t data_len;
+            uint16_t content_type;
+            uint8_t path_len;
+        } __packed;
+    };
+
+    /* Internal */
+    size_t header_len;
+    size_t path_and_data_len;
+    size_t path_and_data_consumed;
+
+    uint8_t path[256];
+    const uint8_t *path_and_data;
+};
+
+static struct pouch_downlink_entry pouch_downlink_entry;
+
+static const char *entry_content_format_str(int content_format)
+{
+    switch (content_format)
+    {
+        case POUCH_CONTENT_TYPE_OCTET_STREAM:
+            return "octet-stream";
+        case POUCH_CONTENT_TYPE_JSON:
+            return "json";
+        case POUCH_CONTENT_TYPE_CBOR:
+            return "cbor";
+    }
+
+    return "unsupported";
+}
+
+static void entry_finish(struct pouch_downlink_entry *entry, bool is_last)
+{
+    const uint8_t *data;
+    size_t len;
+    size_t offset;
+
+    if (entry->path_and_data_consumed == 0)
+    {
+        data = &entry->path_and_data[entry->path_len];
+        len = entry->path_and_data_len - entry->path_len;
+        offset = 0;
+
+        /* Copy path for future use */
+        memcpy(entry->path, entry->path_and_data, entry->path_len);
+        entry->path[entry->path_len] = '\0';
+    }
+    else
+    {
+        data = entry->path_and_data;
+        len = entry->path_and_data_len - entry->path_and_data_consumed;
+        offset = entry->path_and_data_consumed - entry->path_len;
+    }
+
+    downlink_received(entry->path, entry->content_type, data, len, offset, is_last);
+
+    if (is_last)
+    {
+        entry->header_len = 0;
+        entry->path_and_data_len = 0;
+        entry->path_and_data_consumed = 0;
+    }
+    else
+    {
+        entry->path_and_data_consumed = entry->path_and_data_len;
+    }
+}
+
+static size_t entry_push_one(struct pouch_downlink_entry *entry,
+                             const uint8_t *buf,
+                             size_t buf_len,
+                             bool is_stream)
+{
+    const uint8_t *buf_start = buf;
+
+    /* Header */
+    while (buf_len)
+    {
+        if (entry->header_len >= sizeof(entry->header))
+        {
+            break;
+        }
+
+        entry->header[entry->header_len] = *buf;
+        entry->header_len++;
+
+        buf++;
+        buf_len--;
+
+        if (entry->header_len == sizeof(entry->header))
+        {
+            /* Header complete */
+            LOG_HEXDUMP_DBG(entry->header, sizeof(entry->header), "entry header raw");
+
+            entry->data_len = sys_be16_to_cpu(entry->data_len);
+            entry->content_type = sys_be16_to_cpu(entry->content_type);
+
+            LOG_DBG("data_len  %d", entry->data_len);
+            LOG_DBG("content_type %s (%d)",
+                    entry_content_format_str(entry->content_type),
+                    (int) entry->content_type);
+            LOG_DBG("path_len  %d", entry->path_len);
+        }
+    }
+
+    /* Data */
+    while (buf_len)
+    {
+        size_t to_consume = buf_len;
+
+        if (!is_stream)
+        {
+            size_t total_length = entry->data_len + entry->path_len;
+            size_t remaining_length = total_length - entry->path_and_data_len;
+
+            to_consume = MIN(remaining_length, buf_len);
+        }
+
+        LOG_DBG("entry path_and_data chunk [%2d : %2d]",
+                (int) entry->path_and_data_len,
+                (int) entry->path_and_data_len + to_consume);
+        LOG_HEXDUMP_DBG(buf, to_consume, "entry path_and_data chunk");
+
+        entry->path_and_data = buf;
+        entry->path_and_data_len += to_consume;
+
+        buf += to_consume;
+        buf_len -= to_consume;
+
+        if (!is_stream && entry->path_and_data_len >= entry->data_len + entry->path_len)
+        {
+            entry_finish(entry, true);
+            break;
+        }
+    }
+
+    return buf - buf_start;
+}
+
+static size_t entry_push(struct pouch_downlink_entry *entry,
+                         const uint8_t *buf,
+                         size_t buf_len,
+                         bool is_stream)
+{
+    const uint8_t *buf_start = buf;
+    size_t consumed;
+
+    while (buf_len)
+    {
+        consumed = entry_push_one(entry, buf, buf_len, is_stream);
+
+        buf += consumed;
+        buf_len -= consumed;
+    }
+
+    return buf - buf_start;
+}
+
+void pouch_downlink_entries_push(const uint8_t *buf, size_t buf_len, bool is_stream, bool is_last)
+{
+    struct pouch_downlink_entry *entry = &pouch_downlink_entry;
+
+    if (is_stream && entry->path_and_data_consumed == 0)
+    {
+        /* Header does not contain data_len in this case */
+        entry->header_len = sizeof(entry->data_len);
+    }
+
+    entry_push(entry, buf, buf_len, is_stream);
+
+    if (is_stream)
+    {
+        entry_finish(entry, is_last);
+    }
+}
 
 static int write_entry(struct pouch_buf *block, const struct pouch_entry *entry)
 {

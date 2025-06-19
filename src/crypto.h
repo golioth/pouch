@@ -3,7 +3,7 @@
  */
 #pragma once
 
-#include "cddl/header_encode_types.h"
+#include "cddl/header_types.h"
 #include "buf.h"
 #include <pouch/types.h>
 
