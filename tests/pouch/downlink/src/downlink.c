@@ -11,13 +11,19 @@ LOG_MODULE_REGISTER(downlink_test);
 
 #define BLOCK_SIZE 512
 
-#define LEN_POUCH_HEADER 5
+#define LEN_DEVICE_NAME (sizeof(CONFIG_POUCH_DEVICE_NAME) - 1)
+
+/*
+ * CBOR "device name length" is encoded with more bytes if device name is more
+ * than 23 bytes
+ */
+#define LEN_POUCH_HEADER 5 + (LEN_DEVICE_NAME > 23 ? 1 : 0)
 #define LEN_BLOCK_HEADER 3
 #define LEN_ENTRY_LENGTH 2
 #define LEN_ENTRY_PATH 2
 #define LEN_ENTRY_CONTENT_TYPE 1
 
-#define FIRST_BLOCK_OFFSET (LEN_POUCH_HEADER + sizeof("id123") - 1)
+#define FIRST_BLOCK_OFFSET (LEN_POUCH_HEADER + LEN_DEVICE_NAME)
 
 #define TRANSPORT_MTU 19
 

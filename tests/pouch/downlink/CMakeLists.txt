@@ -18,6 +18,7 @@ function(pouch_gen_lorem length)
     ${PYTHON_EXECUTABLE}
     ${APPLICATION_SOURCE_DIR}/scripts/pouch-gen-lorem.py
     --length ${length}
+    --device-name ${CONFIG_POUCH_DEVICE_NAME}
     ${gen_dir}/lorem-${length}.bin
     DEPENDS ${APPLICATION_SOURCE_DIR}/scripts/pouch-gen-lorem.py
     WORKING_DIRECTORY ${APPLICATION_SOURCE_DIR}/

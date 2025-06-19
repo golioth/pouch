@@ -75,9 +75,10 @@ def payload_append(payload: bytearray, data: bytes, stream_id: int, no_more: boo
 def main(
         out: Annotated[typer.FileBinaryWrite, typer.Argument()],
         length: Annotated[int, typer.Option(min=0)] = len(LOREM_IPSUM),
+        device_name: Annotated[str, typer.Option()] = "id123",
 ):
     obj = {
-        "device_id": "id123",
+        "device_id": device_name,
         "entries": [
             {
                 "path": "/.s/lorem",
