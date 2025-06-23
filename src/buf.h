@@ -53,6 +53,20 @@ uint8_t *buf_next(struct pouch_buf *buf);
 /** Get the number of buffers currently in flight */
 int buf_active_count(void);
 
+/**
+ * Trim start of buffer by @a bytes
+ *
+ * @return Number of bytes actually trimmed
+ */
+size_t buf_trim_start(struct pouch_buf *buf, size_t bytes);
+
+/**
+ * Trim end of buffer by @a bytes
+ *
+ * @return Number of bytes actually trimmed
+ */
+size_t buf_trim_end(struct pouch_buf *buf, size_t bytes);
+
 /** Initialize a buffer queue */
 void buf_queue_init(pouch_buf_queue_t *queue);
 
