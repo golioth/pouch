@@ -24,14 +24,17 @@
 /** Special block ID for entry blocks */
 #define BLOCK_ID_ENTRY 0x00
 
+/** Mask for ID field indicating that this is the first block in the stream */
+#define FIRST_DATA_MASK 0x40
+
 /** Mask for ID field indicating that this is the last block in the stream */
-#define NO_MORE_DATA_MASK 0x80
+#define LAST_DATA_MASK 0x80
 
 static void write_block_header(struct pouch_buf *block, size_t size, uint8_t id, bool more_data)
 {
     if (!more_data)
     {
-        id |= NO_MORE_DATA_MASK;
+        id |= LAST_DATA_MASK;
     }
 
     sys_put_be16(size, buf_claim(block, sizeof(uint16_t)));
