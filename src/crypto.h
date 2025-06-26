@@ -14,6 +14,11 @@ int crypto_pouch_start(void);
 int crypto_header_get(const struct pouch_config *config, struct encryption_info *encryption_info);
 
 /**
+ * Decrypt a block of data.
+ */
+struct pouch_buf *crypto_decrypt_block(struct pouch_buf *block);
+
+/**
  * Encrypt a block of data.
  */
 struct pouch_buf *crypto_encrypt_block(struct pouch_buf *block);
