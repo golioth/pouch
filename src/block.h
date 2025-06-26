@@ -6,7 +6,7 @@
 #include <zephyr/kernel.h>
 #include "buf.h"
 
-#define BLOCK_ID_MASK 0x7f
+#define BLOCK_ID_MASK 0x1f
 
 struct pouch_buf *block_alloc(void);
 
