@@ -14,12 +14,25 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 #include <pouch/events.h>
 #include <pouch/uplink.h>
 #include <pouch/transport/ble_gatt/peripheral.h>
+#include <pouch/transport/ble_gatt/common/types.h>
 
-static uint8_t service_data[] = {GOLIOTH_BLE_GATT_UUID_SVC_VAL, 0x00};
+static struct
+{
+    uint8_t uuid[16];
+    struct golioth_ble_gatt_adv_data data;
+} __packed service_data = {
+    .uuid = {GOLIOTH_BLE_GATT_UUID_SVC_VAL},
+    .data =
+        {
+            .version = (POUCH_VERSION << GOLIOTH_BLE_GATT_ADV_VERSION_POUCH_SHIFT)
+                | (GOLIOTH_BLE_GATT_VERSION << GOLIOTH_BLE_GATT_ADV_VERSION_SELF_SHIFT),
+            .flags = 0x0,
+        },
+};
 
 static struct bt_data ad[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
-    BT_DATA(BT_DATA_SVC_DATA128, service_data, ARRAY_SIZE(service_data)),
+    BT_DATA(BT_DATA_SVC_DATA128, &service_data, sizeof(service_data)),
     BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
 };
 
@@ -60,7 +73,7 @@ BT_CONN_CB_DEFINE(conn_callbacks) = {
 
 void sync_request_work_handler(struct k_work *work)
 {
-    service_data[ARRAY_SIZE(service_data) - 1] = 0x01;
+    service_data.data.flags = 0x01;
     bt_le_adv_update_data(ad, ARRAY_SIZE(ad), NULL, 0);
 }
 
@@ -80,7 +93,7 @@ static void pouch_event_handler(enum pouch_event event, void *ctx)
 
     if (POUCH_EVENT_SESSION_END == event)
     {
-        service_data[ARRAY_SIZE(service_data) - 1] = 0x00;
+        service_data.data.flags = 0x00;
         k_work_schedule(&sync_request_work, K_SECONDS(CONFIG_EXAMPLE_SYNC_PERIOD_S));
     }
 }

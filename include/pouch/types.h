@@ -11,6 +11,8 @@
  * @brief Pouch type definitions
  */
 
+#define POUCH_VERSION 1
+
 /**
  * @defgroup content_types Pouch content types
  * @{
