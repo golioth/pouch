@@ -8,6 +8,13 @@
 
 #define BLOCK_ID_MASK 0x1f
 
+void block_decode_hdr(struct pouch_bufview *v,
+                      uint16_t *block_size,
+                      uint8_t *stream_id,
+                      bool *is_stream,
+                      bool *is_first,
+                      bool *is_last);
+
 struct pouch_buf *block_alloc(void);
 
 struct pouch_buf *block_alloc_stream(uint8_t stream_id, bool first);
