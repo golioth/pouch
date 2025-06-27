@@ -12,14 +12,14 @@ concurrency:
 
 jobs:
   build:
-    container: golioth/golioth-zephyr-base:0.16.8-SDK-v0
+    container: golioth/golioth-zephyr-base:0.17.0-SDK-v0
     strategy:
       matrix:
         manifest:
           - west.yml
           - west-ncs.yml
     env:
-      ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-0.16.8
+      ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-0.17.0
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
@@ -32,13 +32,13 @@ jobs:
           west update --narrow -o=--depth=1
       - name: Install pip packages
         run: |
-          pip3 install \
+          uv pip install \
             -r deps/zephyr/scripts/requirements-base.txt        \
             -r deps/zephyr/scripts/requirements-build-test.txt  \
             -r deps/zephyr/scripts/requirements-run-test.txt         \
             -r pouch/requirements.txt
 
-          pip3 install            \
+          uv pip install          \
             cryptography==41.0.7  \
             pyasn1                \
             pyyaml                \
