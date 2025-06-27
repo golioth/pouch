@@ -85,6 +85,21 @@ int buf_active_count(void)
     return atomic_get(&bufs);
 }
 
+size_t buf_trim_start(struct pouch_buf *buf, size_t bytes)
+{
+    bytes = MIN(bytes, buf->bytes);
+    buf->bytes -= bytes;
+    memmove(&buf->buf[0], &buf->buf[bytes], buf->bytes);
+    return bytes;
+}
+
+size_t buf_trim_end(struct pouch_buf *buf, size_t bytes)
+{
+    bytes = MIN(bytes, buf->bytes);
+    buf->bytes -= bytes;
+    return bytes;
+}
+
 void buf_queue_init(pouch_buf_queue_t *queue)
 {
     sys_slist_init(queue);
