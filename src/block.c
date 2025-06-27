@@ -30,6 +30,23 @@
 /** Mask for ID field indicating that this is the last block in the stream */
 #define LAST_DATA_MASK 0x80
 
+void block_decode_hdr(struct pouch_bufview *v,
+                      uint16_t *block_size,
+                      uint8_t *stream_id,
+                      bool *is_stream,
+                      bool *is_first,
+                      bool *is_last)
+{
+    *block_size = pouch_bufview_read_be16(v);
+
+    uint8_t id = pouch_bufview_read_byte(v);
+
+    *stream_id = id & BLOCK_ID_MASK;
+    *is_stream = (*stream_id) != BLOCK_ID_ENTRY;
+    *is_first = id & FIRST_DATA_MASK;
+    *is_last = id & LAST_DATA_MASK;
+}
+
 static void update_block_header(struct pouch_buf *block, size_t size, uint8_t flags)
 {
     sys_put_be16(size, buf_claim(block, sizeof(uint16_t)));
