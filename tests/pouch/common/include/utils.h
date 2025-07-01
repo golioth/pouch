@@ -12,7 +12,8 @@
 struct block
 {
     uint8_t id;
-    bool more_data;
+    bool first;
+    bool last;
     size_t data_len;
     uint8_t *data;
 };
@@ -22,8 +23,9 @@ static inline void pull_block(uint8_t **buf, struct block *block)
 {
     uint8_t *data = *buf;
     block->data_len = sys_get_be16(&data[0]) - 1;
-    block->id = data[2] & 0x7f;
-    block->more_data = !(data[2] & 0x80);
+    block->id = data[2] & 0x1f;
+    block->first = !!(data[2] & 0x40);
+    block->last = !!(data[2] & 0x80);
     block->data = &data[3];
     *buf = &data[3 + block->data_len];
 }

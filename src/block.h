@@ -10,7 +10,7 @@
 
 struct pouch_buf *block_alloc(void);
 
-struct pouch_buf *block_alloc_stream(uint8_t stream_id);
+struct pouch_buf *block_alloc_stream(uint8_t stream_id, bool first);
 
 void block_free(struct pouch_buf *block);
 
@@ -18,4 +18,4 @@ size_t block_space_get(const struct pouch_buf *block);
 size_t block_size_get(const struct pouch_buf *block);
 
 void block_finish(struct pouch_buf *block);
-void block_finish_stream(struct pouch_buf *block, uint8_t stream_id, bool more_data);
+void block_finish_stream(struct pouch_buf *block, uint8_t stream_id, bool last);

@@ -30,15 +30,16 @@
 /** Mask for ID field indicating that this is the last block in the stream */
 #define LAST_DATA_MASK 0x80
 
-static void write_block_header(struct pouch_buf *block, size_t size, uint8_t id, bool more_data)
+static void update_block_header(struct pouch_buf *block, size_t size, uint8_t flags)
 {
-    if (!more_data)
-    {
-        id |= LAST_DATA_MASK;
-    }
-
     sys_put_be16(size, buf_claim(block, sizeof(uint16_t)));
-    *buf_claim(block, 1) = id;
+    *buf_claim(block, 1) |= flags;
+}
+
+static void write_block_header(struct pouch_buf *block, size_t size, uint8_t id, uint8_t flags)
+{
+    sys_put_be16(size, buf_claim(block, sizeof(uint16_t)));
+    *buf_claim(block, 1) = id | flags;
 }
 
 size_t block_space_get(const struct pouch_buf *block)
@@ -56,18 +57,18 @@ struct pouch_buf *block_alloc(void)
     struct pouch_buf *block = buf_alloc(CONFIG_POUCH_BLOCK_SIZE);
     if (block != NULL)
     {
-        write_block_header(block, 0, BLOCK_ID_ENTRY, false);
+        write_block_header(block, 0, BLOCK_ID_ENTRY, FIRST_DATA_MASK | LAST_DATA_MASK);
     }
 
     return block;
 }
 
-struct pouch_buf *block_alloc_stream(uint8_t stream_id)
+struct pouch_buf *block_alloc_stream(uint8_t stream_id, bool first)
 {
     struct pouch_buf *block = buf_alloc(CONFIG_POUCH_BLOCK_SIZE);
     if (block != NULL)
     {
-        write_block_header(block, 0, stream_id, true);
+        write_block_header(block, 0, stream_id, first ? FIRST_DATA_MASK : 0);
     }
 
     return block;
@@ -78,7 +79,7 @@ void block_free(struct pouch_buf *block)
     buf_free(block);
 }
 
-static void finish(struct pouch_buf *block, uint8_t id, bool more_data)
+static void finish(struct pouch_buf *block, uint8_t id, uint8_t flags)
 {
     size_t size = block_size_get(block);
     pouch_buf_state_t state = buf_state_get(block);
@@ -86,7 +87,7 @@ static void finish(struct pouch_buf *block, uint8_t id, bool more_data)
     // Temporarily roll back the block to the initial state so we can write the block size:
     buf_restore(block, POUCH_BUF_STATE_INITIAL);
 
-    write_block_header(block, size - sizeof(uint16_t), id, more_data);
+    update_block_header(block, size - sizeof(uint16_t), flags);
 
     // Restore:
     buf_restore(block, state);
@@ -94,10 +95,10 @@ static void finish(struct pouch_buf *block, uint8_t id, bool more_data)
 
 void block_finish(struct pouch_buf *block)
 {
-    finish(block, BLOCK_ID_ENTRY, false);
+    finish(block, BLOCK_ID_ENTRY, FIRST_DATA_MASK | LAST_DATA_MASK);
 }
 
-void block_finish_stream(struct pouch_buf *block, uint8_t stream_id, bool more_data)
+void block_finish_stream(struct pouch_buf *block, uint8_t stream_id, bool last)
 {
-    finish(block, stream_id, more_data);
+    finish(block, stream_id, last ? LAST_DATA_MASK : 0);
 }
