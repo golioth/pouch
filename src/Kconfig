@@ -44,6 +44,11 @@ config POUCH_ENCRYPTION_NONE
 
 endchoice
 
+config POUCH_AUTH_TAG_LEN
+  int
+  default 16 if POUCH_ENCRYPTION_SAEAD
+  default 0
+
 menu "Streaming AEAD encryption"
   depends on POUCH_ENCRYPTION_SAEAD
 
