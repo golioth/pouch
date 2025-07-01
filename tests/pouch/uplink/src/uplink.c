@@ -147,7 +147,7 @@ ZTEST(uplink, test_pouch_block)
     zassert_equal(block_len, len - 2, "Unexpected block length %d", block_len);
 
     zassert_equal(block[2],
-                  0x80,
+                  0x80 | 0x40,
                   "Expected block type to be ENTRY and no more data to be true, was %u",
                   block[2]);
 }
@@ -417,7 +417,8 @@ ZTEST(uplink, test_stream_multiblock)
                               0x7f,
                               "Unexpected stream ID %#x",
                               first_block.block.id);
-    zassert_true(first_block.block.more_data, "Unexpected no more data");
+    zassert_true(first_block.block.first, "Expected first data");
+    zassert_false(first_block.block.last, "Unexpected last data");
     zassert_equal(first_block.content_type,
                   POUCH_CONTENT_TYPE_OCTET_STREAM,
                   "Unexpected content type");
@@ -443,7 +444,8 @@ ZTEST(uplink, test_stream_multiblock)
                               "Unexpected stream ID %#x",
                               second_block.id);
     zassert_equal(second_block.id, first_block.block.id, "Unexpected stream ID");
-    zassert_false(second_block.more_data, "Unexpected more data");
+    zassert_false(second_block.first, "Unexpected first data");
+    zassert_true(second_block.last, "Expected last data");
     zassert_mem_equal(second_block.data,
                       &data[first_block.data_len],
                       second_block.data_len,
@@ -482,7 +484,8 @@ ZTEST(uplink, test_stream_multi_stream)
     struct stream_block blocks[2];
     pull_stream_block(&buf, &blocks[0]);
 
-    zassert_false(blocks[0].block.more_data, "Unexpected more data");
+    zassert_true(blocks[0].block.first, "Expected first data");
+    zassert_true(blocks[0].block.last, "Expected last data");
     zassert_not_equal(blocks[0].block.id, 0, "Unexpected stream ID");
     zassert_equal(blocks[0].data_len,
                   sizeof(data1),
@@ -494,7 +497,8 @@ ZTEST(uplink, test_stream_multi_stream)
 
     pull_stream_block(&buf, &blocks[1]);
 
-    zassert_false(blocks[1].block.more_data, "Unexpected more data");
+    zassert_true(blocks[1].block.first, "Expected first data");
+    zassert_true(blocks[1].block.last, "Expected last data");
     zassert_not_equal(blocks[1].block.id, 0, "Unexpected stream ID");
     zassert_equal(blocks[1].data_len,
                   sizeof(data2),
@@ -588,8 +592,8 @@ ZTEST(uplink, test_stream_multi_block_multi_stream)
 
         streams[i % 2].data_len += block.data_len;
 
-        bool more_data = streams[i % 2].data_len < CONFIG_POUCH_BLOCK_SIZE * 2;
-        zassert_equal(block.more_data, more_data, "Unexpected more data");
+        bool last = !(streams[i % 2].data_len < CONFIG_POUCH_BLOCK_SIZE * 2);
+        zassert_equal(block.last, last, "Expected more data");
     }
 
     for (int i = 0; i < 2; i++)
@@ -721,7 +725,8 @@ ZTEST(uplink, test_stream_length_aligned_to_block_size)
     struct stream_block block1;
     pull_stream_block(&blockbuf, &block1);
 
-    zassert_true(block1.block.more_data, "Unexpected no more data");
+    zassert_true(block1.block.first, "Expected first data");
+    zassert_false(block1.block.last, "Unexpected last data");
     zassert_not_equal(block1.block.id, 0, "Unexpected stream ID");
     zassert_equal(block1.block.data_len,
                   CONFIG_POUCH_BLOCK_SIZE - 3,  // 3 for the header
@@ -732,7 +737,8 @@ ZTEST(uplink, test_stream_length_aligned_to_block_size)
     struct block block2;
     pull_block(&blockbuf, &block2);
 
-    zassert_false(block2.more_data, "Unexpected more data");
+    zassert_false(block2.first, "Unexpected first data");
+    zassert_true(block2.last, "Expected last data");
     zassert_equal(block2.id, block1.block.id, "Unexpected stream ID");
     zassert_equal(block2.data_len,
                   CONFIG_POUCH_BLOCK_SIZE - 3,  // 3 for the header

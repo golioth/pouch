@@ -68,7 +68,7 @@ struct pouch_stream *pouch_uplink_stream_open(const char *path, uint16_t content
     stream->bytes = 0;
     stream->session_id = uplink_session_id();
 
-    stream->buf = block_alloc_stream(stream->id);
+    stream->buf = block_alloc_stream(stream->id, true);
     if (stream->buf == NULL)
     {
         free(stream);
@@ -105,13 +105,13 @@ size_t pouch_stream_write(struct pouch_stream *stream,
              * stream as a result of this failed write instead of having to allocate an empty block
              * for this.
              */
-            struct pouch_buf *buf = block_alloc_stream(stream->id);
+            struct pouch_buf *buf = block_alloc_stream(stream->id, false);
             if (buf == NULL)
             {
                 break;
             }
 
-            block_finish_stream(stream->buf, stream->id, true);
+            block_finish_stream(stream->buf, stream->id, false);
             uplink_enqueue(stream->buf);
 
             stream->buf = buf;
@@ -137,7 +137,7 @@ int pouch_stream_close(struct pouch_stream *stream, k_timeout_t timeout)
 
     if (pouch_stream_is_valid(stream) && stream->bytes > 0)
     {
-        block_finish_stream(stream->buf, stream->id, false);
+        block_finish_stream(stream->buf, stream->id, true);
         uplink_enqueue(stream->buf);
     }
     else
