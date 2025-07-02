@@ -8,13 +8,19 @@
 #include <sys/types.h>
 #include <psa/crypto.h>
 #include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/util.h>
 #include <zephyr/sys/base64.h>
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(saead_session, LOG_LEVEL_DBG);
 
+/**
+ * String length required to base64 encode a buffer of a given length, excluding the 0 terminator.
+ */
+#define BASE64_STRLEN(buflen) (4 * DIV_ROUND_UP(buflen, 3))
+
 #define NONCE_LEN 12
-#define INFO_MAX_LEN 34
+#define INFO_MAX_LEN (12 + BASE64_STRLEN(SESSION_ID_LEN) + 1)
 #define SAEAD_KEY_SIZE 32
 
 #define SESSION_KEY_TYPE(alg) \
@@ -63,9 +69,10 @@ int session_id_generate(struct session_id *id)
 
 static ssize_t session_key_info_build(const struct session_id *id,
                                       psa_algorithm_t algorithm,
+                                      uint8_t max_block_size_log,
                                       char *buf)
 {
-    char session_id[SESSION_ID_LEN * 2];
+    char session_id[BASE64_STRLEN(SESSION_ID_LEN) + 1];
     size_t id_len = 0;
 
     int err = base64_encode(session_id,
@@ -81,15 +88,17 @@ static ssize_t session_key_info_build(const struct session_id *id,
     session_id[id_len] = '\0';
 
     return sprintf(buf,
-                   "E0:%c:%s:C%c%c",
+                   "E0:%c:%s:C%c%c:%02x",
                    id->initiator == POUCH_ROLE_DEVICE ? 'D' : 'S',
                    session_id,
                    algorithm == PSA_ALG_CHACHA20_POLY1305 ? 'C' : 'A',
-                   id->type == SESSION_ID_TYPE_SEQUENTIAL ? 'S' : 'R');
+                   id->type == SESSION_ID_TYPE_SEQUENTIAL ? 'S' : 'R',
+                   max_block_size_log);
 }
 
 psa_key_id_t session_key_generate(const struct session_id *id,
                                   psa_algorithm_t algorithm,
+                                  uint8_t max_block_size_log,
                                   psa_key_id_t private_key,
                                   const struct pubkey *pubkey,
                                   psa_key_usage_t usage)
@@ -128,7 +137,7 @@ psa_key_id_t session_key_generate(const struct session_id *id,
     }
 
     uint8_t info[INFO_MAX_LEN];
-    ssize_t info_len = session_key_info_build(id, algorithm, info);
+    ssize_t info_len = session_key_info_build(id, algorithm, max_block_size_log, info);
     if (info_len < 0)
     {
         LOG_ERR("Failed session key build: %d", info_len);
