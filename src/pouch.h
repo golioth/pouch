@@ -9,6 +9,18 @@
 
 #define PUBKEY_LEN PSA_EXPORT_PUBLIC_KEY_MAX_SIZE
 
+/** Role of pouch participant */
+enum pouch_role
+{
+    /** Device */
+    POUCH_ROLE_DEVICE,
+    /** Server */
+    POUCH_ROLE_SERVER,
+};
+
+/** Pouch identifier */
+typedef uint16_t pouch_id_t;
+
 /** Public key buffer */
 struct pubkey
 {
