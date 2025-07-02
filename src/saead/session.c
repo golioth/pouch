@@ -69,7 +69,10 @@ int session_id_generate(session_id_t *id)
     return 0;
 }
 
-static ssize_t session_key_info_build(const session_id_t *id, psa_algorithm_t algorithm, char *buf)
+static ssize_t session_key_info_build(const session_id_t *id,
+                                      psa_algorithm_t algorithm,
+                                      uint8_t max_block_size_log,
+                                      char *buf)
 {
     char session_id[SESSION_ID_LEN * 2];
     size_t id_len = 0;
@@ -87,15 +90,17 @@ static ssize_t session_key_info_build(const session_id_t *id, psa_algorithm_t al
     session_id[id_len] = '\0';
 
     return sprintf(buf,
-                   "E0:%c:%s:C%c%c",
+                   "E0:%c:%s:C%c%c:%02x",
                    id->initiator == POUCH_ROLE_DEVICE ? 'D' : 'S',
                    session_id,
                    algorithm == PSA_ALG_CHACHA20_POLY1305 ? 'C' : 'A',
-                   id->type == SESSION_ID_TYPE_SEQUENTIAL ? 'S' : 'R');
+                   id->type == SESSION_ID_TYPE_SEQUENTIAL ? 'S' : 'R',
+                   max_block_size_log);
 }
 
 psa_key_id_t session_key_generate(const session_id_t *id,
                                   psa_algorithm_t algorithm,
+                                  uint8_t max_block_size_log,
                                   psa_key_id_t private_key,
                                   const struct pubkey *pubkey,
                                   psa_key_usage_t usage)
@@ -134,7 +139,7 @@ psa_key_id_t session_key_generate(const session_id_t *id,
     }
 
     uint8_t info[INFO_MAX_LEN];
-    ssize_t info_len = session_key_info_build(id, algorithm, info);
+    ssize_t info_len = session_key_info_build(id, algorithm, max_block_size_log, info);
     if (info_len < 0)
     {
         LOG_ERR("Failed session key build: %d", info_len);

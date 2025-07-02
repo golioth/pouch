@@ -78,6 +78,7 @@ int session_id_generate(session_id_t *id);
 /** Generate a session key for the given session */
 psa_key_id_t session_key_generate(const session_id_t *id,
                                   psa_algorithm_t algorithm,
+                                  uint8_t max_block_size_log,
                                   psa_key_id_t private_key,
                                   const struct pubkey *pubkey,
                                   psa_key_usage_t usage);
