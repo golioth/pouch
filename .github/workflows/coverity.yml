@@ -1,0 +1,52 @@
+name: "Coverity"
+
+on:
+  schedule:
+    # Run workflow every Sunday
+    - cron: "00 0 * * 0"
+  workflow_dispatch:
+
+jobs:
+  coverity:
+    runs-on: ubuntu-24.04
+    container: golioth/golioth-coverity-base:89df175
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: pouch
+      - name: Init and update west
+        run: |
+          west init -l pouch --mf west.yml
+          west update --narrow -o=--depth=1
+      - name: Install pip packages
+        run: |
+          uv pip install \
+            -r deps/zephyr/scripts/requirements-base.txt        \
+            -r pouch/requirements.txt
+
+          uv pip install            \
+            cryptography==41.0.7  \
+            pyasn1                \
+            pyyaml                \
+            cbor>=1.0.0           \
+            imgtool>=1.9.0        \
+            jinja2                \
+            click
+      - run: |
+          /opt/toolchains/coverity/bin/cov-configure --comptype gcc \
+            --compiler /opt/toolchains/zephyr-sdk-0.17.0/arm-zephyr-eabi/bin/arm-zephyr-eabi-gcc
+          /opt/toolchains/coverity/bin/cov-build --dir cov-int \
+            west build -p -b nrf52840dk/nrf52840 pouch/examples/ble_gatt \
+            -- -DCONFIG_LOG=n
+          tar czvf pouch.tgz cov-int
+          curl --form token=${{ secrets.POUCH_COVERITY_TOKEN }} \
+            --form email=sam@golioth.io \
+            --form file=@pouch.tgz \
+            --form version="0" \
+            --form description="Description" \
+            https://scan.coverity.com/builds?project=golioth%2Fpouch
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverity_output
+          path: pouch.tgz
