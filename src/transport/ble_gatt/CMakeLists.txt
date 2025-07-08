@@ -15,6 +15,7 @@ zephyr_library_sources(
 )
 
 zephyr_library_sources_ifdef(CONFIG_POUCH_ENCRYPTION_SAEAD
+    device_cert_characteristic.c
     server_cert_characteristic.c
 )
 
