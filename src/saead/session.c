@@ -5,6 +5,7 @@
 
 #include "../block.h"
 #include <stdint.h>
+#include <stdio.h>
 #include <sys/types.h>
 #include <psa/crypto.h>
 #include <zephyr/sys/byteorder.h>

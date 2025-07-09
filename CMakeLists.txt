@@ -18,6 +18,7 @@ if(CONFIG_POUCH)
 
     zephyr_library_sources_ifdef(CONFIG_POUCH_ENCRYPTION_NONE src/crypto_none.c)
     zephyr_library_sources_ifdef(CONFIG_POUCH_ENCRYPTION_SAEAD
+        src/crypto_saead.c
         src/cert.c
         src/saead/session.c
         src/saead/uplink.c
