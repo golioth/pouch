@@ -36,15 +36,13 @@ static struct
 static void decrypt_blocks(struct k_work *work);
 static void consume_blocks(struct k_work *work);
 
-int downlink_init(const struct pouch_config *config)
+void downlink_init(void)
 {
     buf_queue_init(&decrypt.queue);
     k_work_init(&decrypt.work, decrypt_blocks);
 
     buf_queue_init(&consume.queue);
     k_work_init(&consume.work, consume_blocks);
-
-    return 0;
 }
 
 static void consume_blocks(struct k_work *work)

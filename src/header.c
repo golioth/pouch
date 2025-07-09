@@ -35,13 +35,13 @@
 #error "Unsupported encryption type"
 #endif
 
-static int write_header(const struct pouch_config *config, struct pouch_buf *buf, size_t maxlen)
+static int write_header(struct pouch_buf *buf, size_t maxlen)
 {
     struct pouch_header header = {
         .version = POUCH_HEADER_VERSION,
     };
 
-    int err = crypto_header_get(config, &header.encryption_info_m);
+    int err = crypto_header_get(&header.encryption_info_m);
     if (err)
     {
         return err;
@@ -59,7 +59,7 @@ static int write_header(const struct pouch_config *config, struct pouch_buf *buf
     return 0;
 }
 
-struct pouch_buf *pouch_header_create(const struct pouch_config *config)
+struct pouch_buf *pouch_header_create(void)
 {
     struct pouch_buf *header = buf_alloc(POUCH_HEADER_MAX_LEN);
     if (!header)
@@ -67,7 +67,7 @@ struct pouch_buf *pouch_header_create(const struct pouch_config *config)
         return NULL;
     }
 
-    int err = write_header(config, header, POUCH_HEADER_MAX_LEN);
+    int err = write_header(header, POUCH_HEADER_MAX_LEN);
     if (err)
     {
         buf_free(header);

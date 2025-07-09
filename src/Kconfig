@@ -19,7 +19,6 @@ config POUCH_BLOCK_SIZE
 
 choice
   prompt "Pouch uplink encryption scheme"
-  default POUCH_ENCRYPTION_NONE # NOTE: This will change once SAEAD encryption is available.
   help
     Select the encryption method to use for uplink Pouch transfers.
 

@@ -3,14 +3,10 @@
  */
 #include "downlink.h"
 #include "uplink.h"
+#include "crypto.h"
 
 #include <pouch/events.h>
-#include <pouch/transport/uplink.h>
-#include <pouch/types.h>
-#include <string.h>
 
-#include <zephyr/init.h>
-#include <zephyr/kernel.h>
 #include <zephyr/sys/iterable_sections.h>
 #include <zephyr/sys/ring_buffer.h>
 
@@ -25,26 +21,8 @@ void pouch_event_emit(enum pouch_event event)
 
 int pouch_init(const struct pouch_config *config)
 {
-    int err;
+    downlink_init();
+    uplink_init();
 
-    if (config->encryption_type != POUCH_ENCRYPTION_PLAINTEXT)
-    {
-        return -ENOTSUP;
-    }
-    if (!config->encryption.plaintext.device_id)
-    {
-        return -EINVAL;
-    }
-    if (strlen(config->encryption.plaintext.device_id) > POUCH_DEVICE_ID_MAX_LEN)
-    {
-        return -EINVAL;
-    }
-
-    err = downlink_init(config);
-    if (err)
-    {
-        return err;
-    }
-
-    return uplink_init(config);
+    return crypto_init(config);
 }

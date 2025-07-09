@@ -7,11 +7,20 @@
 #include "buf.h"
 #include <pouch/types.h>
 
+/** Initialize crypto module */
+int crypto_init(const struct pouch_config *config);
+
+/** Notify the crypto module that a new pouch session is starting */
+int crypto_session_start(void);
+
+/** Notify the crypto module that the pouch session is ending */
+void crypto_session_end(void);
+
 /** Initialize a new pouch in the encryption engine. */
 int crypto_pouch_start(void);
 
 /** Construct the encryption info part of the pouch header */
-int crypto_header_get(const struct pouch_config *config, struct encryption_info *encryption_info);
+int crypto_header_get(struct encryption_info *encryption_info);
 
 /**
  * Decrypt a block of data.
