@@ -1,5 +1,6 @@
 #pragma once
 
+#include <pouch/certificate.h>
 #include <pouch/types.h>
 #include <stdbool.h>
 #include <mbedtls/x509_crt.h>
@@ -8,11 +9,6 @@
 #define CERT_REF_HASH_ALG PSA_ALG_SHA_256
 #define CERT_REF_LEN PSA_HASH_LENGTH(CERT_REF_HASH_ALG)
 #define CERT_REF_SHORT_LEN 6
-
-/* Max serial number length is 20 bytes according to spec:
- * https://datatracker.ietf.org/doc/html/rfc5280#section-4.1.2.2
- */
-#define CERT_SERIAL_MAXLEN 20
 
 int cert_device_set(const struct pouch_cert *cert);
 int cert_server_set(const struct pouch_cert *cert);
