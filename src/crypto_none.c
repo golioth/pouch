@@ -15,7 +15,7 @@ int crypto_header_get(const struct pouch_config *config, struct encryption_info 
         return -EINVAL;
     }
 
-    encryption_info->Union_choice = encryption_info_union_plaintext_info_m_c;
+    encryption_info->union_choice = encryption_info_union_plaintext_info_m_c;
     encryption_info->plaintext_info_m.id.len = strlen(config->encryption.plaintext.device_id);
     encryption_info->plaintext_info_m.id.value = config->encryption.plaintext.device_id;
 
