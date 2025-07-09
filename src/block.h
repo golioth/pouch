@@ -4,9 +4,15 @@
 #pragma once
 
 #include <zephyr/kernel.h>
+#include <zephyr/sys/util.h>
 #include "buf.h"
 
 #define BLOCK_ID_MASK 0x1f
+
+/** Log2 of max block size */
+#define MAX_BLOCK_SIZE_LOG LOG2(CONFIG_POUCH_BLOCK_SIZE)
+/** Rounded maximum block size */
+#define MAX_BLOCK_SIZE (1 << MAX_BLOCK_SIZE_LOG)
 
 void block_decode_hdr(struct pouch_bufview *v,
                       uint16_t *block_size,
