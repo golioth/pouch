@@ -78,6 +78,12 @@ config POUCH_ENCRYPTION_AES_GCM
 
 endchoice
 
+config POUCH_SERVER_CERT_MAX_LEN
+  int "Server certificate maximum length"
+  default 4096
+  help
+    Maximum length of server certificate.
+
 menuconfig POUCH_VALIDATE_SERVER_CERT
   bool "Validate server's certificate"
   default y

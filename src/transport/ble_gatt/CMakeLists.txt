@@ -1,11 +1,17 @@
 zephyr_library()
 
+zephyr_library_link_libraries(pouch)
+
 zephyr_library_sources(
     downlink_characteristic.c
     info_encode.c
     info_characteristic.c
     peripheral.c
     uplink_characteristic.c
+)
+
+zephyr_library_sources_ifdef(CONFIG_POUCH_ENCRYPTION_SAEAD
+    server_cert_characteristic.c
 )
 
 zephyr_linker_sources(DATA_SECTIONS attributes.ld)
