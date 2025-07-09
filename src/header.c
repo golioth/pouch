@@ -2,9 +2,11 @@
  * Copyright (c) 2025 Golioth, Inc.
  */
 #include "header.h"
+#include "cert.h"
 #include "crypto.h"
 #include "buf.h"
 #include "cddl/header_encode.h"
+#include "saead/session.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -27,6 +29,8 @@
 
 #define POUCH_HEADER_MAX_LEN \
     (POUCH_HEADER_OVERHEAD + POUCH_HEADER_OVERHEAD_ENCRYPTION_NONE + POUCH_DEVICE_ID_MAX_LEN)
+#elif defined(CONFIG_POUCH_ENCRYPTION_SAEAD)
+#define POUCH_HEADER_MAX_LEN (16 + SESSION_ID_LEN + CERT_REF_SHORT_LEN)
 #else
 #error "Unsupported encryption type"
 #endif
