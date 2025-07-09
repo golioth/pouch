@@ -24,7 +24,6 @@ enum flags
 
 struct pouch_uplink
 {
-    struct pouch_config config;
     struct pouch_buf *header;
     atomic_t flags;
     atomic_t id;
@@ -88,6 +87,13 @@ static void process_blocks(struct k_work *work)
     }
 }
 
+static void session_end(void)
+{
+    crypto_session_end();
+    atomic_clear_bit(&uplink.flags, SESSION_ACTIVE);
+    pouch_event_emit(POUCH_EVENT_SESSION_END);
+}
+
 void uplink_enqueue(struct pouch_buf *block)
 {
     buf_queue_submit(&uplink.processing.queue, block);
@@ -108,14 +114,11 @@ int pouch_uplink_close(k_timeout_t timeout)
     return err;
 }
 
-int uplink_init(const struct pouch_config *config)
+void uplink_init(void)
 {
-    uplink.config = *config;
     buf_queue_init(&uplink.processing.queue);
     buf_queue_init(&uplink.transport.queue);
     k_work_init(&uplink.processing.work, process_blocks);
-
-    return 0;
 }
 
 uint32_t uplink_session_id(void)
@@ -127,17 +130,32 @@ uint32_t uplink_session_id(void)
 
 struct pouch_uplink *pouch_uplink_start(void)
 {
+    int err;
+
     if (atomic_test_and_set_bit(&uplink.flags, SESSION_ACTIVE))
     {
         return NULL;
     }
 
-    crypto_pouch_start();
+    err = crypto_session_start();
+    if (err)
+    {
+        atomic_clear_bit(&uplink.flags, SESSION_ACTIVE);
+        return NULL;
+    }
+
+    err = crypto_pouch_start();
+    if (err)
+    {
+        atomic_clear_bit(&uplink.flags, SESSION_ACTIVE);
+        return NULL;
+    }
 
     // Create the header, but don't push it to the queue until we have data to send:
-    uplink.header = pouch_header_create(&uplink.config);
+    uplink.header = pouch_header_create();
     if (!uplink.header)
     {
+        atomic_clear_bit(&uplink.flags, SESSION_ACTIVE);
         return NULL;
     }
 
@@ -189,8 +207,7 @@ enum pouch_result pouch_uplink_fill(struct pouch_uplink *uplink, uint8_t *dst, s
         return POUCH_MORE_DATA;
     }
 
-    atomic_clear_bit(&uplink->flags, SESSION_ACTIVE);
-    pouch_event_emit(POUCH_EVENT_SESSION_END);
+    session_end();
 
     return POUCH_NO_MORE_DATA;
 }
@@ -224,6 +241,6 @@ void pouch_uplink_finish(struct pouch_uplink *uplink)
          * we didn't emit the end event, and need to do it
          * here instead.
          */
-        pouch_event_emit(POUCH_EVENT_SESSION_END);
+        session_end();
     }
 }

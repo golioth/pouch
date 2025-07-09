@@ -14,7 +14,6 @@ static struct session uplink;
 
 int uplink_session_start(psa_algorithm_t algorithm, psa_key_id_t private_key)
 {
-    session_init(&uplink, algorithm);
     struct pubkey pubkey;
 
     uplink.flags = ATOMIC_INIT(0);
@@ -43,6 +42,8 @@ int uplink_session_start(psa_algorithm_t algorithm, psa_key_id_t private_key)
         return err;
     }
 
+    uplink.algorithm = algorithm;
+    uplink.pouch.id = 0;
     atomic_set_bit(&uplink.flags, SESSION_VALID);
     atomic_set_bit(&uplink.flags, SESSION_ACTIVE);
 
@@ -58,7 +59,7 @@ int uplink_header_get(struct saead_info *info)
 {
     if (!atomic_test_bit(&uplink.flags, SESSION_ACTIVE))
     {
-        LOG_ERR("Session not active");
+        LOG_ERR("Not in a session");
         return -ENOTCONN;
     }
 
@@ -98,15 +99,14 @@ int uplink_header_get(struct saead_info *info)
 
 struct pouch_buf *uplink_encrypt_block(struct pouch_buf *block)
 {
-    struct pouch_buf *encrypted = NULL;
-    if (atomic_test_bit(&uplink.flags, SESSION_ACTIVE))
-    {
-        encrypted = session_encrypt_block(&uplink, block);
-    }
-    else
+    if (!atomic_test_bit(&uplink.flags, SESSION_ACTIVE))
     {
         LOG_WRN("Not in a session");
+        buf_free(block);
+        return NULL;
     }
+
+    struct pouch_buf *encrypted = session_encrypt_block(&uplink, block);
 
     buf_free(block);
 
