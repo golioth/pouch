@@ -16,6 +16,9 @@ int crypto_session_start(void);
 /** Notify the crypto module that the pouch session is ending */
 void crypto_session_end(void);
 
+/** Start a new downlink pouch */
+int crypto_downlink_start(const struct encryption_info *encryption_info);
+
 /** Initialize a new pouch in the encryption engine. */
 int crypto_pouch_start(void);
 

@@ -117,7 +117,18 @@ static size_t pouch_downlink_parse_header(struct pouch_bufview *v)
     LOG_HEXDUMP_DBG(header_raw, header_len, "pouch header raw");
 
     LOG_DBG("Header version %d", (int) header.version);
+    LOG_DBG("Encryption type %s",
+            (int) header.encryption_info_m.Union_choice == encryption_info_union_plaintext_info_m_c
+                ? "Plaintext"
+                : "SAEAD");
     LOG_DBG("Payload len %d", (int) header_len);
+
+    int err = crypto_downlink_start(&header.encryption_info_m);
+    if (err)
+    {
+        LOG_ERR("Invalid header: %d", err);
+        return err;
+    }
 
     return header_len;
 }
