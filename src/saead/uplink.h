@@ -17,3 +17,14 @@ int uplink_pouch_start(void);
 
 /** Encrypt a block in the current uplink pouch */
 struct pouch_buf *uplink_encrypt_block(struct pouch_buf *block);
+
+/**
+ * Get whether the given session ID, block size and algorithm matches the uplink's ongoing session
+ * parameters.
+ */
+bool uplink_session_matches(const struct session_id *id,
+                            uint8_t max_block_size_log,
+                            psa_algorithm_t algorithm);
+
+/** Make a copy of the uplink session's session key. */
+psa_key_id_t uplink_session_key_copy(psa_key_usage_t usage);

@@ -119,6 +119,13 @@ static size_t pouch_downlink_parse_header(struct pouch_bufview *v)
     LOG_DBG("Header version %d", (int) header.version);
     LOG_DBG("Payload len %d", (int) header_len);
 
+    int err = crypto_downlink_start(&header.encryption_info_m);
+    if (err)
+    {
+        LOG_ERR("Invalid header: %d", err);
+        return err;
+    }
+
     return header_len;
 }
 
