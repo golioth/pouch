@@ -22,6 +22,7 @@ if(CONFIG_POUCH)
         src/cert.c
         src/saead/session.c
         src/saead/uplink.c
+        src/saead/downlink.c
     )
 
     # Add MbedTLS features through a config file override:
