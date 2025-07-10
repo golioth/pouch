@@ -24,6 +24,11 @@ if(CONFIG_POUCH)
         src/saead/uplink.c
     )
 
+    # Add MbedTLS features through a config file override:
+    if (CONFIG_POUCH_ENCRYPTION_SAEAD AND CONFIG_NRF_SECURITY)
+        zephyr_library_compile_definitions(MBEDTLS_USER_CONFIG_FILE="${CMAKE_CURRENT_LIST_DIR}/src/saead/mbedtls_config.h")
+    endif()
+
     if (DEFINED CONFIG_POUCH_CA_CERT_FILENAME)
         find_file(ca_cert ${CONFIG_POUCH_CA_CERT_FILENAME}
             PATHS
