@@ -179,12 +179,6 @@ int session_pouch_start(struct session *session, pouch_id_t pouch_id)
         return -EBUSY;
     }
 
-    if (atomic_test_and_set_bit(&session->flags, SESSION_HAS_POUCH)
-        && pouch_id <= session->pouch.id)
-    {
-        return -EINVAL;
-    }
-
     session->pouch.id = pouch_id;
     session->pouch.block_index = 0;
 
@@ -273,7 +267,7 @@ struct pouch_buf *session_decrypt_block(struct session *session, struct pouch_bu
     }
 
     uint8_t nonce[NONCE_LEN];
-    nonce_generate(session, POUCH_ROLE_DEVICE, nonce);
+    nonce_generate(session, POUCH_ROLE_SERVER, nonce);
 
     struct pouch_bufview ciphertext;
     pouch_bufview_init(&ciphertext, block);

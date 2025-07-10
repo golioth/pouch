@@ -87,7 +87,7 @@ static void process_blocks(struct k_work *work)
     }
 }
 
-static void session_end(void)
+static void end_session(void)
 {
     crypto_session_end();
     atomic_clear_bit(&uplink.flags, SESSION_ACTIVE);
@@ -207,7 +207,7 @@ enum pouch_result pouch_uplink_fill(struct pouch_uplink *uplink, uint8_t *dst, s
         return POUCH_MORE_DATA;
     }
 
-    session_end();
+    end_session();
 
     return POUCH_NO_MORE_DATA;
 }
@@ -241,6 +241,6 @@ void pouch_uplink_finish(struct pouch_uplink *uplink)
          * we didn't emit the end event, and need to do it
          * here instead.
          */
-        session_end();
+        end_session();
     }
 }
