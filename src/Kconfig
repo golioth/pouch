@@ -24,14 +24,13 @@ choice
 
 config POUCH_ENCRYPTION_SAEAD
   bool "Streaming AEAD"
-  select PSA_WANT_ALG_ECDSA
   select PSA_WANT_ALG_ECDH
   select PSA_WANT_ALG_HKDF
+  select PSA_WANT_ALG_HMAC
   select PSA_WANT_ALG_STREAM_CIPHER
   select PSA_WANT_ALG_SHA_256
-  select MBEDTLS_X509_LIBRARY
-  select MBEDTLS_X509_CRT_PARSE_C
-  select MBEDTLS_PK_PARSE_C
+  select PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_DERIVE
+  select PSA_WANT_KEY_TYPE_ECC_PUBLIC_KEY
   select BASE64
   help
     Use a streaming AEAD encryption scheme for uplink Pouch transfers.
@@ -92,6 +91,12 @@ config POUCH_CA_CERT_FILENAME
     This is used to verify the server's identity.
 
 endif
+
+config MBEDTLS_USER_CONFIG_ENABLE
+  default y
+
+config MBEDTLS_USER_CONFIG_FILE
+  default "${ZEPHYR_POUCH_MODULE_DIR}/src/saead/mbedtls_config.h"
 
 endmenu
 
