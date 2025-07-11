@@ -7,7 +7,7 @@
 #include <pouch/types.h>
 
 /** Initialize the pouch uplink handler */
-int uplink_init(const struct pouch_config *config);
+void uplink_init(void);
 
 void uplink_enqueue(struct pouch_buf *block);
 

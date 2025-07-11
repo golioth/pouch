@@ -7,6 +7,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/atomic.h>
 #include <psa/crypto.h>
+#include <string.h>
 
 #define SESSION_ID_LEN 16
 #define SESSION_ID_TAG_LEN (SESSION_ID_LEN - sizeof(uint64_t))
