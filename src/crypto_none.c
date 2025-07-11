@@ -35,6 +35,16 @@ int crypto_session_start(void)
 
 void crypto_session_end(void) {}
 
+int crypto_downlink_start(const struct encryption_info *encryption_info)
+{
+    if (encryption_info->Union_choice != encryption_info_union_plaintext_info_m_c)
+    {
+        return -ENOTSUP;
+    }
+
+    return 0;
+}
+
 int crypto_pouch_start(void)
 {
     return 0;

@@ -117,3 +117,31 @@ void uplink_session_end(void)
 {
     session_end(&uplink);
 }
+
+bool uplink_session_matches(const struct session_id *id,
+                            uint8_t max_block_size_log,
+                            psa_algorithm_t algorithm)
+{
+    return atomic_test_bit(&uplink.flags, SESSION_VALID) && session_id_is_equal(id, &uplink.id)
+        && max_block_size_log == MAX_BLOCK_SIZE_LOG && uplink.algorithm == algorithm;
+}
+
+psa_key_id_t uplink_session_key_copy(psa_key_usage_t usage)
+{
+    psa_key_id_t copy = PSA_KEY_ID_NULL;
+    if (!atomic_test_bit(&uplink.flags, SESSION_VALID))
+    {
+        return PSA_KEY_ID_NULL;
+    }
+
+    psa_key_attributes_t attrs = PSA_KEY_ATTRIBUTES_INIT;
+    psa_set_key_usage_flags(&attrs, usage);
+
+    psa_status_t status = psa_copy_key(uplink.key, &attrs, &copy);
+    if (status != PSA_SUCCESS)
+    {
+        return PSA_KEY_ID_NULL;
+    }
+
+    return copy;
+}
