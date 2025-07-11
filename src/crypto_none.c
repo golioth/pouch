@@ -8,22 +8,17 @@ static const char *device_id;
 
 int crypto_init(const struct pouch_config *config)
 {
-    if (config->encryption_type != POUCH_ENCRYPTION_PLAINTEXT)
-    {
-        return -ENOTSUP;
-    }
-
-    if (config->encryption.plaintext.device_id == NULL)
+    if (config->device_id == NULL)
     {
         return -EINVAL;
     }
 
-    if (strlen(config->encryption.plaintext.device_id) > POUCH_DEVICE_ID_MAX_LEN)
+    if (strlen(config->device_id) > POUCH_DEVICE_ID_MAX_LEN)
     {
         return -EINVAL;
     }
 
-    device_id = config->encryption.plaintext.device_id;
+    device_id = config->device_id;
 
     return 0;
 }
