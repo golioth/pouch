@@ -18,23 +18,18 @@ static psa_key_id_t pkey;
 
 int crypto_init(const struct pouch_config *config)
 {
-    if (config->encryption_type != POUCH_ENCRYPTION_SAEAD)
-    {
-        return -ENOTSUP;
-    }
-
-    if (config->encryption.saead.private_key == PSA_KEY_ID_NULL)
+    if (config->private_key == PSA_KEY_ID_NULL)
     {
         return -EINVAL;
     }
 
-    int err = cert_device_set(&config->encryption.saead.certificate);
+    int err = cert_device_set(&config->certificate);
     if (err)
     {
         return err;
     }
 
-    pkey = config->encryption.saead.private_key;
+    pkey = config->private_key;
 
     return 0;
 }

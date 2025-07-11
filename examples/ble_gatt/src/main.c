@@ -119,11 +119,7 @@ int main(void)
     LOG_DBG("Bluetooth initialized\n");
 
     struct pouch_config config = {
-        .encryption_type = POUCH_ENCRYPTION_PLAINTEXT,
-        .encryption.plaintext =
-            {
-                .device_id = CONFIG_EXAMPLE_DEVICE_ID,
-            },
+        .device_id = CONFIG_EXAMPLE_DEVICE_ID,
     };
     err = pouch_init(&config);
     if (err)

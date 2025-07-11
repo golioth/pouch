@@ -39,8 +39,7 @@ struct downlink_api_context
 static struct downlink_api_context downlink_api;
 
 static const struct pouch_config pouch_config = {
-    .encryption_type = POUCH_ENCRYPTION_PLAINTEXT,
-    .encryption.plaintext.device_id = CONFIG_POUCH_DEVICE_NAME,
+    .device_id = CONFIG_POUCH_DEVICE_NAME,
 };
 
 static void *init_pouch(void)
