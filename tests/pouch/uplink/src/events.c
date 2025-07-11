@@ -12,8 +12,7 @@ static uint32_t end_events;
 #define DEVICE_ID "test-device-id"
 
 static const struct pouch_config pouch_config = {
-    .encryption_type = POUCH_ENCRYPTION_PLAINTEXT,
-    .encryption.plaintext.device_id = DEVICE_ID,
+    .device_id = DEVICE_ID,
 };
 
 static void *init_pouch(void)
