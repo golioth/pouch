@@ -21,8 +21,33 @@ static const struct bt_uuid_128 golioth_ble_gatt_server_cert_chrc_uuid =
 
 static struct golioth_ble_gatt_server_cert_ctx
 {
+    struct golioth_ble_gatt_packetizer *packetizer;
     struct pouch_cert cert;
+    uint8_t serial[CERT_SERIAL_MAXLEN];
+    uint8_t serial_len;
+    uint8_t serial_offset;
 } server_cert_chrc_ctx;
+
+static enum golioth_ble_gatt_packetizer_result server_cert_serial_fill_cb(void *dst,
+                                                                          size_t *dst_len,
+                                                                          void *user_arg)
+{
+    struct golioth_ble_gatt_server_cert_ctx *ctx = user_arg;
+    enum golioth_ble_gatt_packetizer_result ret = GOLIOTH_BLE_GATT_PACKETIZER_MORE_DATA;
+    size_t maxlen = *dst_len;
+
+    *dst_len = MIN(maxlen, ctx->serial_len - ctx->serial_offset);
+    memcpy(dst, &ctx->serial[ctx->serial_offset], *dst_len);
+
+    ctx->serial_offset += *dst_len;
+
+    if (ctx->serial_offset >= ctx->serial_len)
+    {
+        ret = GOLIOTH_BLE_GATT_PACKETIZER_NO_MORE_DATA;
+    }
+
+    return ret;
+}
 
 static ssize_t server_cert_serial_read(struct bt_conn *conn,
                                        const struct bt_gatt_attr *attr,
@@ -30,9 +55,49 @@ static ssize_t server_cert_serial_read(struct bt_conn *conn,
                                        uint16_t len,
                                        uint16_t offset)
 {
-    uint8_t empty[] = {0x03};
+    /* Force packets into a single MTU */
 
-    return bt_gatt_attr_read(conn, attr, buf, len, offset, empty, sizeof(empty));
+    if (0 != offset)
+    {
+        return 0;
+    }
+
+    struct golioth_ble_gatt_server_cert_ctx *ctx = attr->user_data;
+
+    if (NULL == ctx->packetizer)
+    {
+        int ret;
+
+        ret = pouch_server_certificate_serial_get(ctx->serial, sizeof(ctx->serial));
+        if (ret < 0)
+        {
+            return BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED);
+        }
+
+        ctx->serial_len = ret;
+        ctx->serial_offset = 0;
+
+        ctx->packetizer =
+            golioth_ble_gatt_packetizer_start_callback(server_cert_serial_fill_cb, ctx);
+    }
+
+    size_t buf_len = len;
+    enum golioth_ble_gatt_packetizer_result ret =
+        golioth_ble_gatt_packetizer_get(ctx->packetizer, buf, &buf_len);
+
+    if (GOLIOTH_BLE_GATT_PACKETIZER_ERROR == ret)
+    {
+        golioth_ble_gatt_packetizer_finish(ctx->packetizer);
+        ctx->packetizer = NULL;
+        return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
+    }
+    if (GOLIOTH_BLE_GATT_PACKETIZER_NO_MORE_DATA == ret)
+    {
+        golioth_ble_gatt_packetizer_finish(ctx->packetizer);
+        ctx->packetizer = NULL;
+    }
+
+    return buf_len;
 }
 
 static ssize_t server_cert_write(struct bt_conn *conn,
