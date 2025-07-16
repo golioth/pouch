@@ -22,7 +22,7 @@ LOG_MODULE_REGISTER(saead_session, LOG_LEVEL_DBG);
 
 #define NONCE_LEN 12
 #define INFO_MAX_LEN (12 + BASE64_STRLEN(SESSION_ID_LEN) + 1)
-#define SAEAD_KEY_SIZE 32
+#define SAEAD_KEY_SIZE(alg) ((alg) == PSA_ALG_CHACHA20_POLY1305 ? 32 : 16)
 
 #define SESSION_KEY_TYPE(alg) \
     ((alg) == PSA_ALG_CHACHA20_POLY1305 ? PSA_KEY_TYPE_CHACHA20 : PSA_KEY_TYPE_AES)
@@ -155,7 +155,7 @@ psa_key_id_t session_key_generate(const struct session_id *id,
 
     psa_set_key_lifetime(&key_attributes, PSA_KEY_LIFETIME_VOLATILE);
     psa_set_key_type(&key_attributes, SESSION_KEY_TYPE(algorithm));
-    psa_set_key_bits(&key_attributes, SAEAD_KEY_SIZE * 8);
+    psa_set_key_bits(&key_attributes, SAEAD_KEY_SIZE(algorithm) * 8);
     psa_set_key_algorithm(&key_attributes, algorithm);
     psa_set_key_usage_flags(&key_attributes, usage);
 
