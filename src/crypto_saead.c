@@ -78,48 +78,48 @@ int crypto_downlink_start(const struct encryption_info *encryption_info)
         id.value.sequential.seqnum = session->session_id_sequential_m.seq;
     }
 
-    int err = downlink_session_start(&id,
-                                     session->algorithm_choice == session_info_algorithm_aes_gcm_m_c
-                                         ? PSA_ALG_GCM
-                                         : PSA_ALG_CHACHA20_POLY1305,
-                                     session->max_block_size_log,
-                                     pkey);
+    int err = saead_downlink_session_start(
+        &id,
+        session->algorithm_choice == session_info_algorithm_aes_gcm_m_c ? PSA_ALG_GCM
+                                                                        : PSA_ALG_CHACHA20_POLY1305,
+        session->max_block_size_log,
+        pkey);
     if (err)
     {
         return err;
     }
 
-    return downlink_pouch_start(encryption_info->saead_info_m.pouch_id);
+    return saead_downlink_pouch_start(encryption_info->saead_info_m.pouch_id);
 }
 
 int crypto_session_start(void)
 {
-    return uplink_session_start(ENCRYPTION_ALGORITHM, pkey);
+    return saead_uplink_session_start(ENCRYPTION_ALGORITHM, pkey);
 }
 
 void crypto_session_end(void)
 {
-    uplink_session_end();
-    downlink_session_end();
+    saead_uplink_session_end();
+    saead_downlink_session_end();
 }
 
 int crypto_pouch_start(void)
 {
-    return uplink_pouch_start();
+    return saead_uplink_pouch_start();
 }
 
 int crypto_header_get(struct encryption_info *encryption_info)
 {
     encryption_info->Union_choice = encryption_info_union_saead_info_m_c;
-    return uplink_header_get(&encryption_info->saead_info_m);
+    return saead_uplink_header_get(&encryption_info->saead_info_m);
 }
 
 struct pouch_buf *crypto_decrypt_block(struct pouch_buf *block)
 {
-    return downlink_block_decrypt(block);
+    return saead_downlink_block_decrypt(block);
 }
 
 struct pouch_buf *crypto_encrypt_block(struct pouch_buf *block)
 {
-    return uplink_encrypt_block(block);
+    return saead_uplink_encrypt_block(block);
 }

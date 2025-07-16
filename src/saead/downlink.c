@@ -63,10 +63,10 @@ static bool is_valid_downlink(const struct session_id *id, psa_algorithm_t algor
     return true;
 }
 
-int downlink_session_start(const struct session_id *id,
-                           psa_algorithm_t algorithm,
-                           uint8_t max_block_size_log,
-                           psa_key_id_t private_key)
+int saead_downlink_session_start(const struct session_id *id,
+                                 psa_algorithm_t algorithm,
+                                 uint8_t max_block_size_log,
+                                 psa_key_id_t private_key)
 {
     psa_key_id_t session_key;
 
@@ -85,7 +85,7 @@ int downlink_session_start(const struct session_id *id,
             return -EBADMSG;
         }
 
-        if (!uplink_session_matches(id, max_block_size_log, algorithm))
+        if (!saead_uplink_session_matches(id, max_block_size_log, algorithm))
         {
             // The server claims to use our uplink's session, but it doesn't match
             LOG_ERR("Session reuse failed: No match");
@@ -93,7 +93,7 @@ int downlink_session_start(const struct session_id *id,
         }
 
         // We can make a copy of the uplink session's key instead of deriving it again:
-        session_key = uplink_session_key_copy(DOWNLINK_KEY_USAGE);
+        session_key = saead_uplink_session_key_copy(DOWNLINK_KEY_USAGE);
     }
     else
     {
@@ -125,12 +125,12 @@ int downlink_session_start(const struct session_id *id,
     return 0;
 }
 
-void downlink_session_end(void)
+void saead_downlink_session_end(void)
 {
     session_end(&downlink);
 }
 
-int downlink_pouch_start(pouch_id_t id)
+int saead_downlink_pouch_start(pouch_id_t id)
 {
     if (atomic_test_bit(&downlink.flags, SESSION_HAS_POUCH) && id <= server.pouch_id)
     {
@@ -141,7 +141,7 @@ int downlink_pouch_start(pouch_id_t id)
     return session_pouch_start(&downlink, id);
 }
 
-struct pouch_buf *downlink_block_decrypt(struct pouch_buf *block)
+struct pouch_buf *saead_downlink_block_decrypt(struct pouch_buf *block)
 {
     struct pouch_buf *decrypted = session_decrypt_block(&downlink, block);
     buf_free(block);
