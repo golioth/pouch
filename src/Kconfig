@@ -32,6 +32,12 @@ config POUCH_ENCRYPTION_SAEAD
   select PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_DERIVE
   select PSA_WANT_KEY_TYPE_ECC_PUBLIC_KEY
   select BASE64
+  # nRF Connect SDK only:
+  select NORDIC_SECURITY_BACKEND
+  select MBEDTLS_PK_PARSE_C
+  select MBEDTLS_PK_C
+  select MBEDTLS_X509_LIBRARY
+  select MBEDTLS_X509_CRT_PARSE_C
   help
     Use a streaming AEAD encryption scheme for uplink Pouch transfers.
 
