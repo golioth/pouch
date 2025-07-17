@@ -1,0 +1,11 @@
+common:
+  build_only: true
+  platform_allow:
+    - nrf52840dk/nrf52840
+tests:
+  pouch.encryption.chacha:
+    extra_configs:
+      - CONFIG_POUCH_ENCRYPTION_CHACHA20_POLY1305=y
+  pouch.encryption.aesgcm:
+    extra_configs:
+      - CONFIG_POUCH_ENCRYPTION_AES_GCM=y
