@@ -5,7 +5,7 @@
 
 #include "cddl/header_types.h"
 #include "buf.h"
-#include <pouch/types.h>
+#include <pouch/pouch.h>
 
 /** Initialize crypto module */
 int crypto_init(const struct pouch_config *config);

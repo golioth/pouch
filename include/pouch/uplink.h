@@ -3,8 +3,6 @@
  */
 #pragma once
 
-#include <pouch/types.h>
-
 #include <zephyr/kernel.h>
 
 /**
