@@ -1,3 +1,7 @@
+# Copyright (c) 2025 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 menuconfig POUCH
   bool "Golioth Pouch protocol"
   select ZCBOR

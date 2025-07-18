@@ -1,6 +1,9 @@
 /*
  * Copyright (c) 2025 Golioth, Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
  */
+
 #include "crypto.h"
 #include <string.h>
 

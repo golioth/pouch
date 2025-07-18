@@ -1,7 +1,8 @@
 /*
- * Copyright (c) 2024 Golioth
+ * Copyright (c) 2024 Golioth, Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 #include <stdlib.h>
 
 #include <zephyr/bluetooth/bluetooth.h>

@@ -1,6 +1,9 @@
 /*
  * Copyright (c) 2025 Golioth, Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
  */
+
 #pragma once
 
 /* Zephyr's MbedTLS configuration mechanism does not provide sufficient control over the available

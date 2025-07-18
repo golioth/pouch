@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2024 Golioth
+ * Copyright (c) 2024 Golioth, Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <zephyr/bluetooth/gatt.h>

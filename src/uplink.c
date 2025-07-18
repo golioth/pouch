@@ -1,6 +1,9 @@
 /*
  * Copyright (c) 2025 Golioth, Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
  */
+
 #include "pouch.h"
 #include "header.h"
 #include "entry.h"

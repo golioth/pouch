@@ -1,3 +1,7 @@
+# Copyright (c) 2025 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 if(CONFIG_POUCH)
     zephyr_include_directories(include)
 
