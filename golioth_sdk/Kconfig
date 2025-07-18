@@ -5,3 +5,32 @@
 menuconfig GOLIOTH
   bool "Golioth SDK"
   depends on POUCH
+
+if GOLIOTH
+
+menuconfig GOLIOTH_SETTINGS
+  bool "Golioth Settings service"
+  select ZCBOR_UTILS
+  help
+    Enables the Golioth Settings service. This allows for syncing
+    configuration data from the Golioth service down to the device.
+
+if GOLIOTH_SETTINGS
+
+choice GOLIOTH_SETTINGS_FRONTEND
+  prompt "Settings frontend"
+  help
+    Choose how applications interact with the Settings service
+
+config GOLIOTH_SETTINGS_FRONTEND_CALLBACKS
+  bool "Callbacks"
+  help
+    This enables a callback-based frontend to the Settings service.
+    Applications can register callbacks for individual settings values
+    at runtime.
+
+endchoice
+
+endif
+
+endif
