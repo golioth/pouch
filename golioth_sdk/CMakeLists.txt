@@ -12,4 +12,7 @@ zephyr_library_sources(
     dispatch.c
 )
 
+zephyr_library_sources_ifdef(CONFIG_GOLIOTH_SETTINGS settings.c)
+zephyr_library_sources_ifdef(CONFIG_GOLIOTH_SETTINGS_FRONTEND_CALLBACKS settings_callbacks.c)
+
 zephyr_linker_sources(DATA_SECTIONS dispatch.ld)
