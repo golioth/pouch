@@ -9,12 +9,19 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
+#include <zephyr/drivers/gpio.h>
 
 #include <pouch/pouch.h>
 #include <pouch/events.h>
 #include <pouch/uplink.h>
+#include <pouch/downlink.h>
 #include <pouch/transport/ble_gatt/peripheral.h>
 #include <pouch/transport/ble_gatt/common/types.h>
+
+#include <golioth/golioth.h>
+#include <golioth/settings_callbacks.h>
+
+static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
 
 static struct
 {
@@ -88,7 +95,8 @@ static void pouch_event_handler(enum pouch_event event, void *ctx)
                                  "{\"temp\":22}",
                                  sizeof("{\"temp\":22}") - 1,
                                  K_FOREVER);
-        pouch_uplink_close(K_FOREVER);
+
+        golioth_sync_to_cloud();
     }
 
     if (POUCH_EVENT_SESSION_END == event)
@@ -99,6 +107,15 @@ static void pouch_event_handler(enum pouch_event event, void *ctx)
 }
 
 POUCH_EVENT_HANDLER(pouch_event_handler, NULL);
+
+static int led_setting_cb(bool new_value, void *arg)
+{
+    gpio_pin_set_dt(&led, new_value ? 1 : 0);
+
+    return 0;
+}
+
+GOLIOTH_SETTINGS_HANDLER(LED, led_setting_cb, NULL);
 
 int main(void)
 {
@@ -136,6 +153,12 @@ int main(void)
     }
 
     LOG_DBG("Advertising successfully started");
+
+    err = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
+    if (err < 0)
+    {
+        LOG_ERR("Could not initialize LED");
+    }
 
     k_work_schedule(&sync_request_work, K_SECONDS(CONFIG_EXAMPLE_SYNC_PERIOD_S));
 
