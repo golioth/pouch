@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2025 Golioth, Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #include "uplink.h"
 #include "session.h"
 #include "../cert.h"

@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2025 Golioth, Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #pragma once
 
 /* Max serial number length is 20 bytes according to spec:
