@@ -1,0 +1,7 @@
+# Copyright (c) 2025 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+menuconfig GOLIOTH
+  bool "Golioth SDK"
+  depends on POUCH
