@@ -139,3 +139,6 @@ menu "Pouch libraries"
 rsource "../lib/Kconfig"
 
 endmenu
+
+# SDK
+rsource "../golioth_sdk/Kconfig"

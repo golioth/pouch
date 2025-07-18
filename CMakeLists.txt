@@ -72,6 +72,8 @@ if(CONFIG_POUCH)
                 " ************************************************")
     endif()
 
+    add_subdirectory(golioth_sdk)
+
 endif()
 
 # Libraries
