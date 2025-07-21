@@ -10,6 +10,7 @@ zephyr_library()
 
 zephyr_library_sources(
     dispatch.c
+    ota.c
 )
 
 zephyr_library_sources_ifdef(CONFIG_GOLIOTH_SETTINGS settings.c)
