@@ -21,6 +21,7 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 #include <pouch/transport/ble_gatt/common/types.h>
 
 #include <golioth/golioth.h>
+#include <golioth/ota.h>
 #include <golioth/settings_callbacks.h>
 
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET_OR(DT_ALIAS(led0), gpios, {});
@@ -123,6 +124,8 @@ static int led_setting_cb(bool new_value, void *arg)
 }
 
 GOLIOTH_SETTINGS_HANDLER(LED, led_setting_cb, NULL);
+
+GOLIOTH_OTA_COMPONENT(main, "1.5.6", NULL);
 
 int main(void)
 {
