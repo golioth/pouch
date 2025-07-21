@@ -20,4 +20,5 @@ manifest:
           - segger
           - tfm-mcuboot
           - trusted-firmware-m
+          - littlefs
           - zcbor

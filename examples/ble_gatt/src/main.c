@@ -7,6 +7,8 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
+#include "credentials.h"
+
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/drivers/gpio.h>
@@ -120,7 +122,7 @@ GOLIOTH_SETTINGS_HANDLER(LED, led_setting_cb, NULL);
 int main(void)
 {
     struct golioth_ble_gatt_peripheral *peripheral =
-        golioth_ble_gatt_peripheral_create(CONFIG_EXAMPLE_DEVICE_ID);
+        golioth_ble_gatt_peripheral_create("");  // TODO: This should no longer take the device ID
     if (NULL == peripheral)
     {
         LOG_ERR("Failed to create peripheral");
@@ -133,17 +135,34 @@ int main(void)
         return 0;
     }
 
-    LOG_DBG("Bluetooth initialized\n");
+    LOG_DBG("Bluetooth initialized");
 
-    struct pouch_config config = {
-        .device_id = CONFIG_EXAMPLE_DEVICE_ID,
-    };
+    struct pouch_config config;
+    err = load_certificate(&config.certificate);
+    if (err)
+    {
+        LOG_ERR("Failed to load certificate (err %d)", err);
+        return 0;
+    }
+
+    config.private_key = load_private_key();
+    if (config.private_key == PSA_KEY_ID_NULL)
+    {
+        LOG_ERR("Failed to load private key");
+        return 0;
+    }
+
     err = pouch_init(&config);
     if (err)
     {
         LOG_ERR("Pouch init failed (err %d)", err);
         return 0;
     }
+
+    LOG_DBG("Pouch successfully initialized");
+
+    // Can safely free the raw certificate after pouch initialization:
+    free_certificate(&config.certificate);
 
     err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_2, ad, ARRAY_SIZE(ad), NULL, 0);
     if (err)
