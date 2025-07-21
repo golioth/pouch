@@ -136,9 +136,9 @@ endif
 # Libraries
 menu "Pouch libraries"
 
-rsource "../lib/Kconfig"
+rsource "lib/Kconfig"
 
 endmenu
 
 # SDK
-rsource "../golioth_sdk/Kconfig"
+rsource "golioth_sdk/Kconfig"
