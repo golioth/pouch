@@ -17,4 +17,5 @@ manifest:
           - tfm-mcuboot
           - oberon-psa-crypto
           - trusted-firmware-m
+          - littlefs
           - zcbor
