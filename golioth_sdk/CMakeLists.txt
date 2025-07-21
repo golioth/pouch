@@ -10,7 +10,11 @@ zephyr_library()
 
 zephyr_library_sources(
     dispatch.c
+    ota.c
+    ota_upper.c
 )
+
+zephyr_linker_sources(SECTIONS ota_components.ld)
 
 zephyr_library_sources_ifdef(CONFIG_GOLIOTH_SETTINGS settings.c)
 zephyr_library_sources_ifdef(CONFIG_GOLIOTH_SETTINGS_FRONTEND_CALLBACKS settings_callbacks.c)

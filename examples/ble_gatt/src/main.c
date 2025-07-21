@@ -13,6 +13,11 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/drivers/gpio.h>
 
+#include <zephyr/dfu/flash_img.h>
+#include <zephyr/dfu/mcuboot.h>
+#include <zephyr/storage/flash_map.h>
+#include <zephyr/sys/reboot.h>
+
 #include <pouch/pouch.h>
 #include <pouch/events.h>
 #include <pouch/uplink.h>
@@ -21,6 +26,7 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 #include <pouch/transport/ble_gatt/common/types.h>
 
 #include <golioth/golioth.h>
+#include <golioth/ota.h>
 #include <golioth/settings_callbacks.h>
 
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET_OR(DT_ALIAS(led0), gpios, {});
@@ -123,6 +129,77 @@ static int led_setting_cb(bool new_value, void *arg)
 }
 
 GOLIOTH_SETTINGS_HANDLER(LED, led_setting_cb, NULL);
+
+static bool ota_main_available(const char *name, const char *target)
+{
+    LOG_INF("New package available %s@%s", name, target);
+    return true;
+}
+
+struct flash_img_context _flash_img_context;
+
+static int flash_img_erase_if_needed(struct flash_img_context *ctx)
+{
+    int err;
+
+    if (IS_ENABLED(CONFIG_IMG_ERASE_PROGRESSIVELY))
+    {
+        return 0;
+    }
+
+    err = flash_area_erase(ctx->flash_area, 0, ctx->flash_area->fa_size);
+    if (err)
+    {
+        return err;
+    }
+
+    return 0;
+}
+
+static void ota_main_receive(const void *data, size_t offset, size_t len, bool is_last)
+{
+    LOG_INF("Received %d bytes at offset %d", len, offset);
+
+    int err = 0;
+
+    if (0 == offset)
+    {
+        err = flash_img_init(&_flash_img_context);
+        if (err)
+        {
+            LOG_ERR("Failed to init flash write");
+            return;
+        }
+
+        err = flash_img_erase_if_needed(&_flash_img_context);
+        if (err)
+        {
+            LOG_ERR("Failed to erase flash");
+            return;
+        }
+    }
+
+    err = flash_img_buffered_write(&_flash_img_context, data, len, is_last);
+    if (err)
+    {
+        LOG_ERR("Failed to write to flash: %d", err);
+        return;
+    }
+
+    if (is_last)
+    {
+        err = boot_request_upgrade(BOOT_UPGRADE_TEST);
+        if (err)
+        {
+            LOG_ERR("Failed to request upgrade");
+            return;
+        }
+
+        sys_reboot(SYS_REBOOT_WARM);
+    }
+}
+
+GOLIOTH_OTA_COMPONENT(main, "1.5.5", ota_main_available, ota_main_receive);
 
 int main(void)
 {
