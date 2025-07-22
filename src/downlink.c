@@ -31,25 +31,27 @@ static struct
 
 static struct
 {
-    pouch_buf_queue_t queue;
+    pouch_buf_queue_t buf_queue;
+    struct k_work_q *work_queue;
     struct k_work work;
 } consume;
 
 static void decrypt_blocks(struct k_work *work);
 static void consume_blocks(struct k_work *work);
 
-void downlink_init(void)
+void downlink_init(struct k_work_q *pouch_work_queue)
 {
     buf_queue_init(&decrypt.queue);
     k_work_init(&decrypt.work, decrypt_blocks);
 
-    buf_queue_init(&consume.queue);
+    buf_queue_init(&consume.buf_queue);
+    consume.work_queue = pouch_work_queue;
     k_work_init(&consume.work, consume_blocks);
 }
 
 static void consume_blocks(struct k_work *work)
 {
-    struct pouch_buf *pouch_buf = buf_queue_get(&consume.queue);
+    struct pouch_buf *pouch_buf = buf_queue_get(&consume.buf_queue);
     if (!pouch_buf)
     {
         return;
@@ -59,9 +61,9 @@ static void consume_blocks(struct k_work *work)
 
     buf_free(pouch_buf);
 
-    if (!buf_queue_is_empty(&consume.queue))
+    if (!buf_queue_is_empty(&consume.buf_queue))
     {
-        k_work_submit(work);
+        k_work_submit_to_queue(consume.work_queue, work);
     }
 }
 
@@ -73,8 +75,8 @@ static void decrypt_blocks(struct k_work *work)
         return;
     }
 
-    buf_queue_submit(&consume.queue, decrypted);
-    k_work_submit(&consume.work);
+    buf_queue_submit(&consume.buf_queue, decrypted);
+    k_work_submit_to_queue(consume.work_queue, &consume.work);
 
     if (!buf_queue_is_empty(&decrypt.queue))
     {
