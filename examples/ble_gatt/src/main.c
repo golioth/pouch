@@ -121,14 +121,14 @@ GOLIOTH_SETTINGS_HANDLER(LED, led_setting_cb, NULL);
 
 int main(void)
 {
-    struct golioth_ble_gatt_peripheral *peripheral =
-        golioth_ble_gatt_peripheral_create("");  // TODO: This should no longer take the device ID
-    if (NULL == peripheral)
+    int err = golioth_ble_gatt_peripheral_init();
+    if (err)
     {
-        LOG_ERR("Failed to create peripheral");
+        LOG_ERR("Failed to initialize Pouch BLE GATT peripheral (err %d)", err);
+        return 0;
     }
 
-    int err = bt_enable(NULL);
+    err = bt_enable(NULL);
     if (err)
     {
         LOG_ERR("Bluetooth init failed (err %d)", err);

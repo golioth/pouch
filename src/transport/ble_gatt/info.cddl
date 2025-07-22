@@ -1,4 +1,4 @@
 golioth_ble_gatt_info = {
-    "enc_type" => "plaintext" / "other",
-    "device_id" => tstr,
+    "flags" => uint .size 1,
+    "server_cert_snr" => bstr,
 }

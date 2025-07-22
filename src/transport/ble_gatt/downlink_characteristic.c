@@ -55,6 +55,5 @@ GOLIOTH_BLE_GATT_CHARACTERISTIC(downlink,
                                 BT_GATT_CHRC_WRITE,
                                 BT_GATT_PERM_WRITE,
                                 NULL,
-                                NULL,
                                 downlink_write,
                                 NULL);
