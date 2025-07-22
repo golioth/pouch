@@ -23,6 +23,10 @@ static void *init_pouch(void)
 
 ZTEST_SUITE(events, NULL, init_pouch, NULL, NULL, NULL);
 
+K_SEM_DEFINE(event_rcvd, 0, UINT16_MAX);
+
+#define EVENT_TIMEOUT K_SECONDS(1)
+
 static void event_handler(enum pouch_event event, void *ctx)
 {
     switch (event)
@@ -37,6 +41,8 @@ static void event_handler(enum pouch_event event, void *ctx)
             zassert_unreachable("Unexpected event %d", event);
             break;
     }
+
+    k_sem_give(&event_rcvd);
 }
 
 POUCH_EVENT_HANDLER(event_handler, NULL);
@@ -46,8 +52,10 @@ ZTEST(events, test_start_event)
     start_events = 0;
 
     transport_session_start();
+    zassert_equal(k_sem_take(&event_rcvd, EVENT_TIMEOUT), 0);
     zassert_equal(start_events, 1);
     transport_session_end();
+    zassert_equal(k_sem_take(&event_rcvd, EVENT_TIMEOUT), 0);
 }
 
 
@@ -56,6 +64,8 @@ ZTEST(events, test_end_event)
     end_events = 0;
 
     transport_session_start();
+    zassert_equal(k_sem_take(&event_rcvd, EVENT_TIMEOUT), 0);
     transport_session_end();
+    zassert_equal(k_sem_take(&event_rcvd, EVENT_TIMEOUT), 0);
     zassert_equal(end_events, 1);
 }
