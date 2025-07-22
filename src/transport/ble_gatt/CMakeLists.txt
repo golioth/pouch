@@ -19,7 +19,6 @@ zephyr_library_sources_ifdef(CONFIG_POUCH_ENCRYPTION_SAEAD
 )
 
 zephyr_linker_sources(DATA_SECTIONS attributes.ld)
-zephyr_linker_sources(SECTIONS characteristics.ld)
 
 add_custom_command(OUTPUT info_encode.c
     COMMAND zcbor code -c ${CMAKE_CURRENT_LIST_DIR}/info.cddl -t

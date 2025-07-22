@@ -89,7 +89,6 @@ GOLIOTH_BLE_GATT_CHARACTERISTIC(uplink,
                                 (const struct bt_uuid *) &golioth_ble_gatt_uplink_chrc_uuid,
                                 BT_GATT_CHRC_READ,
                                 BT_GATT_PERM_READ,
-                                NULL,
                                 uplink_read,
                                 NULL,
                                 &uplink_chrc_ctx);
