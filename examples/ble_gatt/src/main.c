@@ -21,7 +21,7 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 #include <golioth/golioth.h>
 #include <golioth/settings_callbacks.h>
 
-static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
+static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET_OR(DT_ALIAS(led0), gpios, {});
 
 static struct
 {
@@ -110,7 +110,10 @@ POUCH_EVENT_HANDLER(pouch_event_handler, NULL);
 
 static int led_setting_cb(bool new_value, void *arg)
 {
-    gpio_pin_set_dt(&led, new_value ? 1 : 0);
+    if (DT_HAS_ALIAS(led0))
+    {
+        gpio_pin_set_dt(&led, new_value ? 1 : 0);
+    }
 
     return 0;
 }
@@ -154,10 +157,13 @@ int main(void)
 
     LOG_DBG("Advertising successfully started");
 
-    err = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
-    if (err < 0)
+    if (DT_HAS_ALIAS(led0))
     {
-        LOG_ERR("Could not initialize LED");
+        err = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
+        if (err < 0)
+        {
+            LOG_ERR("Could not initialize LED");
+        }
     }
 
     k_work_schedule(&sync_request_work, K_SECONDS(CONFIG_EXAMPLE_SYNC_PERIOD_S));
