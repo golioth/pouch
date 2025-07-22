@@ -112,6 +112,8 @@ POUCH_EVENT_HANDLER(pouch_event_handler, NULL);
 
 static int led_setting_cb(bool new_value, void *arg)
 {
+    LOG_INF("LED: %d", (int) new_value);
+
     if (DT_HAS_ALIAS(led0))
     {
         gpio_pin_set_dt(&led, new_value ? 1 : 0);
