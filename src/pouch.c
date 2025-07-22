@@ -10,9 +10,13 @@
 
 #include <pouch/events.h>
 
+#include <zephyr/kernel.h>
 #include <zephyr/sys/iterable_sections.h>
 #include <zephyr/sys/ring_buffer.h>
 
+K_THREAD_STACK_DEFINE(pouch_stack, CONFIG_POUCH_THREAD_STACK_SIZE);
+
+static struct k_work_q pouch_work_q;
 
 void pouch_event_emit(enum pouch_event event)
 {
@@ -24,7 +28,15 @@ void pouch_event_emit(enum pouch_event event)
 
 int pouch_init(const struct pouch_config *config)
 {
-    downlink_init();
+    k_work_queue_init(&pouch_work_q);
+
+    k_work_queue_start(&pouch_work_q,
+                       pouch_stack,
+                       K_THREAD_STACK_SIZEOF(pouch_stack),
+                       CONFIG_POUCH_THREAD_PRIORITY,
+                       NULL);
+
+    downlink_init(&pouch_work_q);
     uplink_init();
 
     return crypto_init(config);

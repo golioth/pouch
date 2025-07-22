@@ -21,6 +21,18 @@ config POUCH_BLOCK_SIZE
   help
     The maximum block size to use for Pouch transfers.
 
+config POUCH_THREAD_STACK_SIZE
+  int "Pouch thread stack size"
+  default 2048
+  help
+    The size of the stack for the internal Pouch thread.
+
+config POUCH_THREAD_PRIORITY
+  int "Pouch thread priority"
+  default 5
+  help
+    The priority of the internal Pouch thread.
+
 choice
   prompt "Pouch uplink encryption scheme"
   help
