@@ -33,6 +33,13 @@ config POUCH_THREAD_PRIORITY
   help
     The priority of the internal Pouch thread.
 
+config POUCH_EVENT_QUEUE_DEPTH
+  int "Maximum pending pouch events"
+  default 4
+  help
+    The maximum number of Pouch events that can queued to send to
+    the application.
+
 choice
   prompt "Pouch uplink encryption scheme"
   help
