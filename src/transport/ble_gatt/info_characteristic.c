@@ -39,12 +39,17 @@ static struct info_ctx
 
 static int build_info_data(void)
 {
+#if CONFIG_POUCH_ENCRYPTION_SAEAD
     uint8_t snr[CERT_SERIAL_MAXLEN];
     ssize_t snr_len = pouch_server_certificate_serial_get(snr, sizeof(snr));
     if (snr_len < 0)
     {
         return snr_len;
     }
+#else
+    uint8_t *snr = NULL;
+    ssize_t snr_len = 0;
+#endif
 
     // TODO: Set the Provisioned flag once we have the functionality to know whether provisioning
     // has taken place.
