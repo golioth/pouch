@@ -142,7 +142,10 @@ int main(void)
 
     LOG_DBG("Bluetooth initialized");
 
-    struct pouch_config config;
+    struct pouch_config config = {0};
+
+#if CONFIG_POUCH_ENCRYPTION_SAEAD
+
     err = load_certificate(&config.certificate);
     if (err)
     {
@@ -157,6 +160,12 @@ int main(void)
         return 0;
     }
 
+#else  // CONFIG_POUCH_ENCRYPTION_SAEAD
+
+    config.device_id = CONFIG_EXAMPLE_DEVICE_ID;
+
+#endif  // CONFIG_POUCH_ENCRYPTION_SAEAD
+
     err = pouch_init(&config);
     if (err)
     {
@@ -166,8 +175,13 @@ int main(void)
 
     LOG_DBG("Pouch successfully initialized");
 
+
+#if CONFIG_POUCH_ENCRYPTION_SAEAD
+
     // Can safely free the raw certificate after pouch initialization:
     free_certificate(&config.certificate);
+
+#endif
 
     err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_2, ad, ARRAY_SIZE(ad), NULL, 0);
     if (err)
