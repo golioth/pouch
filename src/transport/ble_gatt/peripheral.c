@@ -25,5 +25,7 @@ static struct bt_gatt_service golioth_svc = {
 
 int golioth_ble_gatt_peripheral_init(void)
 {
+    GOLIOTH_BLE_GATT_ATTR_ARRAY_LEN(&golioth_svc.attr_count);
+
     return bt_gatt_service_register(&golioth_svc);
 }
