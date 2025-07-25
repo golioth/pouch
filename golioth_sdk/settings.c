@@ -5,7 +5,7 @@
  */
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(settings);
+LOG_MODULE_REGISTER(glth_settings);
 
 #include <zephyr/drivers/gpio.h>
 
