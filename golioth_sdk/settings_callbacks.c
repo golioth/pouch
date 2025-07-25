@@ -5,7 +5,7 @@
  */
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(setttings_callbacks, LOG_LEVEL_WRN);
+LOG_MODULE_DECLARE(glth_settings);
 
 #include <errno.h>
 #include <stddef.h>
