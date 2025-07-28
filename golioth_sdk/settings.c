@@ -166,17 +166,44 @@ static void settings_uplink(void)
     uint8_t buf[64];
     zcbor_new_encode_state(zse, 3, buf, sizeof(buf), 1);
 
-    zcbor_map_start_encode(zse, 2);
-    zcbor_tstr_put_lit(zse, "version");
+    bool ok = zcbor_map_start_encode(zse, 2);
+    if (!ok)
+    {
+        LOG_ERR("Could not form settings uplink");
+        return;
+    }
+
+    ok = zcbor_tstr_put_lit(zse, "version");
+    if (!ok)
+    {
+        LOG_ERR("Could not form settings uplink");
+        return;
+    }
+
     if (settings_version >= 0)
     {
-        zcbor_int64_put(zse, settings_version);
+        ok = zcbor_int64_put(zse, settings_version);
+        if (!ok)
+        {
+            LOG_ERR("Could not form settings uplink");
+            return;
+        }
     }
     else
     {
-        zcbor_nil_put(zse, NULL);
+        ok = zcbor_nil_put(zse, NULL);
+        if (!ok)
+        {
+            LOG_ERR("Could not form settings uplink");
+            return;
+        }
     }
-    zcbor_map_end_encode(zse, 2);
+    ok = zcbor_map_end_encode(zse, 2);
+    if (!ok)
+    {
+        LOG_ERR("Could not form settings uplink");
+        return;
+    }
 
     pouch_uplink_entry_write(SETTINGS_UPLINK_PATH,
                              POUCH_CONTENT_TYPE_CBOR,
