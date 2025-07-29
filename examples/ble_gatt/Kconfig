@@ -2,6 +2,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+configdefault MBEDTLS_HEAP_SIZE
+  int
+  default 1024
+
 source "$ZEPHYR_BASE/Kconfig"
 
 config EXAMPLE_DEVICE_ID
