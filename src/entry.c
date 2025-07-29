@@ -143,7 +143,7 @@ static void pouch_downlink_stream_push(struct pouch_bufview *v,
         memcpy(path_null_term, path, path_len);
         path_null_term[path_len] = '\0';
 
-        downlink_start(0, path_null_term, content_type);
+        downlink_start(stream_id, path_null_term, content_type);
     }
 
     data_len = pouch_bufview_available(v);
