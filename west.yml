@@ -22,3 +22,6 @@ manifest:
           - trusted-firmware-m
           - littlefs
           - zcbor
+
+  self:
+    path: pouch
