@@ -28,7 +28,7 @@ static psa_key_id_t import_raw_pk(const uint8_t *private_key, size_t size)
     int err = mbedtls_pk_parse_key(&pk, private_key, size, NULL, 0, psa_rng_for_mbedtls, NULL);
     if (err)
     {
-        LOG_ERR("Failed to parse key: %x", err);
+        LOG_ERR("Failed to parse key: -0x%x", -err);
         return PSA_KEY_ID_NULL;
     }
 
@@ -42,7 +42,7 @@ static psa_key_id_t import_raw_pk(const uint8_t *private_key, size_t size)
     err = mbedtls_pk_import_into_psa(&pk, &attrs, &key_id);
     if (err)
     {
-        LOG_ERR("Failed to import private key: %x", err);
+        LOG_ERR("Failed to import private key: -0x%x", -err);
         return PSA_KEY_ID_NULL;
     }
 
