@@ -9,5 +9,8 @@ project(ble_gatt_example)
 
 target_sources(app PRIVATE
   src/main.c
+)
+
+target_sources_ifndef(CONFIG_POUCH_ENCRYPTION_NONE app PRIVATE
   src/credentials.c
 )
