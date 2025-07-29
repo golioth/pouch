@@ -22,7 +22,7 @@ jobs:
       - name: Install pip packages
         run: |
           uv pip install \
-            -r deps/zephyr/scripts/requirements-base.txt        \
+            -r zephyr/scripts/requirements-base.txt        \
             -r pouch/requirements.txt
 
           uv pip install            \

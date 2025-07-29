@@ -40,7 +40,7 @@ boots for the first time.
 > the file system, which generates the following warnings in the device log:
 >
 > ```log
-> [00:00:00.392,486] <err> littlefs: WEST_TOPDIR/deps/modules/fs/littlefs/lfs.c:1389: Corrupted dir pair at {0x0, 0x1}
+> [00:00:00.392,486] <err> littlefs: WEST_TOPDIR/modules/fs/littlefs/lfs.c:1389: Corrupted dir pair at {0x0, 0x1}
 > [00:00:00.392,517] <wrn> littlefs: can't mount (LFS -84); formatting
 > ```
 >
