@@ -4,7 +4,6 @@ manifest:
       revision: v3.0.1
       url: http://github.com/nrfconnect/sdk-nrf
       import:
-        path-prefix: deps
         name-allowlist:
           - nrf
           - zephyr

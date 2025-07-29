@@ -10,7 +10,6 @@ manifest:
       url: https://github.com/zephyrproject-rtos/zephyr
       west-commands: scripts/west-commands.yml
       import:
-        path-prefix: deps
         name-allowlist:
           - zephyr
           - cmsis
