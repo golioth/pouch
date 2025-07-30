@@ -200,7 +200,7 @@ static void nonce_generate(const struct session *session,
 
 struct pouch_buf *session_encrypt_block(struct session *session, struct pouch_buf *block)
 {
-    struct pouch_buf *encrypted = buf_alloc(MAX_BLOCK_SIZE + AUTH_TAG_LEN);
+    struct pouch_buf *encrypted = buf_alloc(MAX_CIPHERTEXT_BLOCK_SIZE);
     if (encrypted == NULL)
     {
         LOG_ERR("Couldn't allocate encrypted block");
@@ -263,7 +263,7 @@ struct pouch_buf *session_encrypt_block(struct session *session, struct pouch_bu
 
 struct pouch_buf *session_decrypt_block(struct session *session, struct pouch_buf *block)
 {
-    struct pouch_buf *decrypted = buf_alloc(MAX_BLOCK_SIZE);
+    struct pouch_buf *decrypted = buf_alloc(MAX_PLAINTEXT_BLOCK_SIZE);
     if (decrypted == NULL)
     {
         return NULL;

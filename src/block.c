@@ -66,7 +66,7 @@ static void write_block_header(struct pouch_buf *block, size_t size, uint8_t id,
 
 size_t block_space_get(const struct pouch_buf *block)
 {
-    return MAX_BLOCK_SIZE - block_size_get(block);
+    return MAX_PLAINTEXT_BLOCK_SIZE - block_size_get(block);
 }
 
 size_t block_size_get(const struct pouch_buf *block)
@@ -81,7 +81,7 @@ void block_size_write(struct pouch_buf *block, uint16_t size)
 
 struct pouch_buf *block_alloc(void)
 {
-    struct pouch_buf *block = buf_alloc(MAX_BLOCK_SIZE);
+    struct pouch_buf *block = buf_alloc(MAX_PLAINTEXT_BLOCK_SIZE);
     if (block != NULL)
     {
         write_block_header(block, 0, BLOCK_ID_ENTRY, FIRST_DATA_MASK | LAST_DATA_MASK);
@@ -92,7 +92,7 @@ struct pouch_buf *block_alloc(void)
 
 struct pouch_buf *block_alloc_stream(uint8_t stream_id, bool first)
 {
-    struct pouch_buf *block = buf_alloc(MAX_BLOCK_SIZE);
+    struct pouch_buf *block = buf_alloc(MAX_PLAINTEXT_BLOCK_SIZE);
     if (block != NULL)
     {
         write_block_header(block, 0, stream_id, first ? FIRST_DATA_MASK : 0);

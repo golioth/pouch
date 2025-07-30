@@ -13,9 +13,17 @@
 #define BLOCK_ID_MASK 0x1f
 
 /** Log2 of max block size */
-#define MAX_BLOCK_SIZE_LOG LOG2(CONFIG_POUCH_BLOCK_SIZE)
+#define MAX_BLOCK_PAYLOAD_SIZE_LOG LOG2(CONFIG_POUCH_BLOCK_SIZE)
 /** Rounded maximum block size */
-#define MAX_BLOCK_SIZE (1 << MAX_BLOCK_SIZE_LOG)
+#define MAX_BLOCK_PAYLOAD_SIZE (1 << MAX_BLOCK_PAYLOAD_SIZE_LOG)
+/** 2 bytes for size; 1 byte for ID */
+#define BLOCK_HEADER_SIZE 3
+/** Header + payload */
+#define MAX_PLAINTEXT_BLOCK_SIZE (BLOCK_HEADER_SIZE + MAX_BLOCK_PAYLOAD_SIZE)
+/** Plaintext + authentication tag */
+#define MAX_CIPHERTEXT_BLOCK_SIZE (MAX_PLAINTEXT_BLOCK_SIZE + CONFIG_POUCH_AUTH_TAG_LEN)
+/** Maximum ciphertext size without the length of the size field */
+#define MAX_BLOCK_SIZE_FIELD_VALUE (MAX_CIPHERTEXT_BLOCK_SIZE - sizeof(uint16_t))
 
 void block_decode_hdr(struct pouch_bufview *v,
                       uint16_t *block_size,

@@ -38,7 +38,7 @@ int saead_uplink_session_start(psa_algorithm_t algorithm, psa_key_id_t private_k
 
     uplink.key = session_key_generate(&uplink.id,
                                       algorithm,
-                                      MAX_BLOCK_SIZE_LOG,
+                                      MAX_BLOCK_PAYLOAD_SIZE_LOG,
                                       private_key,
                                       &pubkey,
                                       PSA_KEY_USAGE_ENCRYPT);
@@ -87,7 +87,7 @@ int saead_uplink_header_get(struct saead_info *info)
         ? session_info_algorithm_chacha20_poly1305_m_c
         : session_info_algorithm_aes_gcm_m_c;
     info->session.initiator_choice = session_info_initiator_device_m_c;
-    info->session.max_block_size_log = MAX_BLOCK_SIZE_LOG;
+    info->session.max_block_size_log = MAX_BLOCK_PAYLOAD_SIZE_LOG;
 
     const uint8_t *cert_ref = cert_ref_get();
     if (cert_ref == NULL)
@@ -129,7 +129,7 @@ bool saead_uplink_session_matches(const struct session_id *id,
                                   psa_algorithm_t algorithm)
 {
     return atomic_test_bit(&uplink.flags, SESSION_VALID) && session_id_is_equal(id, &uplink.id)
-        && max_block_size_log == MAX_BLOCK_SIZE_LOG && uplink.algorithm == algorithm;
+        && max_block_size_log == MAX_BLOCK_PAYLOAD_SIZE_LOG && uplink.algorithm == algorithm;
 }
 
 psa_key_id_t saead_uplink_session_key_copy(psa_key_usage_t usage)
