@@ -406,7 +406,7 @@ ZTEST(uplink, test_stream_multiblock)
 
     zassert_between_inclusive(first_block.block.data_len,
                               1,
-                              CONFIG_POUCH_BLOCK_SIZE - 1,
+                              CONFIG_POUCH_BLOCK_SIZE,
                               "Unexpected block length %d",
                               first_block.block.data_len);
 
@@ -693,10 +693,9 @@ ZTEST(uplink, test_stream_length_aligned_to_block_size)
         pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM);
     zassert_not_null(stream, "Failed to open stream");
 
-    // Write data that is exactly aligned to the size of two blocks. Need to account for the header
-    // in both blocks, as well as the size of the content_type, path_length and path in the first
-    // block.
-    size_t data_len = (CONFIG_POUCH_BLOCK_SIZE - 3) * 2 - (2 + 1 + strlen("test/path"));
+    // Write data that is exactly aligned to the size of two blocks. Need to account for the size
+    // of the content_type, path_length and path in the first block.
+    size_t data_len = (CONFIG_POUCH_BLOCK_SIZE) * 2 - (2 + 1 + strlen("test/path"));
     uint8_t *data = malloc(data_len);
     for (int i = 0; i < sizeof(data); i++)
     {
@@ -728,7 +727,7 @@ ZTEST(uplink, test_stream_length_aligned_to_block_size)
     zassert_false(block1.block.last, "Unexpected last data");
     zassert_not_equal(block1.block.id, 0, "Unexpected stream ID");
     zassert_equal(block1.block.data_len,
-                  CONFIG_POUCH_BLOCK_SIZE - 3,  // 3 for the header
+                  CONFIG_POUCH_BLOCK_SIZE,
                   "Unexpected block length %d",
                   block1.data_len);
     zassert_mem_equal(block1.data, data, block1.data_len);
@@ -740,7 +739,7 @@ ZTEST(uplink, test_stream_length_aligned_to_block_size)
     zassert_true(block2.last, "Expected last data");
     zassert_equal(block2.id, block1.block.id, "Unexpected stream ID");
     zassert_equal(block2.data_len,
-                  CONFIG_POUCH_BLOCK_SIZE - 3,  // 3 for the header
+                  CONFIG_POUCH_BLOCK_SIZE,
                   "Unexpected block length %d",
                   block2.data_len);
     zassert_mem_equal(block2.data, &data[block1.data_len], block2.data_len);

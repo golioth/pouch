@@ -96,7 +96,7 @@ void pouch_downlink_start(void)
 
     pouch_header = false;
 
-    pouch_buf = buf_alloc(MAX_BLOCK_SIZE + CONFIG_POUCH_AUTH_TAG_LEN);
+    pouch_buf = buf_alloc(MAX_CIPHERTEXT_BLOCK_SIZE);
     if (!pouch_buf)
     {
         LOG_ERR("Failed to allocate pouch buf");
@@ -151,14 +151,13 @@ void pouch_downlink_push(const void *buf, size_t buf_len)
             return;
         }
 
-        if (buf_size_get(pouch_buf) >= MAX_BLOCK_SIZE + CONFIG_POUCH_AUTH_TAG_LEN)
+        if (buf_size_get(pouch_buf) >= MAX_CIPHERTEXT_BLOCK_SIZE)
         {
             LOG_ERR("No more space for pouch header");
             return;
         }
 
-        size_t buf_written =
-            MIN(buf_len, MAX_BLOCK_SIZE + CONFIG_POUCH_AUTH_TAG_LEN - buf_size_get(pouch_buf));
+        size_t buf_written = MIN(buf_len, MAX_CIPHERTEXT_BLOCK_SIZE - buf_size_get(pouch_buf));
         buf_write(pouch_buf, buf_p, buf_written);
 
         buf_p += buf_written;
@@ -188,11 +187,11 @@ void pouch_downlink_push(const void *buf, size_t buf_len)
         {
             uint16_t block_size = pouch_bufview_read_be16(&v);
 
-            if (block_size >= MAX_BLOCK_SIZE + CONFIG_POUCH_AUTH_TAG_LEN)
+            if (block_size > MAX_BLOCK_SIZE_FIELD_VALUE)
             {
                 LOG_ERR("Block size %u is bigger than supported %u",
                         (unsigned int) block_size,
-                        (unsigned int) (MAX_BLOCK_SIZE + CONFIG_POUCH_AUTH_TAG_LEN));
+                        (unsigned int) (MAX_BLOCK_SIZE_FIELD_VALUE));
                 return;
             }
 
@@ -204,7 +203,7 @@ void pouch_downlink_push(const void *buf, size_t buf_len)
 
                 struct pouch_buf *pouch_buf_to_send = pouch_buf;
 
-                pouch_buf = buf_alloc(MAX_BLOCK_SIZE + CONFIG_POUCH_AUTH_TAG_LEN);
+                pouch_buf = buf_alloc(MAX_CIPHERTEXT_BLOCK_SIZE);
                 if (!pouch_buf)
                 {
                     LOG_ERR("Failed to allocate pouch buf");
