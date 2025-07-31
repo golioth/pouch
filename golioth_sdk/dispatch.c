@@ -13,13 +13,13 @@ LOG_MODULE_REGISTER(glth_dispatch, LOG_LEVEL_DBG);
 
 #include "dispatch.h"
 
-static struct golioth_service *last_seen = NULL;
+static struct golioth_downlink_service *last_seen = NULL;
 
 static void pouch_downlink_start(unsigned int stream_id, const char *path, uint16_t content_type)
 {
     LOG_DBG("Downlink start: %d, %s, %d", stream_id, path, content_type);
 
-    STRUCT_SECTION_FOREACH(golioth_service, service)
+    STRUCT_SECTION_FOREACH(golioth_downlink_service, service)
     {
         if ((NULL != service->path) && (0 == strcmp(service->path, path)))
         {
@@ -40,7 +40,7 @@ static void pouch_downlink_data(unsigned int stream_id, const void *data, size_t
 {
     LOG_DBG("Downlink data: %d", stream_id);
 
-    struct golioth_service *active_service = NULL;
+    struct golioth_downlink_service *active_service = NULL;
 
     if (NULL != last_seen && last_seen->data->stream_id == stream_id)
     {
@@ -48,7 +48,7 @@ static void pouch_downlink_data(unsigned int stream_id, const void *data, size_t
     }
     else
     {
-        STRUCT_SECTION_FOREACH(golioth_service, service)
+        STRUCT_SECTION_FOREACH(golioth_downlink_service, service)
         {
             if (service->data->stream_id == stream_id)
             {
@@ -75,7 +75,7 @@ static void pouch_downlink_data(unsigned int stream_id, const void *data, size_t
 
 int golioth_sync_to_cloud(void)
 {
-    STRUCT_SECTION_FOREACH(golioth_service, service)
+    STRUCT_SECTION_FOREACH(golioth_uplink_service, service)
     {
         if (NULL != service->uplink_cb)
         {
