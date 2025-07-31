@@ -6,4 +6,6 @@
 
 #include <zephyr/linker/iterable_sections.h>
 
-ITERABLE_SECTION_ROM(golioth_service, 4)
+ITERABLE_SECTION_ROM(golioth_downlink_service, 4)
+
+ITERABLE_SECTION_ROM(golioth_uplink_service, 4)

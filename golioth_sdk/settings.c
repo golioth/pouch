@@ -212,4 +212,5 @@ static void settings_uplink(void)
                              K_FOREVER);
 }
 
-GOLIOTH_SERVICE(settings, SETTINGS_DOWNLINK_PATH, settings_downlink, settings_uplink);
+GOLIOTH_DOWNLINK_HANDLER(settings, SETTINGS_DOWNLINK_PATH, settings_downlink);
+GOLIOTH_UPLINK_HANDLER(settings_status, settings_uplink);
