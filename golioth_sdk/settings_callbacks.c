@@ -20,7 +20,7 @@ int golioth_settings_receive_one(const struct setting_value *value)
         {
             if (setting->type != value->type)
             {
-                return -EFTYPE;
+                return -EINVAL;
             }
 
             switch (setting->type)
