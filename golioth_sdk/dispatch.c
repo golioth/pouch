@@ -21,11 +21,26 @@ static void pouch_downlink_start(unsigned int stream_id, const char *path, uint1
 
     STRUCT_SECTION_FOREACH(golioth_downlink_service, service)
     {
-        if ((NULL != service->path) && (0 == strcmp(service->path, path)))
+        size_t path_len = strlen(service->path);
+        bool partial = service->path[path_len - 1] == '*';
+        if (partial)
+        {
+            path_len--;
+        }
+        if (0 == strncmp(service->path, path, path_len))
         {
             LOG_DBG("Found match for path %s", path);
             last_seen = service;
-            service->data->stream_id = stream_id;
+            service->data->downlink_id = stream_id;
+            if (NULL != service->start_cb)
+            {
+                const char *path_remainder = NULL;
+                if (partial && (strlen(path + path_len) > 0))
+                {
+                    path_remainder = path + path_len;
+                }
+                service->start_cb(stream_id, path_remainder);
+            }
             break;
         }
     }
@@ -42,7 +57,7 @@ static void pouch_downlink_data(unsigned int stream_id, const void *data, size_t
 
     struct golioth_downlink_service *active_service = NULL;
 
-    if (NULL != last_seen && last_seen->data->stream_id == stream_id)
+    if (NULL != last_seen && last_seen->data->downlink_id == stream_id)
     {
         active_service = last_seen;
     }
@@ -50,7 +65,7 @@ static void pouch_downlink_data(unsigned int stream_id, const void *data, size_t
     {
         STRUCT_SECTION_FOREACH(golioth_downlink_service, service)
         {
-            if (service->data->stream_id == stream_id)
+            if (service->data->downlink_id == stream_id)
             {
                 active_service = service;
                 break;
@@ -60,10 +75,10 @@ static void pouch_downlink_data(unsigned int stream_id, const void *data, size_t
 
     if (NULL != active_service)
     {
-        active_service->downlink_cb(data, len, is_last);
+        active_service->data_cb(stream_id, data, len, is_last);
         if (is_last)
         {
-            active_service->data->stream_id = STREAM_ID_INVALID;
+            active_service->data->downlink_id = DOWNLINK_ID_INVALID;
             last_seen = NULL;
         }
     }
