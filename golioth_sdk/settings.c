@@ -146,7 +146,7 @@ static int settings_decode(zcbor_state_t *zsd, void *value)
     return 0;
 }
 
-static void settings_downlink(const void *data, size_t len, bool is_last)
+static void settings_downlink(golioth_downlink_id_t id, const void *data, size_t len, bool is_last)
 {
     LOG_DBG("Received settings downlink");
 
@@ -212,5 +212,5 @@ static void settings_uplink(void)
                              K_FOREVER);
 }
 
-GOLIOTH_DOWNLINK_HANDLER(settings, SETTINGS_DOWNLINK_PATH, settings_downlink);
+GOLIOTH_DOWNLINK_HANDLER(settings, SETTINGS_DOWNLINK_PATH, NULL, settings_downlink);
 GOLIOTH_UPLINK_HANDLER(settings_status, settings_uplink);
