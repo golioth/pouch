@@ -11,9 +11,9 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(credentials, LOG_LEVEL_DBG);
 
-#define CERT_DIR "/lfs1/credentials/"
-#define CERT_FILE CERT_DIR "crt.der"
-#define KEY_FILE CERT_DIR "key.der"
+#define CERT_DIR "/lfs1/credentials"
+#define CERT_FILE CERT_DIR "/crt.der"
+#define KEY_FILE CERT_DIR "/key.der"
 
 static int psa_rng_for_mbedtls(void *p_rng, unsigned char *output, size_t output_len)
 {
