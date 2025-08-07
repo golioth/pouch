@@ -118,6 +118,7 @@ int saead_downlink_session_start(const struct session_id *id,
         return -EIO;
     }
 
+    downlink.flags = ATOMIC_INIT(0);
     downlink.pouch.id = 0;
     downlink.algorithm = algorithm;
     downlink.key = session_key;
