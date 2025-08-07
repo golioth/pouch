@@ -53,10 +53,6 @@ jobs:
         shell: bash
         run: |
           west build -p -b nrf52840dk/nrf52840 pouch/examples/ble_gatt
-      - name: Compile (plaintext)
-        shell: bash
-        run: |
-          west build -p -b nrf52840dk/nrf52840 pouch/examples/ble_gatt -- -DCONFIG_POUCH_ENCRYPTION_NONE=y
       - name: Run tests
         env:
           ZEPHYR_BASE: ${{ github.workspace }}/zephyr

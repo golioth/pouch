@@ -144,8 +144,6 @@ int main(void)
 
     struct pouch_config config = {0};
 
-#if CONFIG_POUCH_ENCRYPTION_SAEAD
-
     err = load_certificate(&config.certificate);
     if (err)
     {
@@ -159,12 +157,6 @@ int main(void)
         LOG_ERR("Failed to load private key");
         return 0;
     }
-
-#else  // CONFIG_POUCH_ENCRYPTION_SAEAD
-
-    config.device_id = CONFIG_EXAMPLE_DEVICE_ID;
-
-#endif  // CONFIG_POUCH_ENCRYPTION_SAEAD
 
     err = pouch_init(&config);
     if (err)
