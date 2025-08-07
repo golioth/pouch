@@ -104,28 +104,27 @@ void pouch_downlink_start(void)
     }
 }
 
-static size_t pouch_downlink_parse_header(struct pouch_bufview *v)
+static int pouch_downlink_parse_header(struct pouch_bufview *v, size_t *header_len)
 {
     const uint8_t *header_raw = pouch_bufview_read(v, 0);
     struct pouch_header header;
-    size_t header_len;
     int ret;
 
-    ret = cbor_decode_pouch_header(header_raw, pouch_bufview_available(v), &header, &header_len);
+    ret = cbor_decode_pouch_header(header_raw, pouch_bufview_available(v), &header, header_len);
     if (ret != ZCBOR_SUCCESS)
     {
         LOG_DBG("Failed to decode pouch header: %d", ret);
-        return 0;
+        return -EIO;
     }
 
-    LOG_HEXDUMP_DBG(header_raw, header_len, "pouch header raw");
+    LOG_HEXDUMP_DBG(header_raw, *header_len, "pouch header raw");
 
     LOG_DBG("Header version %d", (int) header.version);
     LOG_DBG("Encryption type %s",
             (int) header.encryption_info_m.Union_choice == encryption_info_union_plaintext_info_m_c
                 ? "Plaintext"
                 : "SAEAD");
-    LOG_DBG("Payload len %d", (int) header_len);
+    LOG_DBG("Payload len %d", (int) *header_len);
 
     int err = crypto_downlink_start(&header.encryption_info_m);
     if (err)
@@ -134,7 +133,7 @@ static size_t pouch_downlink_parse_header(struct pouch_bufview *v)
         return err;
     }
 
-    return header_len;
+    return 0;
 }
 
 void pouch_downlink_push(const void *buf, size_t buf_len)
@@ -168,9 +167,9 @@ void pouch_downlink_push(const void *buf, size_t buf_len)
 
         if (!pouch_header)
         {
-            size_t header_len = pouch_downlink_parse_header(&v);
-
-            if (!header_len)
+            size_t header_len = 0;
+            int err = pouch_downlink_parse_header(&v, &header_len);
+            if (err)
             {
                 return;
             }
