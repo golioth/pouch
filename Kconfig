@@ -47,13 +47,16 @@ choice
 
 config POUCH_ENCRYPTION_SAEAD
   bool "Streaming AEAD"
+  select PSA_WANT_ALG_ECDSA
   select PSA_WANT_ALG_ECDH
   select PSA_WANT_ALG_HKDF
   select PSA_WANT_ALG_HMAC
   select PSA_WANT_ALG_STREAM_CIPHER
   select PSA_WANT_ALG_SHA_256
+  select PSA_WANT_ECC_SECP_R1_256
   select PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_DERIVE
   select PSA_WANT_KEY_TYPE_ECC_PUBLIC_KEY
+  select MBEDTLS_ECDSA_C
   select MBEDTLS_ECP_C
   select BASE64
   # nRF Connect SDK only:
