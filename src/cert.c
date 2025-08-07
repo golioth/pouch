@@ -121,6 +121,29 @@ static int authenticate_server_cert(mbedtls_x509_crt *cert)
     return 0;
 }
 
+static int extract_pubkey(mbedtls_x509_crt *cert, struct pubkey *out)
+{
+    mbedtls_ecp_keypair *key = mbedtls_pk_ec(cert->pk);
+    if (key == NULL)
+    {
+        LOG_ERR("Extract PK: Invalid key type");
+        return -EIO;
+    }
+
+    int err = mbedtls_ecp_write_public_key(key,
+                                           MBEDTLS_ECP_PF_UNCOMPRESSED,
+                                           &out->len,
+                                           out->data,
+                                           sizeof(out->data));
+    if (err)
+    {
+        LOG_ERR("Extract PK: write error 0x%x", -err);
+        return -EIO;
+    }
+
+    return 0;
+}
+
 int cert_device_set(const struct pouch_cert *cert)
 {
     if (!cert_is_valid(cert))
@@ -156,19 +179,6 @@ int cert_server_set(const struct pouch_cert *certbuf)
         return -EIO;
     }
 
-    /* We're pulling private fields here, which isn't great.
-     * Unfortunately, there's no straight forward way to export the
-     * raw public key out of the mbedtls_pk structure. This works fine,
-     * but may change in a new version of Mbed TLS.
-     */
-    uint8_t *pk = parsed_cert.pk.MBEDTLS_PRIVATE(pub_raw);
-    size_t pk_len = parsed_cert.pk.MBEDTLS_PRIVATE(pub_raw_len);
-    if (pk_len > sizeof(server_cert.pubkey.data))
-    {
-        LOG_ERR("Unexpected server public key size: %u", pk_len);
-        goto exit;
-    }
-
     if (parsed_cert.serial.len > sizeof(server_cert.serial.data))
     {
         LOG_ERR("Unexpected server certificate serial number size: %u", parsed_cert.serial.len);
@@ -184,8 +194,11 @@ int cert_server_set(const struct pouch_cert *certbuf)
         }
     }
 
-    memcpy(server_cert.pubkey.data, pk, pk_len);
-    server_cert.pubkey.len = pk_len;
+    err = extract_pubkey(&parsed_cert, &server_cert.pubkey);
+    if (err)
+    {
+        goto exit;
+    }
 
     memcpy(server_cert.serial.data, parsed_cert.serial.p, parsed_cert.serial.len);
     server_cert.serial.len = parsed_cert.serial.len;
