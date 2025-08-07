@@ -18,7 +18,6 @@
 #define MBEDTLS_OID_C
 #define MBEDTLS_PK_C
 #define MBEDTLS_PK_PARSE_C
-#define MBEDTLS_PK_USE_PSA_EC_DATA
 
 // Server certificates are signed with secp384r1
 #define MBEDTLS_PSA_ACCEL_ECC_SECP_R1_384
