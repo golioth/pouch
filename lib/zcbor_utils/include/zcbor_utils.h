@@ -63,6 +63,7 @@ static inline bool zcbor_list_or_map_end(zcbor_state_t *state)
  * @retval <0  POSIX error code on error
  */
 int zcbor_map_int64_decode(zcbor_state_t *zsd, void *value);
+int zcbor_map_int32_decode(zcbor_state_t *zsd, void *value);
 
 /**
  * @brief Decode text string value from CBOR map
