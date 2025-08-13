@@ -33,4 +33,22 @@ endchoice
 
 endif
 
+menuconfig GOLIOTH_OTA
+  bool "Golioth OTA service"
+  help
+    Enables the Golioth OTA service. This service is used to sync
+    binary artifacts like firmware updates or AI models to the device.
+
+if GOLIOTH_OTA
+
+config GOLIOTH_OTA_MAX_PACKAGE_NAME_LEN
+  int "Maximum package name length"
+  default 32
+
+config GOLIOTH_OTA_MAX_VERSION_LEN
+  int "Maximum package version length"
+  default 32
+
+endif
+
 endif
