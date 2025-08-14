@@ -7,7 +7,7 @@
 #include <string.h>
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(ota);
+LOG_MODULE_REGISTER(ota, CONFIG_GOLIOTH_LOG_LEVEL);
 
 #include <pouch/types.h>
 #include <pouch/uplink.h>

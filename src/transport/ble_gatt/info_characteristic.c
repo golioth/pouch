@@ -5,7 +5,7 @@
  */
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(info_chrc);
+LOG_MODULE_REGISTER(info_chrc, CONFIG_POUCH_LOG_LEVEL);
 
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/gatt.h>

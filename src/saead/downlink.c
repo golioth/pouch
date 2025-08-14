@@ -14,7 +14,7 @@
 #include <mbedtls/base64.h>
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(saead_downlink);
+LOG_MODULE_REGISTER(saead_downlink, CONFIG_POUCH_LOG_LEVEL);
 
 #define DOWNLINK_KEY_USAGE (PSA_KEY_USAGE_DECRYPT | PSA_KEY_USAGE_VERIFY_MESSAGE)
 

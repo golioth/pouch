@@ -18,7 +18,7 @@
 #include "entry.h"
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(downlink);
+LOG_MODULE_REGISTER(downlink, CONFIG_POUCH_LOG_LEVEL);
 
 static struct pouch_buf *pouch_buf;
 static bool pouch_header;
