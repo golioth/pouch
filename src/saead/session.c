@@ -16,7 +16,7 @@
 #include <zephyr/sys/base64.h>
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(saead_session);
+LOG_MODULE_REGISTER(saead_session, CONFIG_POUCH_LOG_LEVEL);
 
 /**
  * String length required to base64 encode a buffer of a given length, excluding the 0 terminator.

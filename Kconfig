@@ -154,6 +154,10 @@ config POUCH_TRANSPORT_BLE_GATT
 
 endchoice
 
+module = POUCH
+module-str = Pouch
+source "subsys/logging/Kconfig.template.log_config"
+
 endif
 
 # Libraries

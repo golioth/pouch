@@ -15,7 +15,7 @@
 #include <pouch/downlink.h>
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(entry);
+LOG_MODULE_REGISTER(entry, CONFIG_POUCH_LOG_LEVEL);
 
 #define ENTRY_HEADER_OVERHEAD 5
 
