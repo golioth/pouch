@@ -10,3 +10,9 @@ config EXAMPLE_SYNC_PERIOD_S
     help
       The time, in seconds, after a sync to wait before requesting a sync from
       a gateway.
+
+config EXAMPLE_CREDENTIALS_DIR
+    string "Directory containing credentials"
+    default "/lfs1/credentials"
+    help
+      Directory on mounted file system containing credentials.
