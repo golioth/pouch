@@ -5,7 +5,7 @@
  */
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(zcbor_util, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(zcbor_util);
 
 #include <errno.h>
 

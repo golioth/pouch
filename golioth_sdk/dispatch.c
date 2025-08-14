@@ -5,7 +5,7 @@
  */
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(glth_dispatch, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(glth_dispatch);
 
 #include <pouch/downlink.h>
 #include <pouch/events.h>
