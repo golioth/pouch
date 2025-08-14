@@ -11,7 +11,7 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(credentials, LOG_LEVEL_DBG);
 
-#define CERT_DIR "/lfs1/credentials"
+#define CERT_DIR CONFIG_EXAMPLE_CREDENTIALS_DIR
 #define CERT_FILE CERT_DIR "/crt.der"
 #define KEY_FILE CERT_DIR "/key.der"
 
