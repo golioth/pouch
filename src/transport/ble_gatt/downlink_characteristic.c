@@ -30,7 +30,7 @@ ssize_t downlink_write(struct bt_conn *conn,
     ssize_t payload_len =
         golioth_ble_gatt_packetizer_decode(buf, len, &payload, &is_first, &is_last);
 
-    if (0 >= payload_len)
+    if (0 > payload_len)
     {
         return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
     }
