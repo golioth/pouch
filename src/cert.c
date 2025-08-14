@@ -10,7 +10,7 @@
 #include <pouch/transport/certificate.h>
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(cert, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(cert);
 
 static const uint8_t raw_ca_cert[] = {
 #if IS_ENABLED(CONFIG_POUCH_VALIDATE_SERVER_CERT)

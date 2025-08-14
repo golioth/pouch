@@ -14,7 +14,7 @@
 #include <mbedtls/base64.h>
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(saead_uplink, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(saead_uplink);
 
 static struct session uplink;
 
