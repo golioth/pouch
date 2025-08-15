@@ -53,7 +53,9 @@ config POUCH_ENCRYPTION_SAEAD
   select PSA_WANT_ALG_HMAC
   select PSA_WANT_ALG_STREAM_CIPHER
   select PSA_WANT_ALG_SHA_256
+  select PSA_WANT_ALG_SHA_384
   select PSA_WANT_ECC_SECP_R1_256
+  select PSA_WANT_ECC_SECP_R1_384
   select PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_DERIVE
   select PSA_WANT_KEY_TYPE_ECC_PUBLIC_KEY
   select MBEDTLS_ECDSA_C
@@ -114,8 +116,6 @@ config POUCH_SERVER_CERT_MAX_LEN
 menuconfig POUCH_VALIDATE_SERVER_CERT
   bool "Validate server's certificate"
   default y
-  select PSA_WANT_ALG_SHA_384
-  select PSA_WANT_ECC_SECP_R1_384
   help
     Disabling this will disable the server certificate validation.
     This should never be disabled in production.
