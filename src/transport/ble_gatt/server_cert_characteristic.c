@@ -123,26 +123,26 @@ static ssize_t server_cert_write(struct bt_conn *conn,
 
     if (is_first)
     {
-        free((void *) ctx->cert.der);
-        ctx->cert.der = malloc(CONFIG_POUCH_SERVER_CERT_MAX_LEN);
+        free((void *) ctx->cert.buffer);
+        ctx->cert.buffer = malloc(CONFIG_POUCH_SERVER_CERT_MAX_LEN);
 
         ctx->cert.size = 0;
     }
 
-    if (!ctx->cert.der)
+    if (!ctx->cert.buffer)
     {
         return BT_GATT_ERR(BT_ATT_ERR_INSUFFICIENT_RESOURCES);
     }
 
-    memcpy((void *) &ctx->cert.der[ctx->cert.size], payload, payload_len);
+    memcpy((void *) &ctx->cert.buffer[ctx->cert.size], payload, payload_len);
     ctx->cert.size += payload_len;
 
     if (is_last)
     {
         pouch_server_certificate_set(&ctx->cert);
 
-        free((void *) ctx->cert.der);
-        ctx->cert.der = NULL;
+        free((void *) ctx->cert.buffer);
+        ctx->cert.buffer = NULL;
     }
 
     return len;
