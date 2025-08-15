@@ -35,7 +35,7 @@ static struct
 
 static inline bool cert_is_valid(const struct pouch_cert *cert)
 {
-    return cert != NULL && cert->der != NULL && cert->size > 0;
+    return cert != NULL && cert->buffer != NULL && cert->size > 0;
 }
 
 static int parse_x509_cert(const struct pouch_cert *cert, mbedtls_x509_crt *out)
@@ -47,10 +47,10 @@ static int parse_x509_cert(const struct pouch_cert *cert, mbedtls_x509_crt *out)
 
     mbedtls_x509_crt_init(out);
 
-    int ret = mbedtls_x509_crt_parse(out, cert->der, cert->size);
+    int ret = mbedtls_x509_crt_parse(out, cert->buffer, cert->size);
     if (ret != 0)
     {
-        LOG_ERR("Failed to parse certificate: %x", -ret);
+        LOG_ERR("Failed to parse certificate: 0x%x", -ret);
         return -EIO;
     }
 
@@ -69,7 +69,7 @@ static mbedtls_x509_crt *load_ca_cert(void)
     }
 
     const struct pouch_cert ca_cert_data = {
-        .der = raw_ca_cert,
+        .buffer = raw_ca_cert,
         .size = sizeof(raw_ca_cert),
     };
 
@@ -88,7 +88,7 @@ static int generate_ref(const struct pouch_cert *cert, uint8_t cert_ref[CERT_REF
 {
     size_t hash_length;
     psa_status_t status = psa_hash_compute(PSA_ALG_SHA_256,
-                                           cert->der,
+                                           cert->buffer,
                                            cert->size,
                                            cert_ref,
                                            CERT_REF_LEN,
