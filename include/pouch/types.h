@@ -35,7 +35,7 @@
 /** Create a pouch certificate from a raw byte array of a DER encoded x509 certificate */
 #define POUCH_CERTIFICATE(_raw_cert_der) \
     {                                    \
-        .der = _raw_cert_der,            \
+        .buffer = _raw_cert_der,         \
         .size = sizeof(_raw_cert_der),   \
     }
 
@@ -43,9 +43,9 @@
 struct pouch_cert
 {
     /**
-     * The certificate in DER format.
+     * The certificate in DER or PEM format.
      */
-    const uint8_t *der;
+    const uint8_t *buffer;
     /** The length of the certificate */
     size_t size;
 };

@@ -33,9 +33,9 @@ static enum golioth_ble_gatt_packetizer_result device_cert_fill_cb(void *dst,
     size_t maxlen = *dst_len;
 
     *dst_len = MIN(maxlen, cert->size);
-    memcpy(dst, cert->der, *dst_len);
+    memcpy(dst, cert->buffer, *dst_len);
 
-    cert->der += *dst_len;
+    cert->buffer += *dst_len;
     cert->size -= *dst_len;
 
     if (cert->size == 0)
