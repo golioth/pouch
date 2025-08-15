@@ -18,6 +18,8 @@
 #define MBEDTLS_OID_C
 #define MBEDTLS_PK_C
 #define MBEDTLS_PK_PARSE_C
+#define MBEDTLS_BASE64_C
+#define MBEDTLS_PEM_PARSE_C
 
 /* Server certificates are signed with secp384r1 or ecdsa-with-SHA256.
  * We need to enable these to be able to parse the ASN.1 tag in the certificate, even if we don't
