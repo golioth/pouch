@@ -35,7 +35,7 @@ static struct
 
 static inline bool cert_is_valid(const struct pouch_cert *cert)
 {
-    return cert != NULL && cert->der != NULL && cert->size > 0;
+    return cert != NULL && cert->buffer != NULL && cert->size > 0;
 }
 
 static int parse_x509_cert(const struct pouch_cert *cert, mbedtls_x509_crt *out)
@@ -47,10 +47,10 @@ static int parse_x509_cert(const struct pouch_cert *cert, mbedtls_x509_crt *out)
 
     mbedtls_x509_crt_init(out);
 
-    int ret = mbedtls_x509_crt_parse_der_nocopy(out, cert->der, cert->size);
+    int ret = mbedtls_x509_crt_parse(out, cert->buffer, cert->size);
     if (ret != 0)
     {
-        LOG_ERR("Failed to parse certificate: %x", -ret);
+        LOG_ERR("Failed to parse certificate: 0x%x", -ret);
         return -EIO;
     }
 
@@ -69,7 +69,7 @@ static mbedtls_x509_crt *load_ca_cert(void)
     }
 
     const struct pouch_cert ca_cert_data = {
-        .der = raw_ca_cert,
+        .buffer = raw_ca_cert,
         .size = sizeof(raw_ca_cert),
     };
 
@@ -88,7 +88,7 @@ static int generate_ref(const struct pouch_cert *cert, uint8_t cert_ref[CERT_REF
 {
     size_t hash_length;
     psa_status_t status = psa_hash_compute(PSA_ALG_SHA_256,
-                                           cert->der,
+                                           cert->buffer,
                                            cert->size,
                                            cert_ref,
                                            CERT_REF_LEN,
@@ -171,42 +171,48 @@ int cert_server_set(const struct pouch_cert *certbuf)
         return -EINVAL;
     }
 
-    mbedtls_x509_crt parsed_cert;
-    err = parse_x509_cert(certbuf, &parsed_cert);
+    mbedtls_x509_crt cert_chain;
+    err = parse_x509_cert(certbuf, &cert_chain);
     if (err)
     {
         LOG_ERR("Failed loading server cert");
         return -EIO;
     }
 
-    if (parsed_cert.serial.len > sizeof(server_cert.serial.data))
-    {
-        LOG_ERR("Unexpected server certificate serial number size: %u", parsed_cert.serial.len);
-        goto exit;
-    }
-
     if (IS_ENABLED(CONFIG_POUCH_VALIDATE_SERVER_CERT))
     {
-        err = authenticate_server_cert(&parsed_cert);
+        err = authenticate_server_cert(&cert_chain);
         if (err)
         {
             goto exit;
         }
     }
 
-    err = extract_pubkey(&parsed_cert, &server_cert.pubkey);
+    mbedtls_x509_crt *leaf_cert = &cert_chain;
+    while (leaf_cert->next != NULL)
+    {
+        leaf_cert = leaf_cert->next;
+    }
+
+    if (leaf_cert->serial.len > sizeof(server_cert.serial.data))
+    {
+        LOG_ERR("Unexpected server certificate serial number size: %u", leaf_cert->serial.len);
+        goto exit;
+    }
+
+    err = extract_pubkey(leaf_cert, &server_cert.pubkey);
     if (err)
     {
         goto exit;
     }
 
-    memcpy(server_cert.serial.data, parsed_cert.serial.p, parsed_cert.serial.len);
-    server_cert.serial.len = parsed_cert.serial.len;
+    memcpy(server_cert.serial.data, leaf_cert->serial.p, leaf_cert->serial.len);
+    server_cert.serial.len = leaf_cert->serial.len;
 
     LOG_DBG("Server key stored");
 
 exit:
-    mbedtls_x509_crt_free(&parsed_cert);
+    mbedtls_x509_crt_free(&cert_chain);
     return err;
 }
 

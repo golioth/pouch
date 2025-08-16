@@ -151,7 +151,7 @@ int load_certificate(struct pouch_cert *cert)
         return size;
     }
 
-    cert->der = buf;
+    cert->buffer = buf;
     cert->size = size;
 
     LOG_INF("Read certificate (%d bytes)", size);
@@ -161,5 +161,5 @@ int load_certificate(struct pouch_cert *cert)
 
 void free_certificate(struct pouch_cert *cert)
 {
-    free((void *) cert->der);
+    free((void *) cert->buffer);
 }
