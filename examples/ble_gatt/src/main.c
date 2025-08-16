@@ -104,6 +104,7 @@ static void pouch_event_handler(enum pouch_event event, void *ctx)
     if (POUCH_EVENT_SESSION_END == event)
     {
         service_data.data.flags = 0x00;
+        bt_le_adv_update_data(ad, ARRAY_SIZE(ad), NULL, 0);
         k_work_schedule(&sync_request_work, K_SECONDS(CONFIG_EXAMPLE_SYNC_PERIOD_S));
     }
 }
