@@ -199,7 +199,8 @@ static void ota_receive_component_start(golioth_downlink_id_t id, const char *pa
         size_t name_len = ((intptr_t) delimiter) - ((intptr_t) path_remainder);
         strncpy(component_download.name, path_remainder, name_len);
         component_download.name[name_len] = '\0';
-        strcpy(component_download.version, delimiter + 1);
+        strncpy(component_download.version, delimiter + 1, sizeof(component_download.version));
+        component_download.version[sizeof(component_download.version) - 1] = '\0';
         component_download.offset = 0;
     }
     else

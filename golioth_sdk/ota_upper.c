@@ -60,7 +60,8 @@ int golioth_ota_manifest_receive_one(const struct golioth_ota_component *compone
     {
         if (0 == strcmp(component->package, registered->name))
         {
-            strcpy(registered->data->target, component->version);
+            strncpy(registered->data->target, component->version, sizeof(registered->data->target));
+            registered->data->target[sizeof(registered->data->target) - 1] = '\0';
             memcpy(registered->data->target_hash,
                    component->hash,
                    GOLIOTH_OTA_COMPONENT_HASH_BIN_LEN);
