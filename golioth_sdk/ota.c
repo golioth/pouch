@@ -270,10 +270,13 @@ static void ota_uplink(void)
             return;
         }
 
-        ok = zcbor_tstr_put_lit(zse, "t") && zcbor_tstr_put_term(zse, target_version, SIZE_MAX);
-        if (!ok)
+        if (GOLIOTH_OTA_STATE_IDLE != state)
         {
-            return;
+            ok = zcbor_tstr_put_lit(zse, "t") && zcbor_tstr_put_term(zse, target_version, SIZE_MAX);
+            if (!ok)
+            {
+                return;
+            }
         }
 
         ok = zcbor_map_end_encode(zse, 1);
