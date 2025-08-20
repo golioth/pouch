@@ -2,6 +2,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+config NCS_APPLICATION_BOOT_BANNER_STRING
+    string
+    default "Pouch BLE GATT Example"
+
 source "$ZEPHYR_BASE/Kconfig"
 
 config EXAMPLE_SYNC_PERIOD_S
