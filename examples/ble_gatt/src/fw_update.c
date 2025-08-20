@@ -7,8 +7,10 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(fw_update);
 
+#include <zephyr/kernel.h>
 #include <zephyr/dfu/flash_img.h>
 #include <zephyr/dfu/mcuboot.h>
+#include <zephyr/logging/log_ctrl.h>
 #include <zephyr/storage/flash_map.h>
 #include <zephyr/sys/reboot.h>
 
@@ -49,6 +51,13 @@ static void ota_main_receive(const void *data, size_t offset, size_t len, bool i
             LOG_ERR("Failed to request upgrade");
             return;
         }
+
+        LOG_INF("Rebooting to apply upgrade");
+        while (log_process())
+        {
+        }
+
+        k_sleep(K_SECONDS(3));
 
         sys_reboot(SYS_REBOOT_WARM);
     }

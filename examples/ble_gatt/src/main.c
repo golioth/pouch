@@ -5,7 +5,7 @@
  */
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(main);
 
 #include "credentials.h"
 
@@ -118,7 +118,7 @@ POUCH_EVENT_HANDLER(pouch_event_handler, NULL);
 
 static int led_setting_cb(bool new_value, void *arg)
 {
-    LOG_INF("LED: %d", (int) new_value);
+    LOG_INF("Received LED setting: %d", (int) new_value);
 
     if (DT_HAS_ALIAS(led0))
     {
@@ -150,7 +150,7 @@ int main(void)
         return 0;
     }
 
-    LOG_DBG("Bluetooth initialized");
+    LOG_INF("Bluetooth initialized");
 
     struct pouch_config config = {0};
 
@@ -168,6 +168,8 @@ int main(void)
         return 0;
     }
 
+    LOG_INF("Credentials loaded");
+
     err = pouch_init(&config);
     if (err)
     {
@@ -175,7 +177,7 @@ int main(void)
         return 0;
     }
 
-    LOG_DBG("Pouch successfully initialized");
+    LOG_INF("Pouch initialized");
 
     err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_2, ad, ARRAY_SIZE(ad), NULL, 0);
     if (err)
@@ -184,7 +186,7 @@ int main(void)
         return 0;
     }
 
-    LOG_DBG("Advertising successfully started");
+    LOG_INF("Advertising started");
 
     if (DT_HAS_ALIAS(led0))
     {

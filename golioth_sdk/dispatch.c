@@ -18,6 +18,7 @@ static struct golioth_downlink_service *last_seen = NULL;
 static void pouch_downlink_start(unsigned int stream_id, const char *path, uint16_t content_type)
 {
     LOG_DBG("Downlink start: %d, %s, %d", stream_id, path, content_type);
+    LOG_INF("Receiving Downlink entry on path %s", path);
 
     STRUCT_SECTION_FOREACH(golioth_downlink_service, service)
     {
@@ -78,6 +79,8 @@ static void pouch_downlink_data(unsigned int stream_id, const void *data, size_t
         active_service->data_cb(stream_id, data, len, is_last);
         if (is_last)
         {
+            LOG_INF("Finished entry for %s", active_service->path);
+
             active_service->data->downlink_id = DOWNLINK_ID_INVALID;
             last_seen = NULL;
         }
@@ -90,6 +93,8 @@ static void pouch_downlink_data(unsigned int stream_id, const void *data, size_t
 
 int golioth_sync_to_cloud(void)
 {
+    LOG_INF("Beginning Golioth Uplink");
+
     STRUCT_SECTION_FOREACH(golioth_uplink_service, service)
     {
         if (NULL != service->uplink_cb)

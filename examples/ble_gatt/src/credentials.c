@@ -9,7 +9,7 @@
 #include <mbedtls/pk.h>
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(credentials, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(credentials);
 
 #define CERT_DIR CONFIG_EXAMPLE_CREDENTIALS_DIR
 #define CERT_FILE CERT_DIR "/crt.der"
@@ -119,7 +119,7 @@ static ssize_t read_file(const char *path, uint8_t **out)
         goto finish;
     }
 
-    LOG_INF("Read %d bytes from %s", size, path);
+    LOG_DBG("Read %d bytes from %s", size, path);
 
     *out = buf;
 
@@ -154,7 +154,7 @@ int load_certificate(struct pouch_cert *cert)
     cert->buffer = buf;
     cert->size = size;
 
-    LOG_INF("Read certificate (%d bytes)", size);
+    LOG_DBG("Read certificate (%d bytes)", size);
 
     return 0;
 }
