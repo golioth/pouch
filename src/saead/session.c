@@ -210,7 +210,7 @@ struct pouch_buf *session_encrypt_block(struct session *session, struct pouch_bu
     uint8_t nonce[NONCE_LEN];
     nonce_generate(session, POUCH_ROLE_DEVICE, nonce);
 
-    LOG_INF("Session key: %d", session->key);
+    LOG_DBG("Session key: %d", session->key);
 
     struct pouch_bufview plaintext;
     pouch_bufview_init(&plaintext, block);
