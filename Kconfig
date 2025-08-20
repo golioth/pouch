@@ -120,6 +120,13 @@ menuconfig POUCH_VALIDATE_SERVER_CERT
     Disabling this will disable the server certificate validation.
     This should never be disabled in production.
 
+config POUCH_SERVER_CERT_CN
+  string "Server certificate common name"
+  default "pouch.golioth.io"
+  help
+    The expected common name or subject alternative name for the
+    server leaf certificate.
+
 if POUCH_VALIDATE_SERVER_CERT
 
 config POUCH_CA_CERT_FILENAME
