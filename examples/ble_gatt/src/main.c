@@ -23,6 +23,8 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 #include <golioth/golioth.h>
 #include <golioth/settings_callbacks.h>
 
+#include <app_version.h>
+
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET_OR(DT_ALIAS(led0), gpios, {});
 
 static struct
@@ -130,6 +132,10 @@ GOLIOTH_SETTINGS_HANDLER(LED, led_setting_cb, NULL);
 
 int main(void)
 {
+    LOG_INF("Pouch SDK Version: " STRINGIFY(APP_BUILD_VERSION));
+    LOG_INF("Pouch Protocol Version: %d", POUCH_VERSION);
+    LOG_INF("Pouch BLE Transport Protocol Version: %d", GOLIOTH_BLE_GATT_VERSION);
+
     int err = golioth_ble_gatt_peripheral_init();
     if (err)
     {
