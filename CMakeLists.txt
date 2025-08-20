@@ -67,6 +67,15 @@ if(CONFIG_POUCH)
                 " ************************************************")
     endif()
 
+    if (DEFINED CONFIG_POUCH_ENCRYPTION_SAEAD AND DEFINED CONFIG_MBEDTLS_PSA_P256M_DRIVER_ENABLED)
+        message(FATAL_ERROR " \n"
+                " **************************************************\n"
+                " CONFIG_MBEDTLS_PSA_256M_DRIVER_ENABLED breaks\n"
+                " support for the secp384r1 curve, which is required\n"
+                " for Pouch. Disable this option in prj.conf\n"
+                " **************************************************")
+    endif()
+
     add_subdirectory(golioth_sdk)
 
 endif()
