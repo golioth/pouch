@@ -111,7 +111,13 @@ static int authenticate_server_cert(mbedtls_x509_crt *cert)
     }
 
     uint32_t flags = 0;
-    int ret = mbedtls_x509_crt_verify(cert, ca_cert, NULL, NULL, &flags, NULL, NULL);
+    int ret = mbedtls_x509_crt_verify(cert,
+                                      ca_cert,
+                                      NULL,
+                                      CONFIG_POUCH_SERVER_CERT_CN,
+                                      &flags,
+                                      NULL,
+                                      NULL);
     if (ret != 0)
     {
         LOG_ERR("Failed verifying server cert: 0x%x, %x", -ret, flags);
