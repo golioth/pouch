@@ -39,6 +39,22 @@ struct golioth_settings_handler
     void *cb_arg;
 };
 
+/**
+ * Register a settings handler.
+ *
+ * Use this macro to register a callback to be executed each time a setting
+ * is updated. The data type of the setting is inferred from the callback
+ * signature.
+ *
+ * NOTE: This callback may be called even if the value of the setting has
+ * not changed.
+ *
+ * @param _name     The name of the setting. This must match the name on
+ *                  Golioth.
+ * @param _function The callback function to execute.
+ * @param _arg      A user supplied argument that will be passed to the
+ *                  callback.
+ */
 #define GOLIOTH_SETTINGS_HANDLER(_name, _function, _arg)                   \
     static const STRUCT_SECTION_ITERABLE(golioth_settings_handler,         \
                                          CONCAT(handler_, _function)) = {  \
