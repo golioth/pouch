@@ -136,13 +136,11 @@ enum golioth_ble_gatt_packetizer_result golioth_ble_gatt_packetizer_get(
             goto finish;
         }
 
-        if (bytes_to_fill > 0)
+        *dst_len = sizeof(struct golioth_ble_gatt_packet) + bytes_to_fill;
+
+        if (bytes_to_fill == 0)
         {
-            *dst_len = sizeof(struct golioth_ble_gatt_packet) + bytes_to_fill;
-        }
-        else
-        {
-            *dst_len = 0;
+            ret = GOLIOTH_BLE_GATT_PACKETIZER_EMPTY_PAYLOAD;
         }
 
         if (GOLIOTH_BLE_GATT_PACKETIZER_NO_MORE_DATA == cb_result)
