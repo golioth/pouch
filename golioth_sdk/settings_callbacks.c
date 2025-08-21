@@ -26,18 +26,16 @@ int golioth_settings_receive_one(const struct setting_value *value)
             switch (setting->type)
             {
                 case GOLIOTH_SETTING_VALUE_TYPE_INT:
-                    return setting->int_cb(value->int_val, setting->cb_arg);
+                    return setting->int_cb(value->int_val);
 
                 case GOLIOTH_SETTING_VALUE_TYPE_BOOL:
-                    return setting->bool_cb(value->bool_val, setting->cb_arg);
+                    return setting->bool_cb(value->bool_val);
 
                 case GOLIOTH_SETTING_VALUE_TYPE_FLOAT:
-                    return setting->float_cb(value->float_val, setting->cb_arg);
+                    return setting->float_cb(value->float_val);
 
                 case GOLIOTH_SETTING_VALUE_TYPE_STRING:
-                    return setting->string_cb(value->str_val.data,
-                                              value->str_val.len,
-                                              setting->cb_arg);
+                    return setting->string_cb(value->str_val.data, value->str_val.len);
 
                 default:
                     LOG_ERR("Unknown settings type");

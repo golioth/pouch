@@ -116,7 +116,7 @@ static void pouch_event_handler(enum pouch_event event, void *ctx)
 
 POUCH_EVENT_HANDLER(pouch_event_handler, NULL);
 
-static int led_setting_cb(bool new_value, void *arg)
+static int led_setting_cb(bool new_value)
 {
     LOG_INF("Received LED setting: %d", (int) new_value);
 
@@ -128,7 +128,7 @@ static int led_setting_cb(bool new_value, void *arg)
     return 0;
 }
 
-GOLIOTH_SETTINGS_HANDLER(LED, led_setting_cb, NULL);
+GOLIOTH_SETTINGS_HANDLER(LED, led_setting_cb);
 
 int main(void)
 {
