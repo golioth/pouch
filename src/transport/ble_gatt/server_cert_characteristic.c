@@ -139,7 +139,11 @@ static ssize_t server_cert_write(struct bt_conn *conn,
 
     if (is_last)
     {
-        pouch_server_certificate_set(&ctx->cert);
+        int err = pouch_server_certificate_set(&ctx->cert);
+        if (err)
+        {
+            bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+        }
 
         free((void *) ctx->cert.buffer);
         ctx->cert.buffer = NULL;
