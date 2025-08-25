@@ -41,3 +41,18 @@ The `ble_gatt` transport delivers pouches over Bluetooth Low Energy (BLE)
 Generic Attribute (GATT) Profile. An example of using `pouch` with the
 `ble_gatt` transport can be found in the
 [`examples/ble_gatt`](./examples/ble_gatt) directory.
+
+## Golioth Service Support
+
+The [`golioth_sdk`](./golioth_sdk) implements Golioth device management, data
+routing, and application services over `pouch`. The table below indicates the
+current status of support for each device-facing service.
+
+| Service                       | Supported |
+|-------------------------------|-----------|
+| Logging                       | ✅        |
+| OTA                           | ✅        |
+| Remote Procedure Calls (RPCs) |           |
+| Settings                      | ✅        |
+| State                         |           |
+| Stream                        | ✅        |
