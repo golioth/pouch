@@ -53,9 +53,12 @@ static void ota_main_receive(const void *data, size_t offset, size_t len, bool i
         }
 
         LOG_INF("Rebooting to apply upgrade");
+
+#if IS_ENABLED(CONFIG_LOG)
         while (log_process())
         {
         }
+#endif
 
         k_sleep(K_SECONDS(3));
 
