@@ -17,13 +17,14 @@ board with BLE, PSA, MbedTLS and LittleFS support should work.
 
 ## Authentication
 
-The Pouch BLE GATT example requires a private key and certificate to authenticate
-and encrypt the communication with the Golioth Cloud.
+The Pouch BLE GATT example requires a private key and certificate to
+authenticate and encrypt the communication with Golioth.
 
-Pouch devices use the same certificates and keys as devices that connect directly
-to the Golioth Cloud. Please refer to [the official
-documentation](https://docs.golioth.io/firmware/golioth-firmware-sdk/authentication/certificate-auth)
-for generating and signing a valid private key and certificate.
+Pouch devices use the same certificates and keys as devices that connect
+directly to the Golioth. Please refer to [the official
+documentation](https://docs.golioth.io/connectivity/credentials/pki) for
+information on setting up Public Key Infrastructure (PKI) and issuing device
+certificates.
 
 The example's credential management is implemented in src/credentials.c, and
 expects to find the following files in its filesystem when booting up:
