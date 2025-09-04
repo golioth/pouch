@@ -142,7 +142,7 @@ config MBEDTLS_USER_CONFIG_ENABLE
   default y
 
 config MBEDTLS_USER_CONFIG_FILE
-  default "${ZEPHYR_POUCH_MODULE_DIR}/src/saead/mbedtls_config.h"
+  default "$(ZEPHYR_POUCH_MODULE_DIR)/src/saead/mbedtls_config.h"
 
 endmenu
 
