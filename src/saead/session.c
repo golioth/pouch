@@ -92,7 +92,7 @@ static ssize_t session_key_info_build(const struct session_id *id,
     session_id[id_len] = '\0';
 
     return sprintf(buf,
-                   "E0:%c:%s:C%c%c:%02x",
+                   "E0:%c:%s:C%c%c:%02X",
                    id->initiator == POUCH_ROLE_DEVICE ? 'D' : 'S',
                    session_id,
                    algorithm == PSA_ALG_CHACHA20_POLY1305 ? 'C' : 'A',
