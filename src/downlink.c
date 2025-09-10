@@ -226,4 +226,8 @@ void pouch_downlink_push(const void *buf, size_t buf_len)
     }
 }
 
-void pouch_downlink_finish(void) {}
+void pouch_downlink_finish(void)
+{
+    buf_free(pouch_buf);
+    pouch_buf = NULL;
+}
