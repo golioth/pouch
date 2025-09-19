@@ -27,6 +27,10 @@
         BT_GATT_ATTRIBUTE(_uuid, _perm, _read, _write, _user_data);                            \
     GOLIOTH_BT_GATT_CUD(name)
 
+#define GOLIOTH_BLE_GATT_CCC(name, _changed, _write, _perm) \
+    STRUCT_SECTION_ITERABLE(bt_gatt_attr, name##_zzz_ccc) = \
+        BT_GATT_CCC_WITH_WRITE_CB(_changed, _write, _perm)
+
 #define GOLIOTH_BLE_GATT_SERVICE(_uuid) \
     STRUCT_SECTION_ITERABLE(bt_gatt_attr, AAA_golioth_ble_gatt_svc) = BT_GATT_PRIMARY_SERVICE(_uuid)
 
