@@ -161,6 +161,14 @@ config POUCH_TRANSPORT_BLE_GATT
 
 endchoice
 
+if POUCH_TRANSPORT_BLE_GATT
+
+menu "BLE GATT Transport Options"
+rsource "src/transport/ble_gatt/Kconfig"
+endmenu
+
+endif
+
 module = POUCH
 module-str = Pouch
 source "subsys/logging/Kconfig.template.log_config"

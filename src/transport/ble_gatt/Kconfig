@@ -1,0 +1,11 @@
+# Copyright (c) 2025 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+config POUCH_TRANSPORT_GATT_CUD_ATTRIBUTES
+    bool "Include CUD attributes for each characteristic"
+    help
+        If enabled, Characteristic User Description attributes will
+        be added for each characteristic with a brief identifier. This
+        can be useful during debugging and development to identify
+        the characteristics without consulting their UUIDs.
