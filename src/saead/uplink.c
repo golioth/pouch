@@ -42,10 +42,10 @@ int saead_uplink_session_start(psa_algorithm_t algorithm, psa_key_id_t private_k
                                       private_key,
                                       &pubkey,
                                       PSA_KEY_USAGE_ENCRYPT);
-    if (err)
+    if (PSA_KEY_ID_NULL == uplink.key)
     {
-        LOG_ERR("Session key generation failed (err: %d)", err);
-        return err;
+        LOG_ERR("Session key generation failed");
+        return -ENOENT;
     }
 
     uplink.algorithm = algorithm;
