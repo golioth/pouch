@@ -14,8 +14,8 @@
 
 #include "golioth_ble_gatt_declarations.h"
 
-static const struct bt_uuid_128 golioth_ble_gatt_svc_uuid =
-    BT_UUID_INIT_128(GOLIOTH_BLE_GATT_UUID_SVC_VAL);
+static const struct bt_uuid_16 golioth_ble_gatt_svc_uuid =
+    BT_UUID_INIT_16(GOLIOTH_BLE_GATT_UUID_SVC_VAL_16);
 
 GOLIOTH_BLE_GATT_SERVICE(&golioth_ble_gatt_svc_uuid);
 

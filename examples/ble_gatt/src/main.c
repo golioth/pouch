@@ -29,10 +29,10 @@ static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET_OR(DT_ALIAS(led0), gpios
 
 static struct
 {
-    uint8_t uuid[16];
+    uint16_t uuid;
     struct golioth_ble_gatt_adv_data data;
 } __packed service_data = {
-    .uuid = {GOLIOTH_BLE_GATT_UUID_SVC_VAL},
+    .uuid = GOLIOTH_BLE_GATT_UUID_SVC_VAL_16,
     .data =
         {
             .version = (POUCH_VERSION << GOLIOTH_BLE_GATT_ADV_VERSION_POUCH_SHIFT)
@@ -43,11 +43,8 @@ static struct
 
 static struct bt_data ad[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
+    BT_DATA(BT_DATA_SVC_DATA16, &service_data, sizeof(service_data)),
     BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
-};
-
-static struct bt_data sd[] = {
-    BT_DATA(BT_DATA_SVC_DATA128, &service_data, sizeof(service_data)),
 };
 
 static void connected(struct bt_conn *conn, uint8_t err)
@@ -64,7 +61,7 @@ static void connected(struct bt_conn *conn, uint8_t err)
 
 void disconnect_work_handler(struct k_work *work)
 {
-    int err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_2, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+    int err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_2, ad, ARRAY_SIZE(ad), NULL, 0);
     if (err)
     {
         LOG_ERR("Advertising failed to start (err %d)", err);
@@ -88,7 +85,7 @@ BT_CONN_CB_DEFINE(conn_callbacks) = {
 void sync_request_work_handler(struct k_work *work)
 {
     service_data.data.flags = 0x01;
-    bt_le_adv_update_data(ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+    bt_le_adv_update_data(ad, ARRAY_SIZE(ad), NULL, 0);
 }
 
 K_WORK_DELAYABLE_DEFINE(sync_request_work, sync_request_work_handler);
@@ -109,7 +106,7 @@ static void pouch_event_handler(enum pouch_event event, void *ctx)
     if (POUCH_EVENT_SESSION_END == event)
     {
         service_data.data.flags = 0x00;
-        bt_le_adv_update_data(ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+        bt_le_adv_update_data(ad, ARRAY_SIZE(ad), NULL, 0);
         k_work_schedule(&sync_request_work, K_SECONDS(CONFIG_EXAMPLE_SYNC_PERIOD_S));
     }
 }
