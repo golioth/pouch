@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <stdlib.h>
+
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
@@ -14,12 +16,29 @@
 
 #include "golioth_ble_gatt_declarations.h"
 
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(uplink_chrc, CONFIG_POUCH_LOG_LEVEL);
+
+#define BT_ATT_OVERHEAD 3
+
 static const struct bt_uuid_128 golioth_ble_gatt_uplink_chrc_uuid =
     BT_UUID_INIT_128(GOLIOTH_BLE_GATT_UUID_UPLINK_CHRC_VAL);
+
+enum uplink_indicate_state
+{
+    UPLINK_INDICATE_IDLE,
+    UPLINK_INDICATE_IN_PROGRESS,
+    UPLINK_INDICATE_LAST,
+    UPLINK_INDICATE_FINISHED,
+};
 
 static struct golioth_ble_gatt_uplink_ctx
 {
     struct golioth_ble_gatt_packetizer *packetizer;
+    struct bt_conn *conn;
+    enum uplink_indicate_state state;
+    struct bt_gatt_indicate_params indicate_params;
+    size_t indicate_data_len;
 } uplink_chrc_ctx;
 
 static enum golioth_ble_gatt_packetizer_result uplink_fill_cb(void *dst,
@@ -85,10 +104,154 @@ static ssize_t uplink_read(struct bt_conn *conn,
     return buf_len;
 }
 
+static void cleanup_context(struct golioth_ble_gatt_uplink_ctx *ctx)
+{
+    if (NULL != ctx->packetizer)
+    {
+        golioth_ble_gatt_packetizer_finish(ctx->packetizer);
+        ctx->packetizer = NULL;
+    }
+    if (NULL != ctx->indicate_params.data)
+    {
+        free((void *) ctx->indicate_params.data);
+        ctx->indicate_params.data = NULL;
+        ctx->indicate_data_len = 0;
+    }
+
+    ctx->state = UPLINK_INDICATE_IDLE;
+}
+
+static void send_indication(struct golioth_ble_gatt_uplink_ctx *ctx)
+{
+    if (NULL == ctx->packetizer)
+    {
+        return;
+    }
+
+    size_t buf_len = ctx->indicate_data_len;
+    enum golioth_ble_gatt_packetizer_result ret =
+        golioth_ble_gatt_packetizer_get(ctx->packetizer,
+                                        (void *) ctx->indicate_params.data,
+                                        &buf_len);
+
+    if (GOLIOTH_BLE_GATT_PACKETIZER_ERROR == ret)
+    {
+        ctx->state = UPLINK_INDICATE_FINISHED;
+        return;
+    }
+    if (GOLIOTH_BLE_GATT_PACKETIZER_NO_MORE_DATA == ret)
+    {
+        ctx->state = UPLINK_INDICATE_LAST;
+    }
+
+    ctx->indicate_params.len = buf_len;
+
+    bt_gatt_indicate(ctx->conn, &ctx->indicate_params);
+}
+
+static void uplink_indicate_cb(struct bt_conn *conn,
+                               struct bt_gatt_indicate_params *params,
+                               uint8_t err)
+{
+    struct golioth_ble_gatt_uplink_ctx *ctx = &uplink_chrc_ctx;
+
+    /* If the indicate failed, or this is a response to the last packet */
+
+    if (err || UPLINK_INDICATE_LAST == ctx->state)
+    {
+        ctx->state = UPLINK_INDICATE_FINISHED;
+    }
+}
+
+static void uplink_indicate_destroy(struct bt_gatt_indicate_params *params)
+{
+    struct golioth_ble_gatt_uplink_ctx *ctx = &uplink_chrc_ctx;
+
+    if (UPLINK_INDICATE_IN_PROGRESS == ctx->state)
+    {
+        send_indication(ctx);
+    }
+    else if (UPLINK_INDICATE_FINISHED == ctx->state)
+    {
+        cleanup_context(ctx);
+    }
+}
+
 GOLIOTH_BLE_GATT_CHARACTERISTIC(uplink,
                                 (const struct bt_uuid *) &golioth_ble_gatt_uplink_chrc_uuid,
-                                BT_GATT_CHRC_READ,
+                                BT_GATT_CHRC_READ | BT_GATT_CHRC_INDICATE,
                                 BT_GATT_PERM_READ,
                                 uplink_read,
                                 NULL,
                                 &uplink_chrc_ctx);
+
+static ssize_t uplink_ccc_write(struct bt_conn *conn,
+                                const struct bt_gatt_attr *attr,
+                                uint16_t value)
+{
+    struct golioth_ble_gatt_uplink_ctx *ctx = &uplink_chrc_ctx;
+
+    if (value & BT_GATT_CCC_INDICATE)
+    {
+        if (UPLINK_INDICATE_IDLE != ctx->state)
+        {
+            LOG_DBG("Indication already in progress");
+            return sizeof(value);
+        }
+
+        /* Start sending */
+
+        ctx->indicate_data_len = bt_gatt_get_mtu(conn) - BT_ATT_OVERHEAD;
+        ctx->indicate_params.data = malloc(ctx->indicate_data_len);
+        if (NULL == ctx->indicate_params.data)
+        {
+            ctx->indicate_data_len = 0;
+            return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
+        }
+
+        struct pouch_uplink *pouch = pouch_uplink_start();
+        if (NULL == pouch)
+        {
+            cleanup_context(ctx);
+            return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
+        }
+
+        ctx->packetizer = golioth_ble_gatt_packetizer_start_callback(uplink_fill_cb, pouch);
+
+        ctx->conn = conn;
+
+        ctx->indicate_params.attr = &uplink_chrc;
+        ctx->indicate_params.func = uplink_indicate_cb;
+        ctx->indicate_params.destroy = uplink_indicate_destroy;
+        ctx->indicate_params.len = 0;
+
+        ctx->state = UPLINK_INDICATE_IN_PROGRESS;
+    }
+
+    return sizeof(value);
+}
+
+static void uplink_ccc_changed(const struct bt_gatt_attr *attr, uint16_t value)
+{
+    struct golioth_ble_gatt_uplink_ctx *ctx = &uplink_chrc_ctx;
+
+    if (value & BT_GATT_CCC_INDICATE)
+    {
+        LOG_DBG("Indications enabled");
+
+        send_indication(ctx);
+    }
+    else
+    {
+        LOG_DBG("Indications disabled");
+
+        /* Indications turned off, stop sending */
+
+        cleanup_context(ctx);
+    }
+}
+
+GOLIOTH_BLE_GATT_CCC(uplink,
+                     uplink_ccc_changed,
+                     uplink_ccc_write,
+                     BT_GATT_PERM_READ | BT_GATT_PERM_WRITE);
