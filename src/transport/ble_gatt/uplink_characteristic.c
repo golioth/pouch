@@ -64,6 +64,25 @@ static enum golioth_ble_gatt_packetizer_result uplink_fill_cb(void *dst,
     return ret;
 }
 
+static struct golioth_ble_gatt_packetizer *packetizer_init(void)
+{
+    struct pouch_uplink *pouch = pouch_uplink_start();
+    if (NULL == pouch)
+    {
+        return NULL;
+    }
+
+    struct golioth_ble_gatt_packetizer *packetizer;
+    packetizer = golioth_ble_gatt_packetizer_start_callback(uplink_fill_cb, pouch);
+
+    if (NULL == packetizer)
+    {
+        pouch_uplink_finish(pouch);
+    }
+
+    return packetizer;
+}
+
 static ssize_t uplink_read(struct bt_conn *conn,
                            const struct bt_gatt_attr *attr,
                            void *buf,
@@ -81,8 +100,11 @@ static ssize_t uplink_read(struct bt_conn *conn,
 
     if (NULL == ctx->packetizer)
     {
-        struct pouch_uplink *pouch = pouch_uplink_start();
-        ctx->packetizer = golioth_ble_gatt_packetizer_start_callback(uplink_fill_cb, pouch);
+        ctx->packetizer = packetizer_init();
+        if (NULL == ctx->packetizer)
+        {
+            return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
+        }
     }
 
     size_t buf_len = len;
@@ -209,16 +231,14 @@ static ssize_t uplink_ccc_write(struct bt_conn *conn,
             return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
         }
 
-        struct pouch_uplink *pouch = pouch_uplink_start();
-        if (NULL == pouch)
+        ctx->conn = conn;
+
+        ctx->packetizer = packetizer_init();
+        if (NULL == ctx->packetizer)
         {
             cleanup_context(ctx);
             return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
         }
-
-        ctx->packetizer = golioth_ble_gatt_packetizer_start_callback(uplink_fill_cb, pouch);
-
-        ctx->conn = conn;
 
         ctx->indicate_params.attr = &uplink_chrc;
         ctx->indicate_params.func = uplink_indicate_cb;
