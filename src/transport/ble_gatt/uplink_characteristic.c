@@ -223,7 +223,14 @@ static ssize_t uplink_ccc_write(struct bt_conn *conn,
 
         /* Start sending */
 
-        ctx->indicate_data_len = bt_gatt_get_mtu(conn) - BT_ATT_OVERHEAD;
+        uint16_t mtu = bt_gatt_get_mtu(conn);
+        if (mtu <= BT_ATT_OVERHEAD)
+        {
+            LOG_ERR("Invalid MTU, likely disconnected");
+            return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
+        }
+
+        ctx->indicate_data_len = mtu - BT_ATT_OVERHEAD;
         ctx->indicate_params.data = malloc(ctx->indicate_data_len);
         if (NULL == ctx->indicate_params.data)
         {
