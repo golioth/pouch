@@ -84,7 +84,7 @@ BT_CONN_CB_DEFINE(conn_callbacks) = {
 
 void sync_request_work_handler(struct k_work *work)
 {
-    service_data.data.flags = 0x01;
+    service_data.data.flags |= GOLIOTH_BLE_GATT_ADV_FLAG_SYNC_REQUEST;
     bt_le_adv_update_data(ad, ARRAY_SIZE(ad), NULL, 0);
 }
 
@@ -105,7 +105,7 @@ static void pouch_event_handler(enum pouch_event event, void *ctx)
 
     if (POUCH_EVENT_SESSION_END == event)
     {
-        service_data.data.flags = 0x00;
+        service_data.data.flags &= ~GOLIOTH_BLE_GATT_ADV_FLAG_SYNC_REQUEST;
         bt_le_adv_update_data(ad, ARRAY_SIZE(ad), NULL, 0);
         k_work_schedule(&sync_request_work, K_SECONDS(CONFIG_EXAMPLE_SYNC_PERIOD_S));
     }
