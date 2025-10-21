@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2024 Golioth
  */
+#pragma once
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -34,4 +35,8 @@ ssize_t pouch_gatt_packetizer_decode(const void *buf,
                                      size_t buf_len,
                                      const void **payload,
                                      bool *is_first,
-                                     bool *is_last);
+                                     bool *is_last,
+                                     unsigned int *seq);
+int pouch_gatt_packetizer_get_sequence(const void *packet, size_t length);
+ssize_t pouch_gatt_ack_encode(void *buf, size_t buf_len, int seq, int window);
+int pouch_gatt_ack_decode(const void *buf, size_t buf_len, unsigned int *seq, unsigned int *window);
