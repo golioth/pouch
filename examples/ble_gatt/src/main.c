@@ -17,8 +17,8 @@ LOG_MODULE_REGISTER(main);
 #include <pouch/events.h>
 #include <pouch/uplink.h>
 #include <pouch/downlink.h>
-#include <pouch/transport/ble_gatt/peripheral.h>
-#include <pouch/transport/ble_gatt/common/types.h>
+#include <pouch/transport/gatt/peripheral.h>
+#include <pouch/transport/gatt/common/types.h>
 
 #include <golioth/golioth.h>
 #include <golioth/settings_callbacks.h>
@@ -30,13 +30,13 @@ static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET_OR(DT_ALIAS(led0), gpios
 static struct
 {
     uint16_t uuid;
-    struct golioth_ble_gatt_adv_data data;
+    struct pouch_gatt_adv_data data;
 } __packed service_data = {
-    .uuid = GOLIOTH_BLE_GATT_UUID_SVC_VAL_16,
+    .uuid = POUCH_GATT_UUID_SVC_VAL_16,
     .data =
         {
-            .version = (POUCH_VERSION << GOLIOTH_BLE_GATT_ADV_VERSION_POUCH_SHIFT)
-                | (GOLIOTH_BLE_GATT_VERSION << GOLIOTH_BLE_GATT_ADV_VERSION_SELF_SHIFT),
+            .version = (POUCH_VERSION << POUCH_GATT_ADV_VERSION_POUCH_SHIFT)
+                | (POUCH_GATT_VERSION << POUCH_GATT_ADV_VERSION_SELF_SHIFT),
             .flags = 0x0,
         },
 };
@@ -84,7 +84,7 @@ BT_CONN_CB_DEFINE(conn_callbacks) = {
 
 void sync_request_work_handler(struct k_work *work)
 {
-    service_data.data.flags |= GOLIOTH_BLE_GATT_ADV_FLAG_SYNC_REQUEST;
+    service_data.data.flags |= POUCH_GATT_ADV_FLAG_SYNC_REQUEST;
     bt_le_adv_update_data(ad, ARRAY_SIZE(ad), NULL, 0);
 }
 
@@ -105,7 +105,7 @@ static void pouch_event_handler(enum pouch_event event, void *ctx)
 
     if (POUCH_EVENT_SESSION_END == event)
     {
-        service_data.data.flags &= ~GOLIOTH_BLE_GATT_ADV_FLAG_SYNC_REQUEST;
+        service_data.data.flags &= ~POUCH_GATT_ADV_FLAG_SYNC_REQUEST;
         bt_le_adv_update_data(ad, ARRAY_SIZE(ad), NULL, 0);
         k_work_schedule(&sync_request_work, K_SECONDS(CONFIG_EXAMPLE_SYNC_PERIOD_S));
     }
@@ -131,9 +131,9 @@ int main(void)
 {
     LOG_INF("Pouch SDK Version: " STRINGIFY(APP_BUILD_VERSION));
     LOG_INF("Pouch Protocol Version: %d", POUCH_VERSION);
-    LOG_INF("Pouch BLE Transport Protocol Version: %d", GOLIOTH_BLE_GATT_VERSION);
+    LOG_INF("Pouch BLE Transport Protocol Version: %d", POUCH_GATT_VERSION);
 
-    int err = golioth_ble_gatt_peripheral_init();
+    int err = pouch_gatt_peripheral_init();
     if (err)
     {
         LOG_ERR("Failed to initialize Pouch BLE GATT peripheral (err %d)", err);
