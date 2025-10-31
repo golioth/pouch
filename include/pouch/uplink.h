@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #pragma once
 
 #include <zephyr/kernel.h>
@@ -110,3 +115,7 @@ int pouch_stream_close(struct pouch_stream *stream, k_timeout_t timeout);
  * @return true if the stream is valid, false otherwise.
  */
 bool pouch_stream_is_valid(struct pouch_stream *stream);
+
+#ifdef __cplusplus
+}
+#endif

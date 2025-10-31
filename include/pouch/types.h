@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #pragma once
 
 #include <stddef.h>
@@ -49,3 +54,7 @@ struct pouch_cert
     /** The length of the certificate */
     size_t size;
 };
+
+#ifdef __cplusplus
+}
+#endif

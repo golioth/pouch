@@ -3,6 +3,12 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
+
 #pragma once
 
 /**
@@ -11,3 +17,7 @@
  * @return 0 on success or a negative error code on failure.
  */
 int golioth_sync_to_cloud(void);
+
+#ifdef __cplusplus
+}
+#endif

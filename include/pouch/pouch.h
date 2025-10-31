@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #pragma once
 
 #include <psa/crypto_types.h>
@@ -45,3 +50,7 @@ struct pouch_config
  * @param config The configuration to use.
  */
 int pouch_init(const struct pouch_config *config);
+
+#ifdef __cplusplus
+}
+#endif

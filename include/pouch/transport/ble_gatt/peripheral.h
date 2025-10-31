@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/uuid.h>
 
@@ -13,3 +18,7 @@
     BT_DATA_BYTES(BT_DATA_SVC_DATA128, GOLIOTH_BLE_GATT_UUID_SVC_VAL, 0xA5)
 
 int golioth_ble_gatt_peripheral_init(void);
+
+#ifdef __cplusplus
+}
+#endif
