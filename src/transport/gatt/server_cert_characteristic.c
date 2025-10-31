@@ -13,29 +13,29 @@
 #include <pouch/types.h>
 #include <pouch/certificate.h>
 #include <pouch/transport/certificate.h>
-#include <pouch/transport/ble_gatt/common/packetizer.h>
-#include <pouch/transport/ble_gatt/common/uuids.h>
+#include <pouch/transport/gatt/common/packetizer.h>
+#include <pouch/transport/gatt/common/uuids.h>
 
-#include "golioth_ble_gatt_declarations.h"
+#include "pouch_gatt_declarations.h"
 
-static const struct bt_uuid_128 golioth_ble_gatt_server_cert_chrc_uuid =
-    BT_UUID_INIT_128(GOLIOTH_BLE_GATT_UUID_SERVER_CERT_CHRC_VAL);
+static const struct bt_uuid_128 pouch_gatt_server_cert_chrc_uuid =
+    BT_UUID_INIT_128(POUCH_GATT_UUID_SERVER_CERT_CHRC_VAL);
 
-static struct golioth_ble_gatt_server_cert_ctx
+static struct pouch_gatt_server_cert_ctx
 {
-    struct golioth_ble_gatt_packetizer *packetizer;
+    struct pouch_gatt_packetizer *packetizer;
     struct pouch_cert cert;
     uint8_t serial[CERT_SERIAL_MAXLEN];
     uint8_t serial_len;
     uint8_t serial_offset;
 } server_cert_chrc_ctx;
 
-static enum golioth_ble_gatt_packetizer_result server_cert_serial_fill_cb(void *dst,
-                                                                          size_t *dst_len,
-                                                                          void *user_arg)
+static enum pouch_gatt_packetizer_result server_cert_serial_fill_cb(void *dst,
+                                                                    size_t *dst_len,
+                                                                    void *user_arg)
 {
-    struct golioth_ble_gatt_server_cert_ctx *ctx = user_arg;
-    enum golioth_ble_gatt_packetizer_result ret = GOLIOTH_BLE_GATT_PACKETIZER_MORE_DATA;
+    struct pouch_gatt_server_cert_ctx *ctx = user_arg;
+    enum pouch_gatt_packetizer_result ret = POUCH_GATT_PACKETIZER_MORE_DATA;
     size_t maxlen = *dst_len;
 
     *dst_len = MIN(maxlen, ctx->serial_len - ctx->serial_offset);
@@ -45,7 +45,7 @@ static enum golioth_ble_gatt_packetizer_result server_cert_serial_fill_cb(void *
 
     if (ctx->serial_offset >= ctx->serial_len)
     {
-        ret = GOLIOTH_BLE_GATT_PACKETIZER_NO_MORE_DATA;
+        ret = POUCH_GATT_PACKETIZER_NO_MORE_DATA;
     }
 
     return ret;
@@ -64,7 +64,7 @@ static ssize_t server_cert_serial_read(struct bt_conn *conn,
         return 0;
     }
 
-    struct golioth_ble_gatt_server_cert_ctx *ctx = attr->user_data;
+    struct pouch_gatt_server_cert_ctx *ctx = attr->user_data;
 
     if (NULL == ctx->packetizer)
     {
@@ -79,23 +79,22 @@ static ssize_t server_cert_serial_read(struct bt_conn *conn,
         ctx->serial_len = ret;
         ctx->serial_offset = 0;
 
-        ctx->packetizer =
-            golioth_ble_gatt_packetizer_start_callback(server_cert_serial_fill_cb, ctx);
+        ctx->packetizer = pouch_gatt_packetizer_start_callback(server_cert_serial_fill_cb, ctx);
     }
 
     size_t buf_len = len;
-    enum golioth_ble_gatt_packetizer_result ret =
-        golioth_ble_gatt_packetizer_get(ctx->packetizer, buf, &buf_len);
+    enum pouch_gatt_packetizer_result ret =
+        pouch_gatt_packetizer_get(ctx->packetizer, buf, &buf_len);
 
-    if (GOLIOTH_BLE_GATT_PACKETIZER_ERROR == ret)
+    if (POUCH_GATT_PACKETIZER_ERROR == ret)
     {
-        golioth_ble_gatt_packetizer_finish(ctx->packetizer);
+        pouch_gatt_packetizer_finish(ctx->packetizer);
         ctx->packetizer = NULL;
         return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
     }
-    if (GOLIOTH_BLE_GATT_PACKETIZER_NO_MORE_DATA == ret)
+    if (POUCH_GATT_PACKETIZER_NO_MORE_DATA == ret)
     {
-        golioth_ble_gatt_packetizer_finish(ctx->packetizer);
+        pouch_gatt_packetizer_finish(ctx->packetizer);
         ctx->packetizer = NULL;
     }
 
@@ -109,12 +108,11 @@ static ssize_t server_cert_write(struct bt_conn *conn,
                                  uint16_t offset,
                                  uint8_t flags)
 {
-    struct golioth_ble_gatt_server_cert_ctx *ctx = attr->user_data;
+    struct pouch_gatt_server_cert_ctx *ctx = attr->user_data;
     bool is_first = false;
     bool is_last = false;
     const void *payload = NULL;
-    ssize_t payload_len =
-        golioth_ble_gatt_packetizer_decode(buf, len, &payload, &is_first, &is_last);
+    ssize_t payload_len = pouch_gatt_packetizer_decode(buf, len, &payload, &is_first, &is_last);
 
     if (0 >= payload_len)
     {
@@ -152,10 +150,10 @@ static ssize_t server_cert_write(struct bt_conn *conn,
     return len;
 }
 
-GOLIOTH_BLE_GATT_CHARACTERISTIC(server_cert,
-                                (const struct bt_uuid *) &golioth_ble_gatt_server_cert_chrc_uuid,
-                                BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,
-                                BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,
-                                server_cert_serial_read,
-                                server_cert_write,
-                                &server_cert_chrc_ctx);
+POUCH_GATT_CHARACTERISTIC(server_cert,
+                          (const struct bt_uuid *) &pouch_gatt_server_cert_chrc_uuid,
+                          BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,
+                          BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,
+                          server_cert_serial_read,
+                          server_cert_write,
+                          &server_cert_chrc_ctx);

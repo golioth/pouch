@@ -2,5 +2,5 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-config POUCH_TRANSPORT_BLE_GATT_COMMON
+config POUCH_TRANSPORT_GATT_COMMON
     bool "Pouch BLE GATT transport common library"

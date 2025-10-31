@@ -1,4 +1,4 @@
-golioth_ble_gatt_info = {
+pouch_gatt_info = {
     "flags" => uint .size 1,
     "server_cert_snr" => bstr,
 }

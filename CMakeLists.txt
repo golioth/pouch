@@ -56,7 +56,7 @@ if(CONFIG_POUCH)
     # Transports
 
     if (CONFIG_POUCH_TRANSPORT_BLE_GATT)
-        add_subdirectory(src/transport/ble_gatt)
+        add_subdirectory(src/transport/gatt)
     endif()
 
     if (DEFINED CONFIG_POUCH_ENCRYPTION_SAEAD AND NOT DEFINED CONFIG_POUCH_VALIDATE_SERVER_CERT)

@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-if(NOT CONFIG_POUCH_TRANSPORT_BLE_GATT_COMMON)
+if(NOT CONFIG_POUCH_TRANSPORT_GATT_COMMON)
     return()
 endif()
 
