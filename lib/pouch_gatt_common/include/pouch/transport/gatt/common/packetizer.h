@@ -1,10 +1,14 @@
 /*
  * Copyright (c) 2024 Golioth
  */
+#pragma once
 
 #include <stdbool.h>
 #include <stddef.h>
 #include <sys/types.h>
+
+#define POUCH_GATT_ACK_SIZE 3
+#define POUCH_GATT_FIN_SIZE 2
 
 struct pouch_gatt_packetizer;
 
@@ -20,6 +24,13 @@ typedef enum pouch_gatt_packetizer_result (*pouch_gatt_packetizer_fill_cb)(void 
                                                                            size_t *dst_len,
                                                                            void *user_arg);
 
+enum pouch_gatt_ack_code
+{
+    POUCH_GATT_ACK,
+    POUCH_GATT_NACK_UNKNOWN,
+    POUCH_GATT_NACK_IDLE,
+};
+
 struct pouch_gatt_packetizer *pouch_gatt_packetizer_start_buffer(const void *src, size_t src_len);
 struct pouch_gatt_packetizer *pouch_gatt_packetizer_start_callback(pouch_gatt_packetizer_fill_cb cb,
                                                                    void *user_arg);
@@ -34,4 +45,19 @@ ssize_t pouch_gatt_packetizer_decode(const void *buf,
                                      size_t buf_len,
                                      const void **payload,
                                      bool *is_first,
-                                     bool *is_last);
+                                     bool *is_last,
+                                     unsigned int *seq);
+int pouch_gatt_packetizer_get_sequence(const void *packet, size_t length);
+ssize_t pouch_gatt_ack_encode(void *buf,
+                              size_t buf_len,
+                              enum pouch_gatt_ack_code code,
+                              int seq,
+                              int window);
+int pouch_gatt_ack_decode(const void *buf,
+                          size_t buf_len,
+                          enum pouch_gatt_ack_code *code,
+                          unsigned int *seq,
+                          unsigned int *window);
+bool pouch_gatt_packetizer_is_ack(const void *data, size_t length);
+ssize_t pouch_gatt_packetizer_fin_encode(void *buf, size_t buf_len, enum pouch_gatt_ack_code code);
+bool pouch_gatt_packetizer_is_fin(const void *buf, size_t buf_len, enum pouch_gatt_ack_code *code);
