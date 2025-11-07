@@ -4,3 +4,18 @@
 
 config POUCH_TRANSPORT_GATT_COMMON
     bool "Pouch BLE GATT transport common library"
+
+if POUCH_TRANSPORT_GATT_COMMON
+
+config POUCH_GATT_ACK_TIMEOUT_MS
+    int "Pouch GATT ACK timeout (ms)"
+    default 1000
+    help
+    The timeout, in milliseconds, that a receiver will wait
+    for new packets before retransmitting an acknowledgement
+
+module = POUCH_GATT_COMMON
+module-str = Pouch GATT Common
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # POUCH_TRANSPORT_GATT_COMMON
