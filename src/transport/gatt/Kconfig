@@ -21,6 +21,24 @@ config POUCH_TRANSPORT_GATT_PERM_AUTHEN
 
 endchoice # POUCH_TRANSPORT_GATT_PERM
 
+config POUCH_GATT_DOWNLINK_WINDOW_SIZE
+    int "Pouch GATT downlink window size"
+    range 1 127
+    default 4
+    help
+        The number of unacknowledged packets that can be received by
+        the device on the downlink characteristic. Larger numbers can
+        increase throughput but will use more RAM.
+
+config POUCH_GATT_SERVER_CERT_WINDOW_SIZE
+    int "Pouch GATT server certificate window size"
+    range 1 127
+    default 4
+    help
+        The number of unacknowledged packets that can be received by
+        the device on the server certificate characteristic. Larger
+        numbers can increase throughput but will use more RAM.
+
 module = POUCH_GATT
 module-str = Pouch GATT
 source "subsys/logging/Kconfig.template.log_config"
