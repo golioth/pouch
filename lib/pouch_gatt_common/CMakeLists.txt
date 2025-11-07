@@ -12,4 +12,6 @@ zephyr_library()
 
 zephyr_library_sources(
     packetizer.c
+    receiver.c
+    sender.c
 )
