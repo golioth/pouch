@@ -14,91 +14,76 @@
 #include <pouch/certificate.h>
 #include <pouch/transport/certificate.h>
 #include <pouch/transport/gatt/common/packetizer.h>
+#include <pouch/transport/gatt/common/receiver.h>
 #include <pouch/transport/gatt/common/uuids.h>
 
 #include "pouch_gatt_declarations.h"
+
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(server_cert_chrc, CONFIG_POUCH_GATT_LOG_LEVEL);
 
 static const struct bt_uuid_128 pouch_gatt_server_cert_chrc_uuid =
     BT_UUID_INIT_128(POUCH_GATT_UUID_SERVER_CERT_CHRC_VAL);
 
 static struct pouch_gatt_server_cert_ctx
 {
-    struct pouch_gatt_packetizer *packetizer;
+    struct pouch_gatt_receiver *receiver;
     struct pouch_cert cert;
-    uint8_t serial[CERT_SERIAL_MAXLEN];
-    uint8_t serial_len;
-    uint8_t serial_offset;
 } server_cert_chrc_ctx;
 
-static enum pouch_gatt_packetizer_result server_cert_serial_fill_cb(void *dst,
-                                                                    size_t *dst_len,
-                                                                    void *user_arg)
+struct bt_gatt_attr server_cert_chrc;
+
+static int send_ack_cb(void *conn, const void *data, size_t length)
 {
-    struct pouch_gatt_server_cert_ctx *ctx = user_arg;
-    enum pouch_gatt_packetizer_result ret = POUCH_GATT_PACKETIZER_MORE_DATA;
-    size_t maxlen = *dst_len;
+    bt_gatt_notify(conn, &server_cert_chrc, data, length);
 
-    *dst_len = MIN(maxlen, ctx->serial_len - ctx->serial_offset);
-    memcpy(dst, &ctx->serial[ctx->serial_offset], *dst_len);
-
-    ctx->serial_offset += *dst_len;
-
-    if (ctx->serial_offset >= ctx->serial_len)
-    {
-        ret = POUCH_GATT_PACKETIZER_NO_MORE_DATA;
-    }
-
-    return ret;
+    return 0;
 }
 
-static ssize_t server_cert_serial_read(struct bt_conn *conn,
-                                       const struct bt_gatt_attr *attr,
-                                       void *buf,
-                                       uint16_t len,
-                                       uint16_t offset)
+static int server_cert_received_data_cb(void *arg,
+                                        const void *data,
+                                        size_t length,
+                                        bool is_first,
+                                        bool is_last)
 {
-    /* Force packets into a single MTU */
+    struct pouch_gatt_server_cert_ctx *ctx = arg;
 
-    if (0 != offset)
+    if (is_first)
     {
-        return 0;
-    }
-
-    struct pouch_gatt_server_cert_ctx *ctx = attr->user_data;
-
-    if (NULL == ctx->packetizer)
-    {
-        int ret;
-
-        ret = pouch_server_certificate_serial_get(ctx->serial, sizeof(ctx->serial));
-        if (ret < 0)
+        if (!ctx->cert.buffer)
         {
-            return BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED);
+            ctx->cert.buffer = malloc(CONFIG_POUCH_SERVER_CERT_MAX_LEN);
         }
 
-        ctx->serial_len = ret;
-        ctx->serial_offset = 0;
-
-        ctx->packetizer = pouch_gatt_packetizer_start_callback(server_cert_serial_fill_cb, ctx);
+        ctx->cert.size = 0;
     }
 
-    size_t buf_len = len;
-    enum pouch_gatt_packetizer_result ret =
-        pouch_gatt_packetizer_get(ctx->packetizer, buf, &buf_len);
-
-    if (POUCH_GATT_PACKETIZER_ERROR == ret)
+    if (!ctx->cert.buffer)
     {
-        pouch_gatt_packetizer_finish(ctx->packetizer);
-        ctx->packetizer = NULL;
-        return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
-    }
-    if (POUCH_GATT_PACKETIZER_NO_MORE_DATA == ret)
-    {
-        pouch_gatt_packetizer_finish(ctx->packetizer);
-        ctx->packetizer = NULL;
+        return -ENOMEM;
     }
 
-    return buf_len;
+    if (ctx->cert.size + length > CONFIG_POUCH_SERVER_CERT_MAX_LEN)
+    {
+        return -EFBIG;
+    }
+
+    memcpy((void *) &ctx->cert.buffer[ctx->cert.size], data, length);
+    ctx->cert.size += length;
+
+    if (is_last)
+    {
+        int err = pouch_server_certificate_set(&ctx->cert);
+        if (err)
+        {
+            return -EINVAL;
+        }
+
+        free((void *) ctx->cert.buffer);
+        ctx->cert.buffer = NULL;
+    }
+
+    return 0;
 }
 
 static ssize_t server_cert_write(struct bt_conn *conn,
@@ -108,50 +93,37 @@ static ssize_t server_cert_write(struct bt_conn *conn,
                                  uint16_t offset,
                                  uint8_t flags)
 {
-    struct pouch_gatt_server_cert_ctx *ctx = attr->user_data;
-    bool is_first = false;
-    bool is_last = false;
-    const void *payload = NULL;
-    unsigned int seq;
-    ssize_t payload_len =
-        pouch_gatt_packetizer_decode(buf, len, &payload, &is_first, &is_last, &seq);
-
-    if (0 >= payload_len)
+    if (!bt_gatt_is_subscribed(conn, attr, BT_GATT_CCC_NOTIFY))
     {
+        LOG_WRN("Received server cert write but notifications disabled");
+
         return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
     }
 
-    if (is_first)
+    struct pouch_gatt_server_cert_ctx *ctx = attr->user_data;
+
+    if (NULL == ctx->receiver)
     {
-        free((void *) ctx->cert.buffer);
-        ctx->cert.buffer = malloc(CONFIG_POUCH_SERVER_CERT_MAX_LEN);
-
-        ctx->cert.size = 0;
-    }
-
-    if (!ctx->cert.buffer)
-    {
-        return BT_GATT_ERR(BT_ATT_ERR_INSUFFICIENT_RESOURCES);
-    }
-
-    if (ctx->cert.size + payload_len > CONFIG_POUCH_SERVER_CERT_MAX_LEN)
-    {
-        return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
-    }
-
-    memcpy((void *) &ctx->cert.buffer[ctx->cert.size], payload, payload_len);
-    ctx->cert.size += payload_len;
-
-    if (is_last)
-    {
-        int err = pouch_server_certificate_set(&ctx->cert);
-        if (err)
+        enum pouch_gatt_ack_code code;
+        if (pouch_gatt_packetizer_is_fin(buf, len, &code))
         {
-            bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+            LOG_WRN("Received FIN while idle: %d", code);
+        }
+        else
+        {
+            LOG_ERR("Received packet while idle");
+            pouch_gatt_receiver_send_nack(send_ack_cb, conn, POUCH_GATT_NACK_IDLE);
         }
 
-        free((void *) ctx->cert.buffer);
-        ctx->cert.buffer = NULL;
+        return len;
+    }
+
+    bool complete = false;
+    int err = pouch_gatt_receiver_receive_data(ctx->receiver, buf, len, &complete);
+    if (err)
+    {
+        LOG_ERR("Error receiving data: %d", err);
+        return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
     }
 
     return len;
@@ -159,8 +131,49 @@ static ssize_t server_cert_write(struct bt_conn *conn,
 
 POUCH_GATT_CHARACTERISTIC(server_cert,
                           (const struct bt_uuid *) &pouch_gatt_server_cert_chrc_uuid,
-                          BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,
-                          POUCH_GATT_PERM_READ | POUCH_GATT_PERM_WRITE,
-                          server_cert_serial_read,
+                          BT_GATT_CHRC_WRITE | BT_GATT_CHRC_NOTIFY,
+                          POUCH_GATT_PERM_WRITE,
+                          NULL,
                           server_cert_write,
                           &server_cert_chrc_ctx);
+
+static ssize_t server_cert_ccc_write(struct bt_conn *conn,
+                                     const struct bt_gatt_attr *attr,
+                                     uint16_t value)
+{
+    struct pouch_gatt_server_cert_ctx *ctx = &server_cert_chrc_ctx;
+
+    if (value & BT_GATT_CCC_NOTIFY)
+    {
+        ctx->receiver = pouch_gatt_receiver_create(send_ack_cb,
+                                                   conn,
+                                                   server_cert_received_data_cb,
+                                                   ctx,
+                                                   CONFIG_POUCH_GATT_SERVER_CERT_WINDOW_SIZE);
+    }
+
+    return sizeof(value);
+}
+
+static void server_cert_ccc_changed(const struct bt_gatt_attr *attr, uint16_t value)
+{
+    struct pouch_gatt_server_cert_ctx *ctx = &server_cert_chrc_ctx;
+
+    if (value & BT_GATT_CCC_NOTIFY)
+    {
+        LOG_DBG("Notifications enabled");
+    }
+    else
+    {
+        LOG_DBG("Notifications disabled");
+        pouch_gatt_receiver_destroy(ctx->receiver);
+        ctx->receiver = NULL;
+        free((void *) ctx->cert.buffer);
+        ctx->cert.buffer = NULL;
+    }
+}
+
+POUCH_GATT_CCC(server_cert,
+               server_cert_ccc_changed,
+               server_cert_ccc_write,
+               BT_GATT_PERM_READ | BT_GATT_PERM_WRITE);
