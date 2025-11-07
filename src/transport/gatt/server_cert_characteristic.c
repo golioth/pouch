@@ -112,7 +112,9 @@ static ssize_t server_cert_write(struct bt_conn *conn,
     bool is_first = false;
     bool is_last = false;
     const void *payload = NULL;
-    ssize_t payload_len = pouch_gatt_packetizer_decode(buf, len, &payload, &is_first, &is_last);
+    unsigned int seq;
+    ssize_t payload_len =
+        pouch_gatt_packetizer_decode(buf, len, &payload, &is_first, &is_last, &seq);
 
     if (0 >= payload_len)
     {
