@@ -17,7 +17,7 @@
 #include "pouch_gatt_declarations.h"
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(uplink_chrc, CONFIG_POUCH_LOG_LEVEL);
+LOG_MODULE_REGISTER(uplink_chrc, CONFIG_POUCH_GATT_LOG_LEVEL);
 
 #define BT_ATT_OVERHEAD 3
 

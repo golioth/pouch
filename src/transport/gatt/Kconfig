@@ -9,3 +9,7 @@ config POUCH_TRANSPORT_GATT_CUD_ATTRIBUTES
         be added for each characteristic with a brief identifier. This
         can be useful during debugging and development to identify
         the characteristics without consulting their UUIDs.
+
+module = POUCH_GATT
+module-str = Pouch GATT
+source "subsys/logging/Kconfig.template.log_config"
