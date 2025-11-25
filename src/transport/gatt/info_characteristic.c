@@ -124,7 +124,7 @@ static ssize_t info_read(struct bt_conn *conn,
 POUCH_GATT_CHARACTERISTIC(info,
                           (const struct bt_uuid *) &pouch_gatt_info_chrc_uuid,
                           BT_GATT_CHRC_READ,
-                          BT_GATT_PERM_READ,
+                          BT_GATT_PERM_READ_LESC,
                           info_read,
                           NULL,
                           &info_chrc_ctx);
