@@ -52,7 +52,7 @@ ssize_t downlink_write(struct bt_conn *conn,
 POUCH_GATT_CHARACTERISTIC(downlink,
                           (const struct bt_uuid *) &pouch_gatt_downlink_chrc_uuid,
                           BT_GATT_CHRC_WRITE,
-                          BT_GATT_PERM_WRITE,
+                          BT_GATT_PERM_WRITE_LESC,
                           NULL,
                           downlink_write,
                           NULL);
