@@ -1,0 +1,17 @@
+# Copyright (c) 2025 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+source "$ZEPHYR_BASE/Kconfig"
+
+config EXAMPLE_SYNC_PERIOD_S
+    int "Sync Period"
+    default 20
+    help
+      The time, in seconds, after a sync to wait before performing a sync
+
+config EXAMPLE_CREDENTIALS_DIR
+    string "Directory containing credentials"
+    default "/lfs1/credentials"
+    help
+      Directory on mounted file system containing credentials.

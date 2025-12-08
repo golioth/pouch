@@ -159,12 +159,26 @@ config POUCH_TRANSPORT_BLE_GATT
   help
     BLE GATT transport for Pouch
 
+config POUCH_TRANSPORT_COAP
+  bool "CoAP"
+  depends on COAP
+  help
+    CoAP transport for Pouch
+
 endchoice
 
 if POUCH_TRANSPORT_BLE_GATT
 
 menu "BLE GATT Transport Options"
 rsource "src/transport/gatt/Kconfig"
+endmenu
+
+endif
+
+if POUCH_TRANSPORT_COAP
+
+menu "CoAP Transport Options"
+rsource "src/transport/coap/Kconfig"
 endmenu
 
 endif

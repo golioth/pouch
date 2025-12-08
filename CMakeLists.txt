@@ -58,6 +58,9 @@ if(CONFIG_POUCH)
     if (CONFIG_POUCH_TRANSPORT_BLE_GATT)
         add_subdirectory(src/transport/gatt)
     endif()
+    if (CONFIG_POUCH_TRANSPORT_COAP)
+        add_subdirectory(src/transport/coap)
+    endif()
 
     if (DEFINED CONFIG_POUCH_ENCRYPTION_SAEAD AND NOT DEFINED CONFIG_POUCH_VALIDATE_SERVER_CERT)
         message(WARNING " \n"

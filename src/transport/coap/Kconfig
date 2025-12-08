@@ -1,0 +1,7 @@
+# Copyright (c) 2025 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+module = POUCH_COAP
+module-str = Pouch CoAP
+source "subsys/logging/Kconfig.template.log_config"

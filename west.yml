@@ -6,7 +6,7 @@ manifest:
 
   projects:
     - name: zephyr
-      revision: v4.2.0
+      revision: v4.3.0
       url: https://github.com/zephyrproject-rtos/zephyr
       west-commands: scripts/west-commands.yml
       import:
@@ -14,6 +14,7 @@ manifest:
           - zephyr
           - cmsis_6
           - hal_nordic
+          - hal_nxp
           - mbedtls
           - mcuboot
           - segger
