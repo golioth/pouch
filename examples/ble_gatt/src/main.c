@@ -26,6 +26,22 @@ LOG_MODULE_REGISTER(main);
 #include <app_version.h>
 
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET_OR(DT_ALIAS(led0), gpios, {});
+static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET_OR(DT_ALIAS(sw0), gpios, {});
+static struct gpio_callback button_cb_data;
+static struct bt_conn *default_conn;
+
+static void button_pressed(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
+{
+    if (default_conn)
+    {
+        LOG_INF("Confirming passkey");
+        bt_conn_auth_passkey_confirm(default_conn);
+    }
+    else
+    {
+        LOG_WRN("No BT connection for passkey confirmation");
+    }
+}
 
 static struct
 {
@@ -56,6 +72,7 @@ static void connected(struct bt_conn *conn, uint8_t err)
     else
     {
         LOG_DBG("Connected");
+        default_conn = conn;
     }
 }
 
@@ -74,12 +91,59 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
     LOG_DBG("Disconnected (reason 0x%02x)", reason);
 
+    default_conn = NULL;
+
     k_work_schedule(&disconnect_work, K_SECONDS(1));
 }
 
 BT_CONN_CB_DEFINE(conn_callbacks) = {
     .connected = connected,
     .disconnected = disconnected,
+};
+
+static void auth_passkey_display(struct bt_conn *conn, unsigned int passkey)
+{
+    char addr[BT_ADDR_LE_STR_LEN];
+    char passkey_str[7];
+
+    bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+
+    snprintf(passkey_str, 7, "%06u", passkey);
+
+    LOG_INF("Passkey for %s: %s", addr, passkey_str);
+}
+
+static void auth_passkey_confirm(struct bt_conn *conn, unsigned int passkey)
+{
+    char addr[BT_ADDR_LE_STR_LEN];
+    char passkey_str[7];
+
+    bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+
+    snprintf(passkey_str, 7, "%06u", passkey);
+
+    LOG_INF("Confirm passkey for %s: %s", addr, passkey_str);
+
+    if (IS_ENABLED(CONFIG_EXAMPLE_BT_AUTO_CONFIRM))
+    {
+        LOG_INF("Confirming passkey");
+        bt_conn_auth_passkey_confirm(conn);
+    }
+}
+
+static void auth_cancel(struct bt_conn *conn)
+{
+    char addr[BT_ADDR_LE_STR_LEN];
+
+    bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+
+    LOG_INF("Pairing cancelled: %s", addr);
+}
+
+static struct bt_conn_auth_cb auth_cb_display = {
+    .passkey_display = auth_passkey_display,
+    .passkey_confirm = auth_passkey_confirm,
+    .cancel = auth_cancel,
 };
 
 void sync_request_work_handler(struct k_work *work)
@@ -147,6 +211,13 @@ int main(void)
         return 0;
     }
 
+    err = bt_conn_auth_cb_register(&auth_cb_display);
+    if (err)
+    {
+        LOG_ERR("Bluetooth auth cb register failed (err %d)", err);
+        return err;
+    }
+
     LOG_INF("Bluetooth initialized");
 
     struct pouch_config config = {0};
@@ -192,6 +263,30 @@ int main(void)
         {
             LOG_ERR("Could not initialize LED");
         }
+    }
+
+    if (DT_HAS_ALIAS(sw0))
+    {
+        LOG_INF("Set up button at %s pin %d", button.port->name, button.pin);
+
+        err = gpio_pin_configure_dt(&button, GPIO_INPUT);
+        if (err < 0)
+        {
+            LOG_ERR("Could not initialize Button");
+        }
+
+        err = gpio_pin_interrupt_configure_dt(&button, GPIO_INT_EDGE_TO_ACTIVE);
+        if (err)
+        {
+            LOG_ERR("Error %d: failed to configure interrupt on %s pin %d",
+                    err,
+                    button.port->name,
+                    button.pin);
+            return 0;
+        }
+
+        gpio_init_callback(&button_cb_data, button_pressed, BIT(button.pin));
+        gpio_add_callback(button.port, &button_cb_data);
     }
 
     k_work_schedule(&sync_request_work, K_SECONDS(CONFIG_EXAMPLE_SYNC_PERIOD_S));
