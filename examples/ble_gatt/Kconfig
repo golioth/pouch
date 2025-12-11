@@ -20,3 +20,8 @@ config EXAMPLE_CREDENTIALS_DIR
     default "/lfs1/credentials"
     help
       Directory on mounted file system containing credentials.
+
+# This option is used only for automated tests
+config EXAMPLE_BT_AUTO_CONFIRM
+	bool
+	default y if BOARD_NRF52_BSIM_NATIVE
