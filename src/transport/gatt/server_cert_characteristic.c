@@ -153,7 +153,7 @@ static ssize_t server_cert_write(struct bt_conn *conn,
 POUCH_GATT_CHARACTERISTIC(server_cert,
                           (const struct bt_uuid *) &pouch_gatt_server_cert_chrc_uuid,
                           BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,
-                          BT_GATT_PERM_READ_LESC | BT_GATT_PERM_WRITE_LESC,
+                          POUCH_GATT_PERM_READ | POUCH_GATT_PERM_WRITE,
                           server_cert_serial_read,
                           server_cert_write,
                           &server_cert_chrc_ctx);
