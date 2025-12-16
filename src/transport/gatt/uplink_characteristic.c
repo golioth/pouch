@@ -198,7 +198,7 @@ static void uplink_indicate_destroy(struct bt_gatt_indicate_params *params)
 POUCH_GATT_CHARACTERISTIC(uplink,
                           (const struct bt_uuid *) &pouch_gatt_uplink_chrc_uuid,
                           BT_GATT_CHRC_READ | BT_GATT_CHRC_INDICATE,
-                          BT_GATT_PERM_READ_LESC,
+                          POUCH_GATT_PERM_READ,
                           uplink_read,
                           NULL,
                           &uplink_chrc_ctx);

@@ -10,6 +10,17 @@ config POUCH_TRANSPORT_GATT_CUD_ATTRIBUTES
         can be useful during debugging and development to identify
         the characteristics without consulting their UUIDs.
 
+choice POUCH_TRANSPORT_GATT_PERM
+	bool "GATT permissions"
+
+config POUCH_TRANSPORT_GATT_PERM_LESC
+	bool "Require LE Secure Connection for access"
+
+config POUCH_TRANSPORT_GATT_PERM_AUTHEN
+	bool "Require authentication for access"
+
+endchoice # POUCH_TRANSPORT_GATT_PERM
+
 module = POUCH_GATT
 module-str = Pouch GATT
 source "subsys/logging/Kconfig.template.log_config"

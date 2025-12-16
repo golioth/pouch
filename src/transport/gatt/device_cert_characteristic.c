@@ -97,7 +97,7 @@ static ssize_t device_cert_read(struct bt_conn *conn,
 POUCH_GATT_CHARACTERISTIC(device_cert,
                           (const struct bt_uuid *) &pouch_gatt_device_cert_chrc_uuid,
                           BT_GATT_CHRC_READ,
-                          BT_GATT_PERM_READ_LESC,
+                          POUCH_GATT_PERM_READ,
                           device_cert_read,
                           NULL,
                           &device_cert_chrc_ctx);
