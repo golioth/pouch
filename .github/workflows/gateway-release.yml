@@ -26,6 +26,15 @@ jobs:
         run: |
           mkdir -p release
 
+          mv artifacts/ncs-serial-modem-nrf9160dk-nrf9160-ns/merged.hex \
+            release/nrf9160dk_nrf9160.hex
+          mv artifacts/ncs-serial-modem-nrf9160dk-nrf9160-ns/ncs-serial-modem/zephyr/zephyr.elf \
+            release/nrf9160dk_nrf9160.elf
+          mv artifacts/gateway-nrf9160dk-nrf52840/merged.hex \
+            release/nrf9160dk_nrf52840.hex
+          mv artifacts/gateway-nrf9160dk-nrf52840/gateway/zephyr/zephyr.elf \
+            release/nrf9160dk_nrf52840.elf
+
           mv artifacts/gateway-frdm_rw612-ethernet/zephyr.hex \
             release/frdm_rw612-ethernet.hex
           mv artifacts/gateway-frdm_rw612-ethernet/zephyr.elf \
