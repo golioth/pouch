@@ -132,6 +132,11 @@ static ssize_t server_cert_write(struct bt_conn *conn,
         return BT_GATT_ERR(BT_ATT_ERR_INSUFFICIENT_RESOURCES);
     }
 
+    if (ctx->cert.size + payload_len > CONFIG_POUCH_SERVER_CERT_MAX_LEN)
+    {
+        return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
+    }
+
     memcpy((void *) &ctx->cert.buffer[ctx->cert.size], payload, payload_len);
     ctx->cert.size += payload_len;
 
