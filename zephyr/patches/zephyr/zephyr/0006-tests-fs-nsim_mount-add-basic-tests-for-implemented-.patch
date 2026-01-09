@@ -1,4 +1,4 @@
-From 20f3456b3e9a36471fe36087f7ac63137c592b6a Mon Sep 17 00:00:00 2001
+From 3346a85779f41103a838d59fedb259928fe26adf Mon Sep 17 00:00:00 2001
 From: Marcin Niestroj <m.niestroj@emb.dev>
 Date: Tue, 5 Aug 2025 15:51:59 +0200
 Subject: [PATCH] tests: fs: nsim_mount: add basic tests for implemented
@@ -354,5 +354,5 @@ index 00000000000..e8693894deb
 +tests:
 +  filesystem.nsim_mount.default: {}
 -- 
-2.51.0
+2.52.0
 

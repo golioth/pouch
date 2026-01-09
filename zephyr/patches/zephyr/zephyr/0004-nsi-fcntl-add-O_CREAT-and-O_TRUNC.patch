@@ -1,4 +1,4 @@
-From e427f05d4bb0d82871a6b7abd80805caa3e1f555 Mon Sep 17 00:00:00 2001
+From 81d5d2c8328c48fcb0e0a6b8976a35a837bbef5b Mon Sep 17 00:00:00 2001
 From: Marcin Niestroj <m.niestroj@emb.dev>
 Date: Thu, 14 Aug 2025 12:30:36 +0200
 Subject: [PATCH] nsi: fcntl: add O_CREAT and O_TRUNC
@@ -47,5 +47,5 @@ index d1fb298a532..487824e9f4c 100644
  	FROM_MID(O_EXCL);
  	FROM_MID(O_NONBLOCK);
 -- 
-2.51.0
+2.52.0
 

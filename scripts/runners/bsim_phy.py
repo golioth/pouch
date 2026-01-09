@@ -6,7 +6,7 @@ flashing (running) a BabbleSim 2G4 Phy application."""
 
 from pathlib import Path
 
-from .bsim_base import BsimBinaryRunnerBase
+from bsim_base import BsimBinaryRunnerBase
 
 class BsimPhyBinaryRunner(BsimBinaryRunnerBase):
     """Runs the BabbleSim 2G4 Phy binary."""
