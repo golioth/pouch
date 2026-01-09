@@ -4,7 +4,7 @@
 """This file provides a ZephyrBinaryRunner that enables
 flashing (running) a BabbleSim Zephyr application."""
 
-from .bsim_base import BsimBinaryRunnerBase
+from bsim_base import BsimBinaryRunnerBase
 
 class BsimZephyrBinaryRunner(BsimBinaryRunnerBase):
     """Runs the BabbleSim Zephyr application."""

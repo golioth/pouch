@@ -6,7 +6,7 @@ flashing (running) BabbleSim arbitrary application."""
 
 from pathlib import Path
 
-from .bsim_base import BsimBinaryRunnerBase
+from bsim_base import BsimBinaryRunnerBase
 
 class BsimDeviceBinaryRunner(BsimBinaryRunnerBase):
     """Runs the BabbleSim arbitrary application."""

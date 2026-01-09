@@ -75,16 +75,50 @@ void pouch_gateway_device_cert_abort(struct pouch_gateway_device_cert_context *c
     free(context);
 }
 
+struct device_cert_set_ctx
+{
+    struct k_sem sem;
+    enum golioth_status status;
+};
+
+static void device_cert_set_callback(struct golioth_client *client,
+                                     enum golioth_status status,
+                                     const struct golioth_coap_rsp_code *coap_rsp_code,
+                                     const char *path,
+                                     void *arg)
+{
+    struct device_cert_set_ctx *ctx = arg;
+
+    ctx->status = status;
+    k_sem_give(&ctx->sem);
+}
+
 int pouch_gateway_device_cert_finish(struct pouch_gateway_device_cert_context *context)
 {
+    struct device_cert_set_ctx ctx = {};
     enum golioth_status status;
+
+    k_sem_init(&ctx.sem, 0, 1);
 
     if (IS_ENABLED(CONFIG_POUCH_GATEWAY_CLOUD))
     {
-        status = golioth_gateway_device_cert_set(_client, context->buf, context->len, 5);
+        status = golioth_gateway_device_cert_set(_client,
+                                                 context->buf,
+                                                 context->len,
+                                                 device_cert_set_callback,
+                                                 &ctx,
+                                                 5);
         if (status != GOLIOTH_OK)
         {
             LOG_ERR("Failed to finish device cert: %d", status);
+            return -EIO;
+        }
+
+        k_sem_take(&ctx.sem, K_FOREVER);
+
+        if (ctx.status != GOLIOTH_OK)
+        {
+            LOG_ERR("Failed to set cert: %d", ctx.status);
             return -EIO;
         }
     }

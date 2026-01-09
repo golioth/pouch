@@ -1,4 +1,4 @@
-From f37625a5066c54ba371e055c4c2aa7c19e4de7c2 Mon Sep 17 00:00:00 2001
+From 56ae5d0d190160212a03fddb9819eaf420d6ea94 Mon Sep 17 00:00:00 2001
 From: Marcin Niestroj <m.niestroj@emb.dev>
 Date: Thu, 14 Aug 2025 12:34:01 +0200
 Subject: [PATCH] subsys: fs: nsim_mount: new FS for mounting host filesystem
@@ -27,12 +27,12 @@ Signed-off-by: Marcin Niestroj <m.niestroj@emb.dev>
  create mode 100644 subsys/fs/nsim_mount_bottom.h
 
 diff --git a/include/zephyr/fs/fs.h b/include/zephyr/fs/fs.h
-index e2cf7dff73b..99bace60393 100644
+index c43d78e7df5..7a38995566e 100644
 --- a/include/zephyr/fs/fs.h
 +++ b/include/zephyr/fs/fs.h
-@@ -61,6 +61,9 @@ enum {
- 	/** Identifier for in-tree Ext2 file system. */
- 	FS_EXT2,
+@@ -64,6 +64,9 @@ enum {
+ 	/** Identifier for in-tree Virtiofs file system. */
+ 	FS_VIRTIOFS,
  
 +	/** Identifier for in-tree Native Simulator mount file system. */
 +	FS_NSIM_MOUNT,
@@ -41,7 +41,7 @@ index e2cf7dff73b..99bace60393 100644
  	FS_TYPE_EXTERNAL_BASE,
  };
 diff --git a/subsys/fs/CMakeLists.txt b/subsys/fs/CMakeLists.txt
-index 48df605ae01..24108d05faa 100644
+index 66206064334..46a42de179f 100644
 --- a/subsys/fs/CMakeLists.txt
 +++ b/subsys/fs/CMakeLists.txt
 @@ -11,6 +11,11 @@ if(CONFIG_FILE_SYSTEM_LIB_LINK)
@@ -57,12 +57,12 @@ index 48df605ae01..24108d05faa 100644
                                              LFS_CONFIG=zephyr_lfs_config.h
      )
 diff --git a/subsys/fs/Kconfig b/subsys/fs/Kconfig
-index 4dde4b27100..d895c50ec3c 100644
+index 7693c69e847..0b261685c9e 100644
 --- a/subsys/fs/Kconfig
 +++ b/subsys/fs/Kconfig
-@@ -99,6 +99,18 @@ config FUSE_FS_ACCESS
- 	help
- 	  Expose file system partitions to the host system through FUSE.
+@@ -128,6 +128,18 @@ config FUSE_LIBRARY_V3
+ 
+ endchoice
  
 +config FILE_SYSTEM_NSIM_MOUNT
 +	bool "Mount Native Simulator host FS to Zephyr"
@@ -1012,5 +1012,5 @@ index 00000000000..0ee97b3f371
 +
 +#endif /* ZEPHYR_FS_NSIM_MOUNT_BOTTOM_H */
 -- 
-2.51.0
+2.52.0
 

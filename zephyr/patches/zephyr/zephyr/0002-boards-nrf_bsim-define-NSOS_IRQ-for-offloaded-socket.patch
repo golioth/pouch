@@ -1,4 +1,4 @@
-From dacb35a6427d1f177bada3e10cea8162af5c0757 Mon Sep 17 00:00:00 2001
+From 3d2a38e73f028b1c1333331e9250f280efbb8e10 Mon Sep 17 00:00:00 2001
 From: Marcin Niestroj <m.niestroj@emb.dev>
 Date: Tue, 14 Jan 2025 17:02:25 +0100
 Subject: [PATCH] boards: nrf_bsim: define NSOS_IRQ for offloaded sockets
@@ -18,7 +18,7 @@ Signed-off-by: Marcin Niestroj <m.niestroj@emb.dev>
  1 file changed, 6 insertions(+), 1 deletion(-)
 
 diff --git a/boards/native/nrf_bsim/board_soc.h b/boards/native/nrf_bsim/board_soc.h
-index e0b1cb60a59..a99916ec2cf 100644
+index ee77478caab..609038feee1 100644
 --- a/boards/native/nrf_bsim/board_soc.h
 +++ b/boards/native/nrf_bsim/board_soc.h
 @@ -19,6 +19,7 @@
@@ -52,5 +52,5 @@ index e0b1cb60a59..a99916ec2cf 100644
  #define FLASH_PAGE_MAX_CNT		256UL
  
 -- 
-2.51.0
+2.52.0
 

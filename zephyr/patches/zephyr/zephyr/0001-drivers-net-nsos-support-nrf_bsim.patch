@@ -1,4 +1,4 @@
-From 073a10f50ff7275970471af29f27b6ba5c4b17b5 Mon Sep 17 00:00:00 2001
+From 8d013089772fd106241a90255c5b12ed40d1fddd Mon Sep 17 00:00:00 2001
 From: Marcin Niestroj <m.niestroj@emb.dev>
 Date: Tue, 14 Jan 2025 16:53:03 +0100
 Subject: [PATCH] drivers: net: nsos: support nrf_bsim
@@ -14,7 +14,7 @@ Signed-off-by: Marcin Niestroj <m.niestroj@emb.dev>
  1 file changed, 4 insertions(+)
 
 diff --git a/drivers/net/nsos_adapt.c b/drivers/net/nsos_adapt.c
-index d1631efc651..9e908982e38 100644
+index 377649cdd1f..5e2976e49f0 100644
 --- a/drivers/net/nsos_adapt.c
 +++ b/drivers/net/nsos_adapt.c
 @@ -1164,7 +1164,11 @@ static void nsos_adapt_poll_triggered(void)
@@ -30,5 +30,5 @@ index d1631efc651..9e908982e38 100644
  	} else {
  		nsos_adapt_poll_time = nsi_hws_get_time() + NSOS_EPOLL_WAIT_INTERVAL;
 -- 
-2.51.0
+2.52.0
 
