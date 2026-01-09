@@ -26,16 +26,6 @@ jobs:
         run: |
           mkdir -p release
 
-          mv artifacts/gateway-nrf9160dk-nrf9160-ns/merged.hex \
-            release/nrf9160dk_nrf9160.hex
-          mv artifacts/gateway-nrf9160dk-nrf9160-ns/gateway/zephyr/zephyr.elf \
-            release/nrf9160dk_nrf9160_ns.elf
-
-          mv artifacts/gateway-thingy91x-nrf9151-ns/merged.hex \
-            release/thingy91x_nrf9151.hex
-          mv artifacts/gateway-thingy91x-nrf9151-ns/gateway/zephyr/zephyr.elf \
-            release/thingy91x_nrf9151_ns.elf
-
           mv artifacts/gateway-frdm_rw612-ethernet/zephyr.hex \
             release/frdm_rw612-ethernet.hex
           mv artifacts/gateway-frdm_rw612-ethernet/zephyr.elf \

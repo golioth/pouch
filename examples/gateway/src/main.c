@@ -91,26 +91,6 @@ static void connect_golioth_client(void)
     golioth_client_register_event_callback(client, on_client_event, NULL);
 }
 
-#ifdef CONFIG_NRF_MODEM
-#include <modem/lte_lc.h>
-static void lte_handler(const struct lte_lc_evt *const evt)
-{
-    if (evt->type == LTE_LC_EVT_NW_REG_STATUS)
-    {
-
-        if ((evt->nw_reg_status == LTE_LC_NW_REG_REGISTERED_HOME)
-            || (evt->nw_reg_status == LTE_LC_NW_REG_REGISTERED_ROAMING))
-        {
-
-            if (!client)
-            {
-                connect_golioth_client();
-            }
-        }
-    }
-}
-#endif /* CONFIG_NRF_MODEM */
-
 #ifdef CONFIG_MODEM_HL7800
 #define NET_MGMT_MASK (NET_EVENT_DNS_SERVER_ADD | NET_EVENT_L4_DISCONNECTED)
 #include <zephyr/net/conn_mgr_monitor.h>
@@ -149,17 +129,13 @@ void wait_for_network(void)
 
 static void connect_to_cloud(void)
 {
-#if defined(CONFIG_NRF_MODEM)
-    LOG_INF("Connecting to LTE, this may take some time...");
-    lte_lc_connect_async(lte_handler);
-#else
 #if defined(CONFIG_NET_L2_ETHERNET) && defined(CONFIG_NET_DHCPV4)
     net_dhcpv4_start(net_if_get_default());
 #elif defined(CONFIG_MODEM_HL7800)
     wait_for_network();
 #endif
+
     connect_golioth_client();
-#endif
     k_sem_take(&connected, K_FOREVER);
 }
 
