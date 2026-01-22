@@ -35,6 +35,7 @@ endif
 
 menuconfig GOLIOTH_OTA
   bool "Golioth OTA service"
+  select ZCBOR_UTILS
   help
     Enables the Golioth OTA service. This service is used to sync
     binary artifacts like firmware updates or AI models to the device.
