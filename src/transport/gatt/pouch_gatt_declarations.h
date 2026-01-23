@@ -39,9 +39,6 @@ STRUCT_SECTION_START_EXTERN(bt_gatt_attr);
 #define POUCH_GATT_ATTR_ARRAY_PTR STRUCT_SECTION_START(bt_gatt_attr)
 #define POUCH_GATT_ATTR_ARRAY_LEN(dst) STRUCT_SECTION_COUNT(bt_gatt_attr, dst)
 
-#define POUCH_GATT_PERM_READ                                                        \
-    (IS_ENABLED(CONFIG_POUCH_TRANSPORT_GATT_PERM_AUTHEN) ? BT_GATT_PERM_READ_AUTHEN \
-                                                         : BT_GATT_PERM_READ_LESC)
 #define POUCH_GATT_PERM_WRITE                                                        \
     (IS_ENABLED(CONFIG_POUCH_TRANSPORT_GATT_PERM_AUTHEN) ? BT_GATT_PERM_WRITE_AUTHEN \
                                                          : BT_GATT_PERM_WRITE_LESC)
