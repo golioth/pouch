@@ -178,3 +178,50 @@ jobs:
         with:
           name: gw-${{ inputs.gw_board }}-${{ inputs.manifest_yml }}
           path: gateway-${{ inputs.gw_board }}.hex
+
+  hil-test:
+    name: hil-test-${{ inputs.hil_board }}-${{ inputs.manifest_yml }}
+    if: ${{ inputs.run_hil_test }}
+    needs:
+      - build-and-test
+      - build-gateway
+    runs-on:
+      - is_active
+      - has_${{ inputs.hil_board }}
+      - has_${{ inputs.gw_board }}
+    timeout-minutes: 30
+
+    container:
+      image: golioth/golioth-twister-base:89df175
+      env:
+        ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-0.17.0
+      volumes:
+        - /dev:/dev
+        - /home/golioth/credentials:/opt/credentials
+      options: --privileged
+
+    steps:
+      - name: Checkout repository and submodules
+        uses: actions/checkout@v4
+        with:
+          path: pouch
+
+      - name: Clean Binaries from Prior Runs
+        shell: bash
+        run: rm -rf *.bin *.hex
+
+      - name: Download Test Firmware
+        uses: actions/download-artifact@v4
+        with:
+          name: test_artifact_${{ inputs.hil_board }}-${{ inputs.manifest_yml }}
+          path: .
+
+      - name: Download Gateway Firmware
+        uses: actions/download-artifact@v4
+        with:
+          name: gw-${{ inputs.gw_board }}-${{ inputs.manifest_yml }}
+          path: .
+
+      - name: Show downloads
+        shell: bash
+        run: ls -la .
