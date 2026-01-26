@@ -18,6 +18,9 @@ on:
       binary_blob:
         required: false
         type: string
+      gw_board:
+        required: false
+        type: string
 
   workflow_call:
     inputs:
@@ -34,6 +37,9 @@ on:
         required: false
         type: string
       binary_blob:
+        required: false
+        type: string
+      gw_board:
         required: false
         type: string
 
