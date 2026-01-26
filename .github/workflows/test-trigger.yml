@@ -1,0 +1,44 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+      - szczys/ci-gateway
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-integration:
+    name: pouch-integration-tests
+    uses: ./.github/workflows/test-integration.yml
+    secrets: inherit
+
+  test-hil:
+    name: pouch-tests
+    uses: ./.github/workflows/test-hil.yml
+    secrets: inherit
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - hil_board: nrf52840dk
+            west_board: nrf52840dk/nrf52840
+            manifest_yml: west
+            binary_file: zephyr.hex
+          - hil_board: nrf52840dk
+            west_board: nrf52840dk/nrf52840
+            manifest_yml: west-ncs
+            binary_file: zephyr.hex
+
+    with:
+      hil_board: ${{ matrix.hil_board }}
+      west_board: ${{ matrix.west_board }}
+      manifest_yml: ${{ matrix.manifest_yml }}
+      binary_file: ${{ matrix.binary_file}}
+      binary_blob: ${{ matrix.binary_blob }}
