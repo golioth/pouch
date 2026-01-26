@@ -35,6 +35,7 @@ jobs:
             west_board: nrf52840dk/nrf52840
             manifest_yml: west-ncs
             binary_file: zephyr.hex
+            run_hil_test: true
 
     with:
       hil_board: ${{ matrix.hil_board }}
@@ -42,3 +43,8 @@ jobs:
       manifest_yml: ${{ matrix.manifest_yml }}
       binary_file: ${{ matrix.binary_file}}
       binary_blob: ${{ matrix.binary_blob }}
+      run_hil_test: ${{ matrix.run_hil_test || false }}
+      gw_board: frdm_rw612
+      gw_version: f30be4530c17ce8543833c8bb3172f8e1b4510ff
+      gw_manifest_yml: west-zephyr
+      gw_blobs: hal_nxp
