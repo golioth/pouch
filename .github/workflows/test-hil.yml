@@ -122,6 +122,35 @@ jobs:
         with:
           path: pouch
 
+      - name: Init and update west
+        run: |
+          rm -rf .west
+          west init -l pouch --mf ${{ inputs.manifest_yml }}.yml
+          west update --narrow -o=--depth=1
+
+      - name: Install pip packages
+        run: |
+          uv pip install \
+            -r zephyr/scripts/requirements-base.txt        \
+            -r zephyr/scripts/requirements-build-test.txt  \
+            -r zephyr/scripts/requirements-run-test.txt    \
+            -r pouch/requirements.txt                      \
+            'git+https://github.com/golioth/golioth-firmware-sdk@v0.22.0#egg=pytest_hil&subdirectory=tests/hil/scripts/pytest-hil/' \
+            git+https://github.com/golioth/python-golioth-tools@v0.8.1
+
+          uv pip install          \
+            cryptography==41.0.7  \
+            pyasn1                \
+            pyyaml                \
+            cbor>=1.0.0           \
+            imgtool>=1.9.0        \
+            jinja2                \
+            click                 \
+            smpmgr
+
+      - name: Power On USB Hub
+        run: python3 /opt/golioth-scripts/usb_hub_power.py on
+
       - name: Clean Binaries from Prior Runs
         shell: bash
         run: rm -rf *.bin *.hex
@@ -142,3 +171,71 @@ jobs:
       - name: Show downloads
         shell: bash
         run: ls -la .
+
+      - name: Run Pytest
+        shell: bash
+        env:
+          hil_board: ${{ inputs.hil_board }}
+          gw_board: ${{ inputs.gw_board }}
+          ARTIFACT_NAME: test_artifact_${{ inputs.hil_board }}-${{ inputs.manifest_yml }}-${{ inputs.binary_file }}
+          GW_ARTIFACT_NAME: gateway-${{ inputs.gw_board }}.hex
+        run: |
+          source /opt/credentials/runner_env.sh
+          export PATH=$PATH:/opt/SEGGER/JLink
+          PORT_VAR=CI_${hil_board^^}_PORT
+          SNR_VAR=CI_${hil_board^^}_SNR
+          GW_PORT_VAR=CI_${gw_board^^}_PORT
+          GW_SNR_VAR=CI_${gw_board^^}_SNR
+
+          pytest pouch/examples/ble_gatt/pytest              \
+              --rootdir .                                    \
+              --board ${hil_board}                           \
+              --port ${!PORT_VAR}                            \
+              --serial-number ${!SNR_VAR}                    \
+              --fw-image ${ARTIFACT_NAME}                    \
+              --api-url https://api.golioth.io               \
+              --api-key ${{ secrets.POUCH_CI_PROD_API_KEY }} \
+              --gw-board=${gw_board}                         \
+              --gw-port=${!GW_PORT_VAR}                      \
+              --gw-fw-image=${GW_ARTIFACT_NAME}              \
+              --gw-serial-number=${!GW_SNR_VAR}
+
+      - name: Erase flash
+        if: always()
+        shell: bash
+        env:
+          hil_board: ${{ inputs.hil_board }}
+          gw_board: ${{ inputs.gw_board }}
+        run: |
+          source /opt/credentials/runner_env.sh
+          export PATH=$PATH:/opt/SEGGER/JLink
+          SNR_VAR=CI_${hil_board^^}_SNR
+          PORT_VAR=CI_${hil_board^^}_PORT
+          cat <<EOF > erase_frdm_rw612.jlink
+          r
+          h
+          exec EnableEraseAllFlashBanks
+          erase 0x8000000 0x8624000
+          sleep 30
+          r
+          sleep 3
+          q
+          EOF
+
+          if [[ "${hil_board}" == "nrf52840dk" ]]; then
+            nrfjprog --recover --snr ${!SNR_VAR}
+          fi
+
+          if [[ "${gw_board}" == "frdm_rw612" ]]; then
+            JLinkExe \
+              -nogui 1 \
+              -if swd \
+              -speed auto \
+              -device RW612 \
+              -CommanderScript erase_frdm_rw612.jlink \
+              -SelectEmuBySN ${!SNR_VAR}
+          fi
+
+      - name: Power Off USB Hub
+        if: always()
+        run: python3 /opt/golioth-scripts/usb_hub_power.py off
