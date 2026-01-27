@@ -1,4 +1,4 @@
-name: Tests
+name: Test Trigger
 
 on:
   push:
@@ -8,15 +8,22 @@ on:
   pull_request:
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 jobs:
   test-integration:
     name: pouch-integration-tests
     uses: ./.github/workflows/test-integration.yml
     secrets: inherit
+
+    strategy:
+      matrix:
+        manifest_yml:
+          - west
+          - west-ncs
+      fail-fast: false
+
+    with:
+      manifest_yml: ${{ matrix.manifest_yml }}
+
 
   test-hil:
     name: pouch-tests
