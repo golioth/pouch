@@ -110,7 +110,7 @@ jobs:
         shell: bash
         run: |
           west build --sysbuild -p -b ${{ inputs.west_board }} pouch/examples/ble_gatt
-          cp build/ble_gatt/zephyr/${{ inputs.binary_file }} $ARTIFACT_NAME
+          cp $(find build -name ${{ inputs.binary_file }}) $ARTIFACT_NAME
 
       - name: Save artifacts
         if: success() || failure()
@@ -229,7 +229,8 @@ jobs:
             cbor>=1.0.0           \
             imgtool>=1.9.0        \
             jinja2                \
-            click
+            click                 \
+            smpmgr
 
       - name: Power On USB Hub
         run: python3 /opt/golioth-scripts/usb_hub_power.py on
@@ -267,18 +268,21 @@ jobs:
           PORT_VAR=CI_${hil_board^^}_PORT
           SNR_VAR=CI_${hil_board^^}_SNR
           GW_PORT_VAR=CI_${gw_board^^}_PORT
+          GW_SNR_VAR=CI_${gw_board^^}_SNR
 
-          pytest pouch/examples/ble_gatt/pytest                                                                   \
-              --rootdir .                                                                                         \
-              --board ${hil_board}                                                                                \
-              --port ${!PORT_VAR}                                                                                 \
-              --serial-number ${!SNR_VAR}                                                                         \
-              --fw-image ${ARTIFACT_NAME}                                                                         \
-              --api-url https://api.golioth.io                                                                    \
-              --api-key ${{ secrets.MIKE_TEST_API_KEY }}                                                          \
-              --gw-board=${gw_board}                                                                              \
-              --gw-port=${!GW_PORT_VAR}                                                                           \
-              --gw-fw-image=${GW_ARTIFACT_NAME}
+          pytest pouch/examples/ble_gatt/pytest          \
+              --rootdir .                                \
+              --board ${hil_board}                       \
+              --port ${!PORT_VAR}                        \
+              --serial-number ${!SNR_VAR}                \
+              --fw-image ${ARTIFACT_NAME}                \
+              --api-url https://api.golioth.io           \
+              --api-key ${{ secrets.MIKE_TEST_API_KEY }} \
+              --gw-board=${gw_board}                     \
+              --gw-port=${!GW_PORT_VAR}                  \
+              --gw-fw-image=${GW_ARTIFACT_NAME}          \
+              --gw-serial-number=${!GW_SNR_VAR}
+
 
       - name: Erase flash
         if: always()

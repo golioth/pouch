@@ -20,6 +20,7 @@ def pytest_addoption(parser):
     parser.addoption("--gw-board", action="store", help="Gateway hil_board")
     parser.addoption("--gw-port", action="store", help="Gateway serial port")
     parser.addoption("--gw-fw-image", action="store", help="Gateway firmware binary")
+    parser.addoption("--gw-serial-number", type=str, action="store", help="Gateway programmer serial number")
 
 def rand_str():
     return ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase) for i in range(16))
@@ -167,6 +168,8 @@ async def certificate_cred(request, project):
 @pytest.fixture(scope="module")
 async def gateway(request):
     assert request.config.getoption("--gw-board") == "frdm_rw612"
+    assert request.config.getoption("--gw-fw-image") == "gateway-frdm_rw612.hex"
+    assert request.config.getoption("--gw-serial-number") == "1066907334"
 
     gw = FRDMRW612(
         request.config.getoption("--gw-port"),
@@ -174,7 +177,7 @@ async def gateway(request):
         None,
         None,
         request.config.getoption("--gw-fw-image"),
-        serial_number="1063461944",
+        serial_number=request.config.getoption("--gw-serial-number"),
     )
 
     async with gw.started():
