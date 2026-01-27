@@ -37,7 +37,7 @@ jobs:
           - hil_board: nrf52840dk
             west_board: nrf52840dk/nrf52840
             manifest_yml: west
-            binary_file: merged.hex
+            binary_file: zephyr.signed.hex
           - hil_board: nrf52840dk
             west_board: nrf52840dk/nrf52840
             manifest_yml: west-ncs

@@ -165,7 +165,7 @@ async def certificate_cred(request, project):
         p.unlink()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="module", autouse=True)
 async def gateway(request):
     assert request.config.getoption("--gw-board") == "frdm_rw612"
     assert request.config.getoption("--gw-fw-image") == "gateway-frdm_rw612.hex"
