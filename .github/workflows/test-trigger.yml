@@ -25,8 +25,26 @@ jobs:
       manifest_yml: ${{ matrix.manifest_yml }}
 
 
+  build-gateway:
+    name: build-gateway
+    uses: ./.github/workflows/build-gateway.yml
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - gw_board: frdm_rw612
+            gw_version: f30be4530c17ce8543833c8bb3172f8e1b4510ff
+            gw_manifest_yml: west-zephyr
+            gw_blobs: hal_nxp
+    with:
+      gw_board: ${{ matrix.gw_board }}
+      gw_version: ${{ matrix.gw_version }}
+      gw_manifest_yml: ${{ matrix.gw_manifest_yml }}
+      gw_blobs: ${{ matrix.gw_blobs }}
+
   test-hil:
-    name: pouch-tests
+    name: Pouch HIL
+    needs: build-gateway
     uses: ./.github/workflows/test-hil.yml
     secrets: inherit
 
@@ -42,7 +60,7 @@ jobs:
             west_board: nrf52840dk/nrf52840
             manifest_yml: west-ncs
             binary_file: merged.hex
-            run_hil_test: true
+            gw_board: frdm_rw612
 
     with:
       hil_board: ${{ matrix.hil_board }}
@@ -50,8 +68,4 @@ jobs:
       manifest_yml: ${{ matrix.manifest_yml }}
       binary_file: ${{ matrix.binary_file}}
       binary_blob: ${{ matrix.binary_blob }}
-      run_hil_test: ${{ matrix.run_hil_test || false }}
-      gw_board: frdm_rw612
-      gw_version: f30be4530c17ce8543833c8bb3172f8e1b4510ff
-      gw_manifest_yml: west-zephyr
-      gw_blobs: hal_nxp
+      gw_board: ${{ matrix.gw_board || '' }}
