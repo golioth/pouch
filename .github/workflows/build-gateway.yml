@@ -1,0 +1,92 @@
+name: "Build Gateway"
+
+on:
+  workflow_dispatch:
+    inputs:
+      gw_board:
+        required: false
+        type: string
+      gw_version:
+        required: false
+        type: string
+      gw_manifest_yml:
+        required: false
+        type: string
+      gw_blobs:
+        required: false
+        type: string
+
+  workflow_call:
+    inputs:
+      gw_board:
+        required: false
+        type: string
+      gw_version:
+        required: false
+        type: string
+      gw_manifest_yml:
+        required: false
+        type: string
+      gw_blobs:
+        required: false
+        type: string
+
+jobs:
+  build-gateway:
+    name: build-gw-${{ inputs.gw_board }}
+    container: golioth/golioth-zephyr-base:0.17.0-SDK-v0
+    env:
+      ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-0.17.0
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          repository: golioth/pouch-gateway
+          ref: ${{ inputs.gw_version }}
+          path: pouch-gateway
+
+      - name: Init and update west
+        run: |
+          west init -l pouch-gateway --mf ${{ inputs.gw_manifest_yml }}.yml
+          west update --narrow -o=--depth=1
+          git config --global user.email user@git-scm.com
+          git config --global user.name "Git User"
+          west patch apply || true
+
+      - name: Install pip packages
+        run: |
+          uv pip install \
+            -r pouch-gateway/requirements.txt \
+            -r zephyr/scripts/requirements-base.txt
+
+          uv pip install            \
+            cryptography==41.0.7  \
+            pyasn1                \
+            pyyaml                \
+            cbor>=1.0.0           \
+            imgtool>=1.9.0        \
+            jinja2                \
+            click
+
+      - name: Fetch Binary Blobs
+        if: ${{ inputs.gw_blobs }}
+        run: west blobs fetch -a ${{ inputs.gw_blobs }}
+
+      - name: Build
+        id: build
+        shell: bash
+        run: |
+          west build                                    \
+            -b ${{ inputs.gw_board }}                   \
+            pouch-gateway/gateway                       \
+            -- -DCONFIG_COMPILER_WARNINGS_AS_ERRORS=y
+
+          cp build/zephyr/zephyr.hex gateway-${{ inputs.gw_board }}.hex
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gw-artifact-${{ inputs.gw_board }}-${{ inputs.manifest_yml }}
+          path: gateway-${{ inputs.gw_board }}.hex
+
