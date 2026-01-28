@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - dnm/test-prod-and-vanilla
   pull_request:
   workflow_dispatch:
 
@@ -56,6 +57,7 @@ jobs:
             west_board: nrf52840dk/nrf52840
             manifest_yml: west
             binary_file: zephyr.signed.hex
+            gw_board: frdm_rw612
           - hil_board: nrf52840dk
             west_board: nrf52840dk/nrf52840
             manifest_yml: west-ncs
