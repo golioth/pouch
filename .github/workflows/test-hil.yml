@@ -117,6 +117,14 @@ jobs:
       options: --privileged
 
     steps:
+      - name: Prepare Working Directory
+        shell: bash
+        run: |
+          rm -rf *.bin *.hex
+          rm -rf .west
+          rm -rf summary/
+          mkdir summary
+
       - name: Checkout repository and submodules
         uses: actions/checkout@v4
         with:
@@ -124,7 +132,6 @@ jobs:
 
       - name: Init and update west
         run: |
-          rm -rf .west
           west init -l pouch --mf ${{ inputs.manifest_yml }}.yml
           west update --narrow -o=--depth=1
 
@@ -150,10 +157,6 @@ jobs:
 
       - name: Power On USB Hub
         run: python3 /opt/golioth-scripts/usb_hub_power.py on
-
-      - name: Clean Binaries from Prior Runs
-        shell: bash
-        run: rm -rf *.bin *.hex
 
       - name: Download Test Firmware
         uses: actions/download-artifact@v4
