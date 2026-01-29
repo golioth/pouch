@@ -190,18 +190,19 @@ jobs:
           GW_PORT_VAR=CI_${gw_board^^}_PORT
           GW_SNR_VAR=CI_${gw_board^^}_SNR
 
-          pytest pouch/examples/ble_gatt/pytest              \
-              --rootdir .                                    \
-              --board ${hil_board}                           \
-              --port ${!PORT_VAR}                            \
-              --serial-number ${!SNR_VAR}                    \
-              --fw-image ${ARTIFACT_NAME}                    \
-              --api-url https://api.golioth.io               \
-              --api-key ${{ secrets.POUCH_CI_PROD_API_KEY }} \
-              --gw-board=${gw_board}                         \
-              --gw-port=${!GW_PORT_VAR}                      \
-              --gw-fw-image=${GW_ARTIFACT_NAME}              \
-              --gw-serial-number=${!GW_SNR_VAR}
+          pytest pouch/examples/ble_gatt/pytest                                     \
+              --rootdir .                                                           \
+              --board ${hil_board}                                                  \
+              --port ${!PORT_VAR}                                                   \
+              --serial-number ${!SNR_VAR}                                           \
+              --fw-image ${ARTIFACT_NAME}                                           \
+              --api-url https://api.golioth.io                                      \
+              --api-key ${{ secrets.POUCH_CI_PROD_API_KEY }}                        \
+              --gw-board=${gw_board}                                                \
+              --gw-port=${!GW_PORT_VAR}                                             \
+              --gw-fw-image=${GW_ARTIFACT_NAME}                                     \
+              --gw-serial-number=${!GW_SNR_VAR}                                     \
+              --junitxml=summary/hil-${{ inputs.hil_board }}-${{ inputs.manifest_yml }}.xml \
 
       - name: Erase flash
         if: always()

@@ -17,6 +17,12 @@ def anyio_backend():
     return "trio"
 
 
+def pytest_configure(config):
+    ''' Set the JUnit suite name to the name of the sample directory '''
+    suite_name = os.path.basename(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+    config.inicfg["junit_suite_name"] = suite_name
+
+
 def rand_str():
     return ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase) for i in range(16))
 
