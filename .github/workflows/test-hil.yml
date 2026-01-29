@@ -117,6 +117,14 @@ jobs:
       options: --privileged
 
     steps:
+      - name: Prepare Working Directory
+        shell: bash
+        run: |
+          rm -rf *.bin *.hex
+          rm -rf .west
+          rm -rf summary/
+          mkdir summary
+
       - name: Checkout repository and submodules
         uses: actions/checkout@v4
         with:
@@ -124,7 +132,6 @@ jobs:
 
       - name: Init and update west
         run: |
-          rm -rf .west
           west init -l pouch --mf ${{ inputs.manifest_yml }}.yml
           west update --narrow -o=--depth=1
 
@@ -150,10 +157,6 @@ jobs:
 
       - name: Power On USB Hub
         run: python3 /opt/golioth-scripts/usb_hub_power.py on
-
-      - name: Clean Binaries from Prior Runs
-        shell: bash
-        run: rm -rf *.bin *.hex
 
       - name: Download Test Firmware
         uses: actions/download-artifact@v4
@@ -187,18 +190,26 @@ jobs:
           GW_PORT_VAR=CI_${gw_board^^}_PORT
           GW_SNR_VAR=CI_${gw_board^^}_SNR
 
-          pytest pouch/examples/ble_gatt/pytest              \
-              --rootdir .                                    \
-              --board ${hil_board}                           \
-              --port ${!PORT_VAR}                            \
-              --serial-number ${!SNR_VAR}                    \
-              --fw-image ${ARTIFACT_NAME}                    \
-              --api-url https://api.golioth.io               \
-              --api-key ${{ secrets.POUCH_CI_PROD_API_KEY }} \
-              --gw-board=${gw_board}                         \
-              --gw-port=${!GW_PORT_VAR}                      \
-              --gw-fw-image=${GW_ARTIFACT_NAME}              \
-              --gw-serial-number=${!GW_SNR_VAR}
+          pytest pouch/examples/ble_gatt/pytest                                     \
+              --rootdir .                                                           \
+              --board ${hil_board}                                                  \
+              --port ${!PORT_VAR}                                                   \
+              --serial-number ${!SNR_VAR}                                           \
+              --fw-image ${ARTIFACT_NAME}                                           \
+              --api-url https://api.golioth.io                                      \
+              --api-key ${{ secrets.POUCH_CI_PROD_API_KEY }}                        \
+              --gw-board=${gw_board}                                                \
+              --gw-port=${!GW_PORT_VAR}                                             \
+              --gw-fw-image=${GW_ARTIFACT_NAME}                                     \
+              --gw-serial-number=${!GW_SNR_VAR}                                     \
+              --junitxml=summary/hil-${{ inputs.hil_board }}-${{ inputs.manifest_yml }}.xml \
+
+      - name: Upload CI report summary
+        uses: actions/upload-artifact@v4
+        if: success() || failure()
+        with:
+          name: ci-summary-hil-${{ inputs.hil_board }}-${{ inputs.manifest_yml }}
+          path: summary/hil-${{ inputs.hil_board }}-${{ inputs.manifest_yml }}.xml
 
       - name: Erase flash
         if: always()
