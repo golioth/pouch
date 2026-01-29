@@ -204,6 +204,13 @@ jobs:
               --gw-serial-number=${!GW_SNR_VAR}                                     \
               --junitxml=summary/hil-${{ inputs.hil_board }}-${{ inputs.manifest_yml }}.xml \
 
+      - name: Upload CI report summary
+        uses: actions/upload-artifact@v4
+        if: success() || failure()
+        with:
+          name: ci-summary-hil-${{ inputs.hil_board }}-${{ inputs.manifest_yml }}
+          path: summary/hil-${{ inputs.hil_board }}-${{ inputs.manifest_yml }}.xml
+
       - name: Erase flash
         if: always()
         shell: bash
