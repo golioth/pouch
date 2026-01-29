@@ -69,3 +69,24 @@ jobs:
       binary_file: ${{ matrix.binary_file}}
       binary_blob: ${{ matrix.binary_blob }}
       gw_board: ${{ matrix.gw_board || '' }}
+
+
+  publish-test-summaries:
+    if: success() || failure()
+    needs:
+      - test-integration
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Gather summaries
+        uses: actions/download-artifact@v4
+        with:
+          path: summary
+          pattern: ci-summary-*
+          merge-multiple: true
+
+      - name: Publish Test Report
+        uses: mikepenz/action-junit-report@v5
+        if: success() || failure()
+        with:
+          report_paths: summary/*.xml
+          detailed_summary: true
