@@ -52,8 +52,14 @@ jobs:
           EXTRA_ZEPHYR_MODULES: ${{ github.workspace }}/pouch
         run: ./zephyr/scripts/twister -v -T pouch/tests
 
-      - name: Publish Test Report (${{ inputs.manifest_yml }})
-        uses: mikepenz/action-junit-report@v5
-        if: always()
+      - name: Collect JUnit Test Report
+        if: success() || failure()
+        run: |
+          cp twister-out/twister_suite_report.xml twister-out/integration-${{ inputs.manifest_yml }}.xml
+
+      - name: Upload CI report summary
+        uses: actions/upload-artifact@v4
+        if: success() || failure()
         with:
-          report_paths: 'twister-out/twister_suite_report.xml'
+          name: ci-summary-integration-${{ inputs.manifest_yml }}
+          path: twister-out/integration-${{ inputs.manifest_yml }}.xml

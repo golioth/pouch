@@ -69,3 +69,30 @@ jobs:
       binary_file: ${{ matrix.binary_file}}
       binary_blob: ${{ matrix.binary_blob }}
       gw_board: ${{ matrix.gw_board || '' }}
+
+
+  publish-test-summaries:
+    if: success() || failure()
+    needs:
+      - test-integration
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Gather summaries
+        uses: actions/download-artifact@v4
+        with:
+          path: summary
+          pattern: ci-summary-*
+          merge-multiple: true
+
+      - name: Publish Test Report
+        uses: phoenix-actions/test-reporting@v15
+        if: success() || failure()
+        with:
+          name: Firmware Test Summary
+          path: summary/*.xml
+          reporter: java-junit
+          list-tests: failed
+          output-to: step-summary
