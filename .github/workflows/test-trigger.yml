@@ -75,6 +75,7 @@ jobs:
     if: success() || failure()
     needs:
       - test-integration
+      - test-hil
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
