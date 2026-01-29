@@ -50,7 +50,7 @@ jobs:
         env:
           ZEPHYR_BASE: ${{ github.workspace }}/zephyr
           EXTRA_ZEPHYR_MODULES: ${{ github.workspace }}/pouch
-        run: ./zephyr/scripts/twister -v -T pouch/tests
+        run: ./zephyr/scripts/twister -v -T pouch/tests --detailed-test-id
 
       - name: Collect JUnit Test Report
         if: success() || failure()

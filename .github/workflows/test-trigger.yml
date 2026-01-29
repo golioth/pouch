@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - szczys/junit-xml
+      - dnm/test-suite-names
   pull_request:
   workflow_dispatch:
 
@@ -44,3 +44,4 @@ jobs:
         with:
           report_paths: summary/*.xml
           detailed_summary: true
+          group_suite: true
