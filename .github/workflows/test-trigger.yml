@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - szczys/hil-on-dev
   pull_request:
   workflow_dispatch:
     inputs:
