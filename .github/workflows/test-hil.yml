@@ -21,6 +21,12 @@ on:
       gw_board:
         required: false
         type: string
+      api-url:
+        required: true
+        type: string
+      api-key-id:
+        required: true
+        type: string
 
   workflow_call:
     inputs:
@@ -42,25 +48,37 @@ on:
       gw_board:
         required: false
         type: string
+      api-url:
+        description: API gateway URL for Golioth backend services
+        required: false
+        type: string
+        default: https://api.golioth.io
+      api-key-id:
+        description: >-
+          Name of GitHub secret containing an API key that will be used to authenticate with the
+          Golioth backend
+        required: false
+        type: string
+        default: "POUCH_CI_PROD_API_KEY"
 
 jobs:
   build-leaf:
     name: pouch-${{ inputs.hil_board }}-build
-    container: golioth/golioth-zephyr-base:0.17.0-SDK-v0
+    container: golioth/golioth-zephyr-base:0.17.0-sdk-v0
     env:
-      ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-0.17.0
-      ARTIFACT_NAME: test_artifact_${{ inputs.hil_board }}-${{ inputs.manifest_yml }}-${{ inputs.binary_file }}
+      zephyr_sdk_install_dir: /opt/toolchains/zephyr-sdk-0.17.0
+      artifact_name: test_artifact_${{ inputs.hil_board }}-${{ inputs.manifest_yml }}-${{ inputs.binary_file }}
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout repository
+      - name: checkout repository
         uses: actions/checkout@v4
         with:
           path: pouch
-      - name: Init and update west
+      - name: init and update west
         run: |
           west init -l pouch --mf ${{ inputs.manifest_yml }}.yml
           west update --narrow -o=--depth=1
-      - name: Install pip packages
+      - name: install pip packages
         run: |
           uv pip install \
             -r zephyr/scripts/requirements-base.txt        \
@@ -78,23 +96,23 @@ jobs:
             click                 \
             smpmgr
 
-      - name: Download binary blobs
+      - name: download binary blobs
         if: ${{ inputs.binary_blob }}
         run: |
           west blobs fetch ${{ inputs.binary_blob }}
 
-      - name: Compile
+      - name: compile
         shell: bash
         run: |
           west build --sysbuild -p -b ${{ inputs.west_board }} pouch/examples/ble_gatt
-          cp $(find build -name ${{ inputs.binary_file }}) $ARTIFACT_NAME
+          cp $(find build -name ${{ inputs.binary_file }}) $artifact_name
 
-      - name: Save artifacts
+      - name: save artifacts
         if: success() || failure()
         uses: actions/upload-artifact@v4
         with:
           name: test_artifact_${{ inputs.hil_board }}-${{ inputs.manifest_yml }}
-          path: ${{ env.ARTIFACT_NAME }}
+          path: ${{ env.artifact_name }}
 
   test-hil:
     name: hil-test-${{ inputs.hil_board }}-${{ inputs.manifest_yml }}
@@ -110,14 +128,14 @@ jobs:
     container:
       image: golioth/golioth-twister-base:89df175
       env:
-        ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-0.17.0
+        zephyr_sdk_install_dir: /opt/toolchains/zephyr-sdk-0.17.0
       volumes:
         - /dev:/dev
         - /home/golioth/credentials:/opt/credentials
       options: --privileged
 
     steps:
-      - name: Prepare Working Directory
+      - name: prepare working directory
         shell: bash
         run: |
           rm -rf *.bin *.hex
@@ -125,17 +143,17 @@ jobs:
           rm -rf summary/
           mkdir summary
 
-      - name: Checkout repository and submodules
+      - name: checkout repository and submodules
         uses: actions/checkout@v4
         with:
           path: pouch
 
-      - name: Init and update west
+      - name: init and update west
         run: |
           west init -l pouch --mf ${{ inputs.manifest_yml }}.yml
           west update --narrow -o=--depth=1
 
-      - name: Install pip packages
+      - name: install pip packages
         run: |
           uv pip install \
             -r zephyr/scripts/requirements-base.txt        \
@@ -155,53 +173,53 @@ jobs:
             click                 \
             smpmgr
 
-      - name: Power On USB Hub
+      - name: power on usb hub
         run: python3 /opt/golioth-scripts/usb_hub_power.py on
 
-      - name: Download Test Firmware
+      - name: download test firmware
         uses: actions/download-artifact@v4
         with:
           name: test_artifact_${{ inputs.hil_board }}-${{ inputs.manifest_yml }}
           path: .
 
-      - name: Download Gateway Firmware
+      - name: download gateway firmware
         uses: actions/download-artifact@v4
         with:
           path: .
           pattern: gw-artifact-*
           merge-multiple: true
 
-      - name: Show downloads
+      - name: show downloads
         shell: bash
         run: ls -la .
 
-      - name: Run Pytest
+      - name: run pytest
         shell: bash
         env:
           hil_board: ${{ inputs.hil_board }}
           gw_board: ${{ inputs.gw_board }}
-          ARTIFACT_NAME: test_artifact_${{ inputs.hil_board }}-${{ inputs.manifest_yml }}-${{ inputs.binary_file }}
-          GW_ARTIFACT_NAME: gateway-${{ inputs.gw_board }}.hex
+          artifact_name: test_artifact_${{ inputs.hil_board }}-${{ inputs.manifest_yml }}-${{ inputs.binary_file }}
+          gw_artifact_name: gateway-${{ inputs.gw_board }}.hex
         run: |
           source /opt/credentials/runner_env.sh
-          export PATH=$PATH:/opt/SEGGER/JLink
-          PORT_VAR=CI_${hil_board^^}_PORT
-          SNR_VAR=CI_${hil_board^^}_SNR
-          GW_PORT_VAR=CI_${gw_board^^}_PORT
-          GW_SNR_VAR=CI_${gw_board^^}_SNR
+          export path=$path:/opt/segger/jlink
+          port_var=ci_${hil_board^^}_port
+          snr_var=ci_${hil_board^^}_snr
+          gw_port_var=ci_${gw_board^^}_port
+          gw_snr_var=ci_${gw_board^^}_snr
 
-          pytest pouch/examples/ble_gatt/pytest                                     \
-              --rootdir .                                                           \
-              --board ${hil_board}                                                  \
-              --port ${!PORT_VAR}                                                   \
-              --serial-number ${!SNR_VAR}                                           \
-              --fw-image ${ARTIFACT_NAME}                                           \
-              --api-url https://api.golioth.io                                      \
-              --api-key ${{ secrets.POUCH_CI_PROD_API_KEY }}                        \
-              --gw-board=${gw_board}                                                \
-              --gw-port=${!GW_PORT_VAR}                                             \
-              --gw-fw-image=${GW_ARTIFACT_NAME}                                     \
-              --gw-serial-number=${!GW_SNR_VAR}                                     \
+          pytest pouch/examples/ble_gatt/pytest                                             \
+              --rootdir .                                                                   \
+              --board ${hil_board}                                                          \
+              --port ${!port_var}                                                           \
+              --serial-number ${!snr_var}                                                   \
+              --fw-image ${artifact_name}                                                   \
+              --api-url ${{ inputs.api-url }}                                               \
+              --api-key ${{ secrets[inputs.api-key-id] }}                                   \
+              --gw-board=${gw_board}                                                        \
+              --gw-port=${!GW_PORT_VAR}                                                     \
+              --gw-fw-image=${GW_ARTIFACT_NAME}                                             \
+              --gw-serial-number=${!GW_SNR_VAR}                                             \
               --junitxml=summary/hil-${{ inputs.hil_board }}-${{ inputs.manifest_yml }}.xml \
 
       - name: Upload CI report summary

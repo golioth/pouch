@@ -6,6 +6,17 @@ on:
       - main
   pull_request:
   workflow_dispatch:
+    inputs:
+      api-url:
+        description: API gateway URL for Golioth backend services
+        required: false
+        type: string
+      api-key-id:
+        description: >-
+          Name of GitHub secret containing an API key that will be used to authenticate with the
+          Golioth backend
+        required: false
+        type: string
 
 jobs:
   test-integration:
@@ -69,6 +80,8 @@ jobs:
       binary_file: ${{ matrix.binary_file}}
       binary_blob: ${{ matrix.binary_blob }}
       gw_board: ${{ matrix.gw_board || '' }}
+      api-url: ${{ inputs['api-url'] || 'https://api.golioth.io' }}
+      api-key-id: ${{ inputs['api-key-id'] || 'POUCH_CI_PROD_API_KEY' }}
 
 
   publish-test-summaries:
