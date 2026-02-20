@@ -1,0 +1,43 @@
+# Copyright (c) 2026 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+config POUCH_HTTP_GW_URI
+    string "Pouch gateway address"
+    default "gw.golioth.io"
+    help
+        URI address of the HTTP gateway
+
+config POUCH_HTTP_GW_PORT
+    string "Pouch gateway port"
+    default "443"
+    help
+        Port to use for the HTTP gateway
+
+config POUCH_HTTP_TIMEOUT_S
+    int "Pouch HTTP timeout (seconds)"
+    default 10
+    help
+        Timeout for HTTP requests
+
+config POUCH_HTTP_RCV_BUF_SIZE
+    int "HTTP receive buffer size"
+    default 1024
+    help
+        Buffer size used to store response from server
+
+config POUCH_HTTP_SCRATCH_BUF_SIZE
+    int "HTTP upload scratch buffer size"
+    default 1024
+    help
+        Size of the scratch buffer used for storing chunks during uplink
+
+config POUCH_HTTP_SERVER_CRT_MAX_SIZE
+    int "HTTP server cert storage size"
+    default 4096
+    help
+        Amount of memory to allocate for storing the downloaded gateway certificate
+
+module = POUCH_HTTP
+module-str = Pouch HTTP
+source "subsys/logging/Kconfig.template.log_config"

@@ -159,6 +159,12 @@ config POUCH_TRANSPORT_BLE_GATT
   help
     BLE GATT transport for Pouch
 
+config POUCH_TRANSPORT_HTTP
+  bool "HTTP"
+  depends on HTTP_CLIENT
+  help
+    HTTP transport for Pouch
+
 endchoice
 
 if POUCH_TRANSPORT_BLE_GATT
@@ -168,6 +174,14 @@ rsource "src/transport/gatt/Kconfig"
 endmenu
 
 endif
+
+if POUCH_TRANSPORT_HTTP
+
+menu "HTTP Transport Options"
+rsource "src/transport/http/Kconfig"
+endmenu
+
+endif # POUCH_TRANSPORT_HTTP
 
 module = POUCH
 module-str = Pouch
