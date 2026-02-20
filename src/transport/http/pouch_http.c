@@ -283,6 +283,7 @@ static int pouch_http_payload_callback(int sock, struct http_request *req, void 
     tx_len = write_chunk_header_footer(ctx->scratch, 0);
     payload_size += zsock_send(sock, ctx->scratch, tx_len, 0);
 
+    LOG_INF("Uplink payload sent: %zu bytes", payload_size);
     return payload_size;
 }
 
