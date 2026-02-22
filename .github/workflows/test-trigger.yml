@@ -1,0 +1,71 @@
+name: Test Trigger
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test-integration:
+    name: pouch-integration-tests
+    uses: ./.github/workflows/test-integration.yml
+    secrets: inherit
+
+    strategy:
+      matrix:
+        manifest_yml:
+          - west
+          - west-ncs
+      fail-fast: false
+
+    with:
+      manifest_yml: ${{ matrix.manifest_yml }}
+
+
+  build-gateway:
+    name: build-gateway
+    uses: ./.github/workflows/build-gateway.yml
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - gw_board: frdm_rw612
+            gw_version: f30be4530c17ce8543833c8bb3172f8e1b4510ff
+            gw_manifest_yml: west-zephyr
+            gw_blobs: hal_nxp
+    with:
+      gw_board: ${{ matrix.gw_board }}
+      gw_version: ${{ matrix.gw_version }}
+      gw_manifest_yml: ${{ matrix.gw_manifest_yml }}
+      gw_blobs: ${{ matrix.gw_blobs }}
+
+
+  test-hil:
+    name: Pouch HIL
+    needs: build-gateway
+    uses: ./.github/workflows/test-hil.yml
+    secrets: inherit
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - hil_board: nrf52840dk
+            west_board: nrf52840dk/nrf52840
+            manifest_yml: west
+            binary_file: zephyr.signed.hex
+          - hil_board: nrf52840dk
+            west_board: nrf52840dk/nrf52840
+            manifest_yml: west-ncs
+            binary_file: merged.hex
+            gw_board: frdm_rw612
+
+    with:
+      hil_board: ${{ matrix.hil_board }}
+      west_board: ${{ matrix.west_board }}
+      manifest_yml: ${{ matrix.manifest_yml }}
+      binary_file: ${{ matrix.binary_file}}
+      binary_blob: ${{ matrix.binary_blob }}
+      gw_board: ${{ matrix.gw_board || '' }}
