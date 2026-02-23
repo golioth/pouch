@@ -17,6 +17,7 @@ manifest:
           - hal_nxp
           - mbedtls
           - mcuboot
+          - picolibc
           - segger
           - tfm-mcuboot
           - trusted-firmware-m
