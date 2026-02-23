@@ -1,0 +1,1016 @@
+From f37625a5066c54ba371e055c4c2aa7c19e4de7c2 Mon Sep 17 00:00:00 2001
+From: Marcin Niestroj <m.niestroj@emb.dev>
+Date: Thu, 14 Aug 2025 12:34:01 +0200
+Subject: [PATCH] subsys: fs: nsim_mount: new FS for mounting host filesystem
+
+Implement Native Simulator host filesystem mounting under Zephyr. This file
+system allows to access host files and directories inside Zephyr running
+under Native Simulator.
+
+There is new Native Simulator executable parameter supported '-volume',
+which can be used to mount any host directory in Zephyr (following Docker
+volume mount syntax):
+
+  -volume=/host/dir:/dir
+
+Signed-off-by: Marcin Niestroj <m.niestroj@emb.dev>
+---
+ include/zephyr/fs/fs.h        |   3 +
+ subsys/fs/CMakeLists.txt      |   5 +
+ subsys/fs/Kconfig             |  12 +
+ subsys/fs/nsim_mount.c        | 515 ++++++++++++++++++++++++++++++++++
+ subsys/fs/nsim_mount_bottom.c | 336 ++++++++++++++++++++++
+ subsys/fs/nsim_mount_bottom.h |  63 +++++
+ 6 files changed, 934 insertions(+)
+ create mode 100644 subsys/fs/nsim_mount.c
+ create mode 100644 subsys/fs/nsim_mount_bottom.c
+ create mode 100644 subsys/fs/nsim_mount_bottom.h
+
+diff --git a/include/zephyr/fs/fs.h b/include/zephyr/fs/fs.h
+index e2cf7dff73b..99bace60393 100644
+--- a/include/zephyr/fs/fs.h
++++ b/include/zephyr/fs/fs.h
+@@ -61,6 +61,9 @@ enum {
+ 	/** Identifier for in-tree Ext2 file system. */
+ 	FS_EXT2,
+ 
++	/** Identifier for in-tree Native Simulator mount file system. */
++	FS_NSIM_MOUNT,
++
+ 	/** Base identifier for external file systems. */
+ 	FS_TYPE_EXTERNAL_BASE,
+ };
+diff --git a/subsys/fs/CMakeLists.txt b/subsys/fs/CMakeLists.txt
+index 48df605ae01..24108d05faa 100644
+--- a/subsys/fs/CMakeLists.txt
++++ b/subsys/fs/CMakeLists.txt
+@@ -11,6 +11,11 @@ if(CONFIG_FILE_SYSTEM_LIB_LINK)
+     zephyr_library_sources_ifdef(CONFIG_FILE_SYSTEM_LITTLEFS littlefs_fs.c)
+     zephyr_library_sources_ifdef(CONFIG_FILE_SYSTEM_SHELL    shell.c)
+ 
++    if(CONFIG_FILE_SYSTEM_NSIM_MOUNT)
++      zephyr_library_sources(nsim_mount.c)
++      target_sources(native_simulator INTERFACE nsim_mount_bottom.c)
++    endif()
++
+     zephyr_library_compile_definitions_ifdef(CONFIG_FILE_SYSTEM_LITTLEFS
+                                             LFS_CONFIG=zephyr_lfs_config.h
+     )
+diff --git a/subsys/fs/Kconfig b/subsys/fs/Kconfig
+index 4dde4b27100..d895c50ec3c 100644
+--- a/subsys/fs/Kconfig
++++ b/subsys/fs/Kconfig
+@@ -99,6 +99,18 @@ config FUSE_FS_ACCESS
+ 	help
+ 	  Expose file system partitions to the host system through FUSE.
+ 
++config FILE_SYSTEM_NSIM_MOUNT
++	bool "Mount Native Simulator host FS to Zephyr"
++	help
++	  Mount Native Simulator host file system to Zephyr, which allows Zephyr to access host
++	  files.
++
++	  Add:
++
++	    -volume=/host/dir:/dir
++
++	  to mount host system /host/dir be mounted in Zephyr in /dir.
++
+ endif # FILE_SYSTEM
+ 
+ if FILE_SYSTEM_LIB_LINK
+diff --git a/subsys/fs/nsim_mount.c b/subsys/fs/nsim_mount.c
+new file mode 100644
+index 00000000000..f36755b2762
+--- /dev/null
++++ b/subsys/fs/nsim_mount.c
+@@ -0,0 +1,515 @@
++/*
++ * Copyright (c) 2025 Golioth, Inc.
++ * Copyright (c) 2025 Marcin Niestroj
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <zephyr/fs/fs.h>
++#include <zephyr/fs/fs_sys.h>
++
++#include "fs_impl.h"
++
++#include <posix_native_task.h>
++#include "nsi_errno.h"
++#include "nsi_fcntl.h"
++#include "nsi_host_trampolines.h"
++#include "cmdline.h"
++
++#include "nsim_mount_bottom.h"
++
++#include <zephyr/logging/log.h>
++LOG_MODULE_REGISTER(nsim_mount);
++
++struct nsim_mountpoint {
++	struct fs_mount_t mount;
++	const char *host;
++	const char *zephyr;
++};
++
++struct nsim_mount_dir {
++	int fd;
++};
++
++struct nsim_mount_file {
++	int fd;
++	fs_mode_t zflags;
++};
++
++static int nsi_fs_flags_to_mid(int flags)
++{
++	int flags_mid = 0;
++
++#define TO_MID(_flag, _flag_mid)			\
++	if ((flags & (_flag)) == (_flag)) {		\
++		flags &= ~(_flag);			\
++		flags_mid |= NSI_FCNTL_MID_ ## _flag_mid;	\
++	}
++
++	TO_MID(FS_O_RDWR, O_RDWR);
++	TO_MID(FS_O_READ, O_RDONLY);
++	TO_MID(FS_O_WRITE, O_WRONLY);
++
++	TO_MID(FS_O_CREATE, O_CREAT);
++	TO_MID(FS_O_APPEND, O_APPEND);
++	TO_MID(FS_O_TRUNC, O_TRUNC);
++
++#undef TO_MID
++
++	if (flags != 0) {
++		return -NSI_ERRNO_MID_EINVAL;
++	}
++
++	return flags_mid;
++}
++
++static int nsim_mount_open(struct fs_file_t *fp, const char *path, fs_mode_t zflags)
++{
++	const char *host = fp->mp->fs_data;
++	const char *path_rel = fs_impl_strip_prefix(path, fp->mp);
++	struct nsim_mount_file *file;
++	int fd;
++
++	LOG_INF("Opening '%s' '%s'", host, path_rel);
++
++	file = nsi_host_malloc(sizeof(*file));
++	if (!file) {
++		return -ENOMEM;
++	}
++
++	fd = nsi_host_open_with_prefix(host, path_rel, nsi_fs_flags_to_mid(zflags));
++	if (fd < 0) {
++		free(file);
++		return -nsi_errno_from_mid(-fd);
++	}
++
++	file->fd = fd;
++	file->zflags = zflags;
++	fp->filep = file;
++
++	return 0;
++}
++
++static int nsim_mount_close(struct fs_file_t *fp)
++{
++	struct nsim_mount_file *file = fp->filep;
++
++	LOG_INF("Closing '%d'", file->fd);
++
++	nsi_host_close(file->fd);
++	nsi_host_free(file);
++
++	return 0;
++}
++
++static int nsim_mount_unlink(struct fs_mount_t *mountp, const char *path)
++{
++	const char *host = mountp->fs_data;
++	const char *path_rel = fs_impl_strip_prefix(path, mountp);
++	int ret;
++
++	ret = nsi_host_unlink_with_prefix(host, path_rel);
++	if (ret < 0) {
++		return -nsi_errno_from_mid(-ret);
++	}
++
++	return 0;
++}
++
++static int nsim_mount_rename(struct fs_mount_t *mountp, const char *from,
++			   const char *to)
++{
++	const char *host = mountp->fs_data;
++	const char *from_rel = fs_impl_strip_prefix(from, mountp);
++	const char *to_rel = fs_impl_strip_prefix(to, mountp);
++	int ret;
++
++	ret = nsi_host_rename_with_prefix(host, from_rel, to_rel);
++	if (ret < 0) {
++		return -nsi_errno_from_mid(-ret);
++	}
++
++	return 0;
++}
++
++static ssize_t nsim_mount_read(struct fs_file_t *fp, void *ptr, size_t len)
++{
++	struct nsim_mount_file *file = fp->filep;
++	long ret;
++
++	if (!(file->zflags & FS_O_READ)) {
++		return -EACCES;
++	}
++
++	ret = nsi_host_read(file->fd, ptr, len);
++	if (ret < 0) {
++		return -nsi_host_get_errno();
++	}
++
++	return ret;
++}
++
++static ssize_t nsim_mount_write(struct fs_file_t *fp, const void *ptr, size_t len)
++{
++	struct nsim_mount_file *file = fp->filep;
++	long ret;
++
++	if (!(file->zflags & FS_O_WRITE)) {
++		return -EACCES;
++	}
++
++	ret = nsi_host_write(file->fd, ptr, len);
++	if (ret < 0) {
++		return -nsi_host_get_errno();
++	}
++
++	return ret;
++}
++
++static int nsim_mount_stat(struct fs_mount_t *mountp,
++			   const char *path, struct fs_dirent *dirent)
++{
++	const char *host = mountp->fs_data;
++	const char *path_rel = fs_impl_strip_prefix(path, mountp);
++	struct fs_mid_dirent dirent_mid;
++	int err;
++
++	LOG_INF("Stat '%s' '%s'", host, path_rel);
++
++	err = nsi_host_stat_with_prefix(host, path_rel, &dirent_mid);
++	if (err) {
++		return -nsi_errno_from_mid(-err);
++	}
++
++	if (dirent_mid.type == FS_MID_DIR_ENTRY_FILE) {
++		dirent->type = FS_DIR_ENTRY_FILE;
++	} else {
++		dirent->type = FS_DIR_ENTRY_DIR;
++	}
++
++	strncpy(dirent->name, dirent_mid.name, MAX_FILE_NAME);
++	dirent->name[MAX_FILE_NAME] = '\0';
++
++	dirent->size = dirent_mid.size;
++
++	LOG_INF("Stat(%s) size=%d", path, (int) dirent_mid.size);
++
++	return 0;
++}
++
++static int nsim_mount_statvfs(struct fs_mount_t *mountp,
++			      const char *path, struct fs_statvfs *stat)
++{
++	const char *host = mountp->fs_data;
++	const char *path_rel = fs_impl_strip_prefix(path, mountp);
++	struct fs_mid_statvfs stat_mid;
++	int ret;
++
++	ret = nsi_host_statvfs_with_prefix(host, path_rel, &stat_mid);
++	if (ret < 0) {
++		return -nsi_errno_from_mid(-ret);
++	}
++
++	stat->f_bsize = stat_mid.f_bsize;
++	stat->f_frsize = stat_mid.f_frsize;
++	stat->f_blocks = stat_mid.f_blocks;
++	stat->f_bfree = stat_mid.f_bfree;
++
++	return 0;
++}
++
++static int nsim_mount_mount(struct fs_mount_t *mountp)
++{
++	LOG_INF("%s mounted (host %s)", mountp->mnt_point, (const char *)mountp->fs_data);
++
++	return 0;
++}
++
++static int nsim_mount_unmount(struct fs_mount_t *mountp)
++{
++	LOG_INF("%s unmounted", mountp->mnt_point);
++
++	return 0;
++}
++
++static off_t nsim_mount_tell(struct fs_file_t *fp)
++{
++	struct nsim_mount_file *file = fp->filep;
++
++	return nsi_host_lseek(file->fd, 0, SEEK_CUR);
++}
++
++static int nsim_mount_lseek(struct fs_file_t *fp, off_t off, int whence)
++{
++	struct nsim_mount_file *file = fp->filep;
++	int ret;
++
++	ret = nsi_host_lseek(file->fd, off, whence);
++	if (ret < 0) {
++		return -nsi_host_get_errno();
++	}
++
++	return 0;
++}
++
++static int nsim_mount_sync(struct fs_file_t *fp)
++{
++	struct nsim_mount_file *file = fp->filep;
++	int ret;
++
++	ret = nsi_host_fsync(file->fd);
++	if (ret < 0) {
++		return -nsi_host_get_errno();
++	}
++
++	return 0;
++}
++
++static int nsim_mount_truncate(struct fs_file_t *fp, off_t length)
++{
++	struct nsim_mount_file *file = fp->filep;
++	int ret;
++
++	ret = nsi_host_ftruncate(file->fd, length);
++	if (ret < 0) {
++		return -nsi_host_get_errno();
++	}
++
++	return ret;
++}
++
++static int nsim_mount_mkdir(struct fs_mount_t *mountp, const char *path)
++{
++	const char *host = mountp->fs_data;
++	const char *path_rel = fs_impl_strip_prefix(path, mountp);
++	int ret;
++
++	ret = nsi_host_mkdir_with_prefix(host, path_rel);
++	if (ret < 0) {
++		return -nsi_host_get_errno();
++	}
++
++	return 0;
++}
++
++static int nsim_mount_opendir(struct fs_dir_t *dp, const char *path)
++{
++	const char *host = dp->mp->fs_data;
++	struct fs_mid_dir *dir;
++	const char *path_rel;
++
++	path_rel = fs_impl_strip_prefix(path, dp->mp);
++
++	dir = nsi_host_opendir_with_prefix(host, path_rel);
++	if (!dir) {
++		return -nsi_host_get_errno();
++	}
++
++	dp->dirp = dir;
++
++	return 0;
++}
++
++static int nsim_mount_readdir(struct fs_dir_t *dp, struct fs_dirent *entry)
++{
++	struct fs_mid_dirent entry_mid;
++	int err;
++
++	err = nsi_host_readdir(dp->dirp, &entry_mid);
++	if (err) {
++		return -nsi_errno_from_mid(-err);
++	}
++
++	if (entry_mid.name[0] == '\0') {
++		entry->name[0] = '\0';
++		return 0;
++	}
++
++	switch (entry_mid.type) {
++	case FS_MID_DIR_ENTRY_DIR:
++		entry->type = FS_DIR_ENTRY_DIR;
++		break;
++	case FS_MID_DIR_ENTRY_FILE:
++		entry->type = FS_DIR_ENTRY_FILE;
++		break;
++	default:
++		return -ENOTSUP;
++	}
++
++	strncpy(entry->name, entry_mid.name, MAX_FILE_NAME);
++	entry->name[MAX_FILE_NAME] = '\0';
++
++	entry->size = entry_mid.size;
++
++	return 0;
++}
++
++static int nsim_mount_closedir(struct fs_dir_t *dp)
++{
++	struct fs_mid_dir *dir = dp->dirp;
++	int ret;
++
++	ret = nsi_host_closedir(dir);
++	if (ret < 0) {
++		return -nsi_host_get_errno();
++	}
++
++	return 0;
++}
++
++/* File system interface */
++static const struct fs_file_system_t nsim_mount_fs = {
++	.open = nsim_mount_open,
++	.close = nsim_mount_close,
++	.read = nsim_mount_read,
++	.write = nsim_mount_write,
++	.unlink = nsim_mount_unlink,
++	.rename = nsim_mount_rename,
++	.stat = nsim_mount_stat,
++	.statvfs = nsim_mount_statvfs,
++	.mount = nsim_mount_mount,
++	.unmount = nsim_mount_unmount,
++
++	.tell = nsim_mount_tell,
++	.lseek = nsim_mount_lseek,
++	.truncate = nsim_mount_truncate,
++	.sync = nsim_mount_sync,
++
++	.mkdir = nsim_mount_mkdir,
++	.opendir = nsim_mount_opendir,
++	.readdir = nsim_mount_readdir,
++	.closedir = nsim_mount_closedir,
++};
++
++static struct nsim_mountpoint *nsim_mountpoints;
++static size_t nsim_num_mountpoints;
++
++static int nsim_mount_init(void)
++{
++	int err;
++
++	printf("nsim_mount_init\n");
++	LOG_INF("%s", __func__);
++
++	err = fs_register(FS_NSIM_MOUNT, &nsim_mount_fs);
++	if (err) {
++		return err;
++	}
++
++	for (struct nsim_mountpoint *mp = nsim_mountpoints;
++	     mp < &nsim_mountpoints[nsim_num_mountpoints];
++	     mp++) {
++		LOG_INF("Mounting %s under %s", mp->host, mp->zephyr);
++
++		mp->mount.type = FS_NSIM_MOUNT;
++		mp->mount.mnt_point = mp->zephyr;
++		mp->mount.fs_data = (void *)mp->host;
++		mp->mount.storage_dev = NULL;
++
++		err = fs_mount(&mp->mount);
++		if (err) {
++			LOG_ERR("Failed to mount: %d", err);
++			return err;
++		}
++	}
++
++	return 0;
++}
++
++SYS_INIT(nsim_mount_init, POST_KERNEL, CONFIG_FILE_SYSTEM_INIT_PRIORITY);
++
++static void nsim_mount_task_init(void)
++{
++	printf("nsim_mount_task_init\n");
++}
++
++static void nsim_mount_cleanup(void)
++{
++	printf("nsim_mount_cleanup\n");
++}
++
++static int volume_mount_tokenize(char *str, const char **host, const char **zephyr, char **flags)
++{
++	*host = str;
++	*zephyr = "";
++	*flags = "";
++
++	while (*str != '\0' && *str != ':') {
++		str++;
++	}
++
++	if (*str != ':') {
++		return -EINVAL;
++	}
++
++	*str = '\0';
++	str++;
++
++	*zephyr = str;
++
++	while (*str != '\0' && *str != ':') {
++		str++;
++	}
++
++	if (*str != ':') {
++		return 0;
++	}
++
++	*str = '\0';
++	str++;
++
++	*flags = str;
++
++	return 0;
++}
++
++static void volume_found(char *argv, int offset)
++{
++	const char *option = &argv[offset];
++	size_t option_len = strlen(option);
++	char *flags;
++
++	printf("Volume offset: %d\n", offset);
++	printf("Volume argv: %s\n", argv);
++	printf("Volume argv: %s\n", &argv[offset]);
++
++	nsim_num_mountpoints++;
++	nsim_mountpoints = nsi_host_realloc(nsim_mountpoints, nsim_num_mountpoints * sizeof(*nsim_mountpoints));
++
++	struct nsim_mountpoint *mp = &nsim_mountpoints[nsim_num_mountpoints - 1];
++	char *tokenized = nsi_host_malloc(option_len + 1);
++
++	memcpy(tokenized, option, option_len + 1);
++
++	printf("Tokenized: %s\n", tokenized);
++
++	volume_mount_tokenize(tokenized, &mp->host, &mp->zephyr, &flags);
++	mp->mount.flags = 0;
++
++	if (strcmp(flags, "ro") == 0) {
++		mp->mount.flags = FS_MOUNT_FLAG_READ_ONLY;
++	}
++}
++
++static void nsim_mount_options(void)
++{
++	static struct args_struct_t nsim_mount_options[] = {
++		{
++		  .is_switch = false,
++		  .option = "volume",
++		  .name = "HOST-DIR:ZEPHYR-DIR",
++		  .type = 's',
++		  .call_when_found = volume_found,
++		  .descript = "Mount HOST-DIR host directory under ZEPHYR-DIR in Zephyr" },
++		ARG_TABLE_ENDMARKER
++	};
++
++	native_add_command_line_opts(nsim_mount_options);
++}
++
++NATIVE_TASK(nsim_mount_options, PRE_BOOT_1, 1);
++NATIVE_TASK(nsim_mount_task_init, PRE_BOOT_2, 1);
++NATIVE_TASK(nsim_mount_cleanup, ON_EXIT, 1);
+diff --git a/subsys/fs/nsim_mount_bottom.c b/subsys/fs/nsim_mount_bottom.c
+new file mode 100644
+index 00000000000..e4fe8501290
+--- /dev/null
++++ b/subsys/fs/nsim_mount_bottom.c
+@@ -0,0 +1,336 @@
++/*
++ * Copyright (c) 2025 Golioth, Inc.
++ * Copyright (c) 2025 Marcin Niestroj
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#define _GNU_SOURCE
++
++#include <errno.h>
++#include <fcntl.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <sys/stat.h>
++#include <sys/statvfs.h>
++#include <dirent.h>
++
++#include "nsi_errno.h"
++#include "nsi_fcntl.h"
++#include "nsim_mount_bottom.h"
++
++struct fs_mid_dir {
++	DIR *dir;
++	const char *path;
++};
++
++int nsi_host_open_with_prefix(const char *prefix, const char *path, int flags_mid)
++{
++	char *full_path;
++	int ret;
++
++	ret = asprintf(&full_path, "%s%s", prefix, path);
++	if (ret < 0) {
++		return -nsi_errno_to_mid(errno);
++	}
++
++	ret = open(full_path, nsi_fcntl_from_mid(flags_mid), 0644);
++
++	free(full_path);
++
++	if (ret < 0) {
++		return -nsi_errno_to_mid(errno);
++	}
++
++	return ret;
++}
++
++const char *file_name_from_path(const char *path)
++{
++	const char *p = path;
++
++	if (p[0] == '/') {
++		if (p[1] == '\0') {
++			return "/";
++		}
++	}
++
++	while (p[0] != '\0') {
++		if (p[0] == '/') {
++			if (p[1] != '\0') {
++ 				path = p + 1;
++			}
++		}
++
++		p++;
++	}
++
++	return path;
++}
++
++int nsi_host_stat_with_prefix(const char *prefix, const char *path,
++			      struct fs_mid_dirent *dirent_mid)
++{
++	struct stat st;
++	size_t name_len;
++	char *full_path;
++	int ret;
++
++	ret = asprintf(&full_path, "%s%s", prefix, path);
++	if (ret < 0) {
++		return -nsi_errno_to_mid(errno);
++	}
++
++	ret = stat(full_path, &st);
++
++	free(full_path);
++
++	if (ret < 0) {
++		return -nsi_errno_to_mid(errno);
++	}
++
++	switch (st.st_mode & S_IFMT) {
++	case S_IFDIR:
++		dirent_mid->type = FS_MID_DIR_ENTRY_DIR;
++		break;
++	case S_IFREG:
++		dirent_mid->type = FS_MID_DIR_ENTRY_FILE;
++		break;
++	default:
++		return -NSI_ERRNO_MID_ENOTSUP;
++	}
++
++	strncpy(dirent_mid->name, file_name_from_path(path), NSIM_FS_MAX_FILE_NAME_LEN);
++	dirent_mid->name[NSIM_FS_MAX_FILE_NAME_LEN] = '\0';
++	name_len = strlen(dirent_mid->name);
++
++	/* Remove trailing slash */
++	if (dirent_mid->name[name_len - 1] == '/') {
++		dirent_mid->name[name_len - 1] = '\0';
++	}
++
++	dirent_mid->size = st.st_size;
++
++	return ret;
++}
++
++int nsi_host_statvfs_with_prefix(const char *prefix, const char *path,
++				 struct fs_mid_statvfs *stat_mid)
++{
++	struct statvfs stat;
++	char *full_path;
++	int ret;
++
++	ret = asprintf(&full_path, "%s%s", prefix, path);
++	if (ret < 0) {
++		return -nsi_errno_to_mid(errno);
++	}
++
++	ret = statvfs(full_path, &stat);
++
++	free(full_path);
++
++	if (ret < 0) {
++		return -nsi_errno_to_mid(errno);
++	}
++
++	stat_mid->f_bsize = stat.f_bsize;
++	stat_mid->f_frsize = stat.f_frsize;
++	stat_mid->f_blocks = stat.f_blocks;
++	stat_mid->f_bfree = stat.f_bfree;
++
++	return 0;
++}
++
++off_t nsi_host_lseek(int fd, off_t offset, int whence)
++{
++	return lseek(fd, offset, whence);
++}
++
++int nsi_host_ftruncate(int fd, off_t length)
++{
++	return ftruncate(fd, length);
++}
++
++int nsi_host_mkdir_with_prefix(const char *prefix, const char *path)
++{
++	char *full_path;
++	int ret;
++
++	ret = asprintf(&full_path, "%s%s", prefix, path);
++	if (ret < 0) {
++		return -nsi_errno_to_mid(errno);
++	}
++
++	ret = mkdir(full_path, 0755);
++
++	free(full_path);
++
++	if (ret < 0) {
++		return -nsi_errno_to_mid(errno);
++	}
++
++	return ret;
++}
++
++struct fs_mid_dir *nsi_host_opendir_with_prefix(const char *prefix, const char *path)
++{
++	struct fs_mid_dir *dir;
++	char *full_path;
++	int ret;
++
++	ret = asprintf(&full_path, "%s%s", prefix, path);
++	if (ret < 0) {
++		return NULL;
++	}
++
++	dir = malloc(sizeof(*dir));
++	if (!dir) {
++		free(full_path);
++		return NULL;
++	}
++
++	dir->path = full_path;
++	dir->dir = opendir(full_path);
++
++	return dir;
++}
++
++int nsi_host_readdir(struct fs_mid_dir *dir, struct fs_mid_dirent *dirent_mid)
++{
++	struct stat st;
++	struct dirent *dirent;
++	char *full_path;
++	size_t name_len;
++	int ret;
++
++	errno = 0;
++
++	dirent = readdir(dir->dir);
++	if (!dirent) {
++		dirent_mid->name[0] = '\0';
++		return -nsi_errno_to_mid(errno);
++	}
++
++	switch (dirent->d_type) {
++	case DT_DIR:
++		dirent_mid->type = FS_MID_DIR_ENTRY_DIR;
++		break;
++	case DT_REG:
++		dirent_mid->type = FS_MID_DIR_ENTRY_FILE;
++		break;
++	default:
++		return -NSI_ERRNO_MID_ENOTSUP;
++	}
++
++	strncpy(dirent_mid->name, dirent->d_name, NSIM_FS_MAX_FILE_NAME_LEN);
++	dirent_mid->name[NSIM_FS_MAX_FILE_NAME_LEN] = '\0';
++	name_len = strlen(dirent_mid->name);
++
++	/* Remove trailing slash */
++	if (dirent_mid->name[name_len - 1] == '/') {
++		dirent_mid->name[name_len - 1] = '\0';
++	}
++
++	if (dirent->d_type == DT_DIR) {
++		dirent_mid->size = 0;
++		return 0;
++	}
++
++	ret = asprintf(&full_path, "%s/%s", dir->path, dirent_mid->name);
++	if (ret < 0) {
++		return -nsi_errno_to_mid(errno);
++	}
++
++	ret = stat(full_path, &st);
++
++	free(full_path);
++
++	if (ret < 0) {
++		return -nsi_errno_to_mid(errno);
++	}
++
++	dirent_mid->size = st.st_size;
++
++	return 0;
++}
++
++int nsi_host_closedir(struct fs_mid_dir *dir)
++{
++	int ret;
++
++	ret = closedir(dir->dir);
++	free(dir);
++
++	return ret;
++}
++
++int nsi_host_unlink_with_prefix(const char *prefix, const char *path)
++{
++	struct stat st;
++	char *full_path;
++	int ret;
++
++	ret = asprintf(&full_path, "%s%s", prefix, path);
++	if (ret < 0) {
++		return -nsi_errno_to_mid(errno);
++	}
++
++	ret = stat(full_path, &st);
++	if (ret < 0) {
++		return -nsi_errno_to_mid(errno);
++	}
++
++	switch (st.st_mode & S_IFMT) {
++	case S_IFDIR:
++		ret = rmdir(full_path);
++		break;
++	case S_IFREG:
++		ret = unlink(full_path);
++		break;
++	}
++
++	free(full_path);
++
++	if (ret < 0) {
++		return -nsi_errno_to_mid(errno);
++	}
++
++	return ret;
++}
++
++int nsi_host_rename_with_prefix(const char *prefix, const char *from, const char *to)
++{
++	char *from_full;
++	char *to_full;
++	int ret;
++
++	ret = asprintf(&from_full, "%s%s", prefix, from);
++	if (ret < 0) {
++		goto return_errno;
++	}
++
++	ret = asprintf(&to_full, "%s%s", prefix, to);
++	if (ret < 0) {
++		goto free_from;
++	}
++
++	ret = rename(from_full, to_full);
++
++	free(to_full);
++free_from:
++	free(from_full);
++
++return_errno:
++	if (ret < 0) {
++		return -nsi_errno_to_mid(errno);
++	}
++
++	return ret;
++}
++
++int nsi_host_fsync(int fd)
++{
++	return fsync(fd);
++}
+diff --git a/subsys/fs/nsim_mount_bottom.h b/subsys/fs/nsim_mount_bottom.h
+new file mode 100644
+index 00000000000..0ee97b3f371
+--- /dev/null
++++ b/subsys/fs/nsim_mount_bottom.h
+@@ -0,0 +1,63 @@
++/*
++ * Copyright (c) 2025 Golioth, Inc.
++ * Copyright (c) 2025 Marcin Niestroj
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#ifndef ZEPHYR_FS_NSIM_MOUNT_BOTTOM_H
++#define ZEPHYR_FS_NSIM_MOUNT_BOTTOM_H
++
++#include <unistd.h>
++
++#define NSIM_FS_MAX_FILE_NAME_LEN	255
++
++struct fs_mid_dir;
++
++enum fs_mid_dir_entry_type {
++	/** Identifier for file entry */
++	FS_MID_DIR_ENTRY_FILE = 0,
++	/** Identifier for directory entry */
++	FS_MID_DIR_ENTRY_DIR
++};
++
++struct fs_mid_dirent {
++	/**
++	 * File/directory type (FS_DIR_ENTRY_FILE or FS_DIR_ENTRY_DIR)
++	 */
++	enum fs_mid_dir_entry_type type;
++	/** Name of file or directory */
++	char name[NSIM_FS_MAX_FILE_NAME_LEN + 1];
++	/** Size of file (0 if directory). */
++	size_t size;
++};
++
++struct fs_mid_statvfs {
++	/** Optimal transfer block size */
++	unsigned long f_bsize;
++	/** Allocation unit size */
++	unsigned long f_frsize;
++	/** Size of FS in f_frsize units */
++	unsigned long f_blocks;
++	/** Number of free blocks */
++	unsigned long f_bfree;
++};
++
++int nsi_host_open_with_prefix(const char *prefix, const char *path, int flags_mid);
++int nsi_host_stat_with_prefix(const char *prefix, const char *path,
++			      struct fs_mid_dirent *dirent_mid);
++int nsi_host_statvfs_with_prefix(const char *prefix, const char *path,
++				 struct fs_mid_statvfs *stat_mid);
++off_t nsi_host_lseek(int fd, off_t offset, int whence);
++int nsi_host_ftruncate(int fd, off_t length);
++
++int nsi_host_mkdir_with_prefix(const char *prefix, const char *path);
++struct fs_mid_dir *nsi_host_opendir_with_prefix(const char *prefix, const char *name);
++int nsi_host_readdir(struct fs_mid_dir *dir, struct fs_mid_dirent *entry_mid);
++int nsi_host_closedir(struct fs_mid_dir *dir);
++
++int nsi_host_unlink_with_prefix(const char *prefix, const char *path);
++int nsi_host_rename_with_prefix(const char *prefix, const char *from, const char *to);
++int nsi_host_fsync(int fd);
++
++#endif /* ZEPHYR_FS_NSIM_MOUNT_BOTTOM_H */
+-- 
+2.51.0
+
