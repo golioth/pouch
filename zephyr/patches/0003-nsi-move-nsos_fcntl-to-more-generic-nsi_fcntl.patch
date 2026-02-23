@@ -1,0 +1,429 @@
+From 5664e6eff028f7dfb50dcbd0e34775b8a057f5e1 Mon Sep 17 00:00:00 2001
+From: Marcin Niestroj <m.niestroj@emb.dev>
+Date: Tue, 5 Aug 2025 18:18:07 +0200
+Subject: [PATCH] nsi: move nsos_fcntl to more generic nsi_fcntl
+
+Signed-off-by: Marcin Niestroj <m.niestroj@emb.dev>
+---
+ arch/posix/Kconfig.natsim_optional            |  7 ++
+ arch/posix/natsim_optional.cmake              |  8 +-
+ drivers/net/CMakeLists.txt                    |  2 -
+ drivers/net/Kconfig                           |  1 +
+ drivers/net/nsos_adapt.c                      |  6 +-
+ drivers/net/nsos_fcntl.c                      | 91 -------------------
+ drivers/net/nsos_fcntl.h                      | 22 -----
+ drivers/net/nsos_sockets.c                    | 12 +--
+ .../common/src/include/nsi_fcntl.h            | 22 +++++
+ .../native_simulator/common/src/nsi_fcntl.c   | 91 +++++++++++++++++++
+ 10 files changed, 137 insertions(+), 125 deletions(-)
+ delete mode 100644 drivers/net/nsos_fcntl.c
+ delete mode 100644 drivers/net/nsos_fcntl.h
+ create mode 100644 scripts/native_simulator/common/src/include/nsi_fcntl.h
+ create mode 100644 scripts/native_simulator/common/src/nsi_fcntl.c
+
+diff --git a/arch/posix/Kconfig.natsim_optional b/arch/posix/Kconfig.natsim_optional
+index 4ec8dcdc4a5..277134e25a8 100644
+--- a/arch/posix/Kconfig.natsim_optional
++++ b/arch/posix/Kconfig.natsim_optional
+@@ -6,3 +6,10 @@ config NATIVE_USE_NSI_ERRNO
+ 	help
+ 	  Build the native simulator nsi_errno component with the Zephyr embedded code.
+ 	  This component allows translating errno values from/to the embedded libC to/from the host libC.
++
++config NATIVE_USE_NSI_FCNTL
++	bool
++	help
++	  Build the native simulator nsi_fcntl component with the Zephyr embedded code.
++	  This component allows translating fcntl values (e.g. open() flags) from/to the embedded
++	  libC to/from the host libC.
+diff --git a/arch/posix/natsim_optional.cmake b/arch/posix/natsim_optional.cmake
+index e2f3d5f0eb3..f18302236e1 100644
+--- a/arch/posix/natsim_optional.cmake
++++ b/arch/posix/natsim_optional.cmake
+@@ -3,8 +3,14 @@
+ 
+ # Selection of optional components provided by the native simulator
+ 
+-if(CONFIG_NATIVE_USE_NSI_ERRNO)
++if(CONFIG_NATIVE_USE_NSI_ERRNO OR CONFIG_NATIVE_USE_NSI_FCNTL)
+   zephyr_library()
++endif()
+ 
++if(CONFIG_NATIVE_USE_NSI_ERRNO)
+   zephyr_library_sources(${NSI_DIR}/common/src/nsi_errno.c)
+ endif()
++
++if(CONFIG_NATIVE_USE_NSI_FCNTL)
++  zephyr_library_sources(${NSI_DIR}/common/src/nsi_fcntl.c)
++endif()
+diff --git a/drivers/net/CMakeLists.txt b/drivers/net/CMakeLists.txt
+index ba3e44fd1f4..f439fc76592 100644
+--- a/drivers/net/CMakeLists.txt
++++ b/drivers/net/CMakeLists.txt
+@@ -14,7 +14,6 @@ if(CONFIG_NET_NATIVE_OFFLOADED_SOCKETS)
+   zephyr_library_include_directories(
+     ${ZEPHYR_BASE}/subsys/net/lib/sockets
+   )
+-  zephyr_library_sources(nsos_fcntl.c)
+   zephyr_library_sources(nsos_netdb.c)
+   zephyr_library_sources(nsos_sockets.c)
+   target_compile_options(native_simulator BEFORE INTERFACE
+@@ -22,6 +21,5 @@ if(CONFIG_NET_NATIVE_OFFLOADED_SOCKETS)
+     -DNSOS_EPOLL_WAIT_INTERVAL=${CONFIG_NET_NATIVE_OFFLOADED_SOCKETS_EPOLL_WAIT_INTERVAL}
+   )
+   target_sources(native_simulator INTERFACE nsos_adapt.c)
+-  target_sources(native_simulator INTERFACE nsos_fcntl.c)
+   target_sources(native_simulator INTERFACE nsos_netdb.c)
+ endif()
+diff --git a/drivers/net/Kconfig b/drivers/net/Kconfig
+index 30f3b4fb30f..10deb67c02d 100644
+--- a/drivers/net/Kconfig
++++ b/drivers/net/Kconfig
+@@ -250,6 +250,7 @@ menuconfig NET_NATIVE_OFFLOADED_SOCKETS
+ 	depends on NATIVE_LIBRARY
+ 	depends on NET_SOCKETS_OFFLOAD
+ 	select NATIVE_USE_NSI_ERRNO
++	select NATIVE_USE_NSI_FCNTL
+ 	help
+ 	  Offloaded sockets for Native Simulator utilize host BSD sockets API (like socket(),
+ 	  connect(), send(), recvfrom(), etc.) in order to provide networking capability.
+diff --git a/drivers/net/nsos_adapt.c b/drivers/net/nsos_adapt.c
+index 9e908982e38..e460a509246 100644
+--- a/drivers/net/nsos_adapt.c
++++ b/drivers/net/nsos_adapt.c
+@@ -30,7 +30,7 @@
+ 
+ #include "nsos.h"
+ #include "nsi_errno.h"
+-#include "nsos_fcntl.h"
++#include "nsi_fcntl.h"
+ #include "nsos_netdb.h"
+ #include "nsos_socket.h"
+ 
+@@ -1083,14 +1083,14 @@ int nsos_adapt_fcntl_getfl(int fd)
+ 
+ 	flags = fcntl(fd, F_GETFL);
+ 
+-	return fl_to_nsos_mid(flags);
++	return nsi_fcntl_to_mid(flags);
+ }
+ 
+ int nsos_adapt_fcntl_setfl(int fd, int flags)
+ {
+ 	int ret;
+ 
+-	ret = fcntl(fd, F_SETFL, fl_from_nsos_mid(flags));
++	ret = fcntl(fd, F_SETFL, nsi_fcntl_from_mid(flags));
+ 	if (ret < 0) {
+ 		return -nsi_errno_to_mid(errno);
+ 	}
+diff --git a/drivers/net/nsos_fcntl.c b/drivers/net/nsos_fcntl.c
+deleted file mode 100644
+index ad6a61285c9..00000000000
+--- a/drivers/net/nsos_fcntl.c
++++ /dev/null
+@@ -1,91 +0,0 @@
+-/**
+- * Copyright (c) 2023-2024 Marcin Niestroj
+- *
+- * SPDX-License-Identifier: Apache-2.0
+- */
+-
+-/**
+- * @file
+- *
+- * fcntl.h related code common to Zephyr (top: nsos_sockets.c) and Linux
+- * (bottom: nsos_adapt.c).
+- *
+- * It is needed by both sides to share the same macro definitions/values
+- * (prefixed with NSOS_MID_), which is not possible to achieve with two separate
+- * standard libc libraries, since they use different values for the same
+- * symbols.
+- */
+-
+-/*
+- * When building for Zephyr, use Zephyr specific fcntl definitions.
+- */
+-#ifdef __ZEPHYR__
+-#include <zephyr/posix/fcntl.h>
+-#else
+-#include <fcntl.h>
+-#endif
+-
+-#include "nsi_errno.h"
+-#include "nsos_fcntl.h"
+-
+-#include <stdbool.h>
+-
+-static int fl_to_nsos_mid_(int flags, bool strict)
+-{
+-	int flags_mid = 0;
+-
+-#define TO_NSOS_MID(_flag)				\
+-	if (flags & (_flag)) {				\
+-		flags &= ~(_flag);			\
+-		flags_mid |= NSOS_MID_ ## _flag;	\
+-	}
+-
+-	TO_NSOS_MID(O_RDONLY);
+-	TO_NSOS_MID(O_WRONLY);
+-	TO_NSOS_MID(O_RDWR);
+-
+-	TO_NSOS_MID(O_APPEND);
+-	TO_NSOS_MID(O_EXCL);
+-	TO_NSOS_MID(O_NONBLOCK);
+-
+-#undef TO_NSOS_MID
+-
+-	if (strict && flags != 0) {
+-		return -NSI_ERRNO_MID_EINVAL;
+-	}
+-
+-	return flags_mid;
+-}
+-
+-int fl_to_nsos_mid(int flags)
+-{
+-	return fl_to_nsos_mid_(flags, false);
+-}
+-
+-int fl_to_nsos_mid_strict(int flags)
+-{
+-	return fl_to_nsos_mid_(flags, true);
+-}
+-
+-int fl_from_nsos_mid(int flags_mid)
+-{
+-	int flags = 0;
+-
+-#define FROM_NSOS_MID(_flag)				\
+-	if (flags_mid & NSOS_MID_ ## _flag) {		\
+-		flags_mid &= ~NSOS_MID_ ## _flag;	\
+-		flags |= _flag;				\
+-	}
+-
+-	FROM_NSOS_MID(O_RDONLY);
+-	FROM_NSOS_MID(O_WRONLY);
+-	FROM_NSOS_MID(O_RDWR);
+-
+-	FROM_NSOS_MID(O_APPEND);
+-	FROM_NSOS_MID(O_EXCL);
+-	FROM_NSOS_MID(O_NONBLOCK);
+-
+-#undef FROM_NSOS_MID
+-
+-	return flags;
+-}
+diff --git a/drivers/net/nsos_fcntl.h b/drivers/net/nsos_fcntl.h
+deleted file mode 100644
+index 3cab88896f7..00000000000
+--- a/drivers/net/nsos_fcntl.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-/**
+- * Copyright (c) 2023-2024 Marcin Niestroj
+- *
+- * SPDX-License-Identifier: Apache-2.0
+- */
+-
+-#ifndef __DRIVERS_NET_NSOS_FCNTL_H__
+-#define __DRIVERS_NET_NSOS_FCNTL_H__
+-
+-#define NSOS_MID_O_RDONLY	00
+-#define NSOS_MID_O_WRONLY	01
+-#define NSOS_MID_O_RDWR		02
+-
+-#define NSOS_MID_O_APPEND	0x0400
+-#define NSOS_MID_O_EXCL		0x0800
+-#define NSOS_MID_O_NONBLOCK	0x4000
+-
+-int fl_to_nsos_mid(int flags);
+-int fl_to_nsos_mid_strict(int flags);
+-int fl_from_nsos_mid(int flags);
+-
+-#endif /* __DRIVERS_NET_NSOS_FCNTL_H__ */
+diff --git a/drivers/net/nsos_sockets.c b/drivers/net/nsos_sockets.c
+index fdf5a7e8bbf..a3b5d4aa8d6 100644
+--- a/drivers/net/nsos_sockets.c
++++ b/drivers/net/nsos_sockets.c
+@@ -31,7 +31,7 @@ LOG_MODULE_REGISTER(nsos_sockets);
+ #include "sockets_internal.h"
+ #include "nsos.h"
+ #include "nsi_errno.h"
+-#include "nsos_fcntl.h"
++#include "nsi_fcntl.h"
+ #include "nsos_netdb.h"
+ #include "nsos_socket.h"
+ 
+@@ -388,14 +388,14 @@ static int nsos_ioctl(void *obj, unsigned int request, va_list args)
+ 
+ 		flags = nsos_adapt_fcntl_getfl(sock->poll.mid.fd);
+ 
+-		return fl_from_nsos_mid(flags);
++		return nsi_fcntl_from_mid(flags);
+ 	}
+ 
+ 	case F_SETFL: {
+ 		int flags = va_arg(args, int);
+ 		int ret;
+ 
+-		ret = fl_to_nsos_mid_strict(flags);
++		ret = nsi_fcntl_to_mid_strict(flags);
+ 		if (ret < 0) {
+ 			return -nsi_errno_from_mid(-ret);
+ 		}
+@@ -616,7 +616,7 @@ static int nsos_poll_if_blocking(struct nsos_socket *sock, int events,
+ 		non_blocking = true;
+ 	} else {
+ 		sock_flags = nsos_adapt_fcntl_getfl(sock->poll.mid.fd);
+-		non_blocking = sock_flags & NSOS_MID_O_NONBLOCK;
++		non_blocking = sock_flags & NSI_FCNTL_MID_O_NONBLOCK;
+ 	}
+ 
+ 	if (!non_blocking) {
+@@ -658,7 +658,7 @@ static int nsos_connect_blocking(struct nsos_socket *sock,
+ 	int clear_nonblock_ret;
+ 	int ret;
+ 
+-	ret = nsos_adapt_fcntl_setfl(sock->poll.mid.fd, fcntl_flags | NSOS_MID_O_NONBLOCK);
++	ret = nsos_adapt_fcntl_setfl(sock->poll.mid.fd, fcntl_flags | NSI_FCNTL_MID_O_NONBLOCK);
+ 	if (ret < 0) {
+ 		return ret;
+ 	}
+@@ -707,7 +707,7 @@ static int nsos_connect(void *obj, const struct sockaddr *addr, socklen_t addrle
+ 
+ 	flags = nsos_adapt_fcntl_getfl(sock->poll.mid.fd);
+ 
+-	if (flags & NSOS_MID_O_NONBLOCK) {
++	if (flags & NSI_FCNTL_MID_O_NONBLOCK) {
+ 		ret = nsos_adapt_connect(sock->poll.mid.fd, addr_mid, addrlen_mid);
+ 	} else {
+ 		ret = nsos_connect_blocking(sock, addr_mid, addrlen_mid, flags);
+diff --git a/scripts/native_simulator/common/src/include/nsi_fcntl.h b/scripts/native_simulator/common/src/include/nsi_fcntl.h
+new file mode 100644
+index 00000000000..891ce8a6632
+--- /dev/null
++++ b/scripts/native_simulator/common/src/include/nsi_fcntl.h
+@@ -0,0 +1,22 @@
++/**
++ * Copyright (c) 2023-2025 Marcin Niestroj
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#ifndef NSI_COMMON_SRC_NSI_FCNTL_H
++#define NSI_COMMON_SRC_NSI_FCNTL_H
++
++#define NSI_FCNTL_MID_O_RDONLY		00
++#define NSI_FCNTL_MID_O_WRONLY		01
++#define NSI_FCNTL_MID_O_RDWR		02
++
++#define NSI_FCNTL_MID_O_APPEND		0x0400
++#define NSI_FCNTL_MID_O_EXCL		0x0800
++#define NSI_FCNTL_MID_O_NONBLOCK	0x4000
++
++int nsi_fcntl_to_mid(int flags);
++int nsi_fcntl_to_mid_strict(int flags);
++int nsi_fcntl_from_mid(int flags);
++
++#endif /* NSI_COMMON_SRC_NSI_FCNTL_H */
+diff --git a/scripts/native_simulator/common/src/nsi_fcntl.c b/scripts/native_simulator/common/src/nsi_fcntl.c
+new file mode 100644
+index 00000000000..d1fb298a532
+--- /dev/null
++++ b/scripts/native_simulator/common/src/nsi_fcntl.c
+@@ -0,0 +1,91 @@
++/**
++ * Copyright (c) 2023-2024 Marcin Niestroj
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++/**
++ * @file
++ *
++ * fcntl.h related code common to Zephyr (top: sockets.c) and Linux
++ * (bottom: adapt.c).
++ *
++ * It is needed by both sides to share the same macro definitions/values
++ * (prefixed with NSOS_MID_), which is not possible to achieve with two separate
++ * standard libc libraries, since they use different values for the same
++ * symbols.
++ */
++
++/*
++ * When building for Zephyr, use Zephyr specific fcntl definitions.
++ */
++#ifdef __ZEPHYR__
++#include <zephyr/posix/fcntl.h>
++#else
++#include <fcntl.h>
++#endif
++
++#include "nsi_errno.h"
++#include "nsi_fcntl.h"
++
++#include <stdbool.h>
++
++static int nsi_fcntl_to_mid_(int flags, bool strict)
++{
++	int flags_mid = 0;
++
++#define TO_MID(_flag)				\
++	if (flags & (_flag)) {				\
++		flags &= ~(_flag);			\
++		flags_mid |= NSI_FCNTL_MID_ ## _flag;	\
++	}
++
++	TO_MID(O_RDONLY);
++	TO_MID(O_WRONLY);
++	TO_MID(O_RDWR);
++
++	TO_MID(O_APPEND);
++	TO_MID(O_EXCL);
++	TO_MID(O_NONBLOCK);
++
++#undef TO_MID
++
++	if (strict && flags != 0) {
++		return -NSI_ERRNO_MID_EINVAL;
++	}
++
++	return flags_mid;
++}
++
++int nsi_fcntl_to_mid(int flags)
++{
++	return nsi_fcntl_to_mid_(flags, false);
++}
++
++int nsi_fcntl_to_mid_strict(int flags)
++{
++	return nsi_fcntl_to_mid_(flags, true);
++}
++
++int nsi_fcntl_from_mid(int flags_mid)
++{
++	int flags = 0;
++
++#define FROM_MID(_flag)				\
++	if (flags_mid & NSI_FCNTL_MID_ ## _flag) {		\
++		flags_mid &= ~NSI_FCNTL_MID_ ## _flag;	\
++		flags |= _flag;				\
++	}
++
++	FROM_MID(O_RDONLY);
++	FROM_MID(O_WRONLY);
++	FROM_MID(O_RDWR);
++
++	FROM_MID(O_APPEND);
++	FROM_MID(O_EXCL);
++	FROM_MID(O_NONBLOCK);
++
++#undef FROM_MID
++
++	return flags;
++}
+-- 
+2.51.0
+
