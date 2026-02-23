@@ -8,7 +8,7 @@ based on the HTTP client transport.
 The example should be built with west:
 
 ```bash
-west build -b <board>
+west build -p -b <board> --sysbuild
 ```
 
 The `<board>` should be the Zephyr board ID of your board. The example is
