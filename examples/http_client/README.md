@@ -101,3 +101,20 @@ private key files, respectively.
 
 After both files have been transferred, restart the device to initialize Pouch
 with the credentials.
+
+## Using Native Simulator
+
+This example can be run using the Zephyr Native Simulator. Create a
+directory called `creds` in the root of the workspace (parent directory
+of `pouch`) and place `crt.der` and `key.der` device credentials there.
+
+Build and run the example for `native_sim`:
+
+```bash
+west build -p -b native_sim . -- \
+          -DCONFIG_FILE_SYSTEM_NSIM_MOUNT=y \
+          -DCONFIG_NATIVE_EXTRA_CMDLINE_ARGS="\"-volume=$(west topdir)/creds:/creds\"" \
+          -DCONFIG_EXAMPLE_CREDENTIALS_DIR='"/creds"'
+
+west build -t run
+```
