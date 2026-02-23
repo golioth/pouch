@@ -1,0 +1,25 @@
+patches:
+  - path: 0003-nsi-move-nsos_fcntl-to-more-generic-nsi_fcntl.patch
+    sha256sum: 0830899d226a3b7cd1f7b002b8cd746857a41f2a19ee899bfc5cf15773f296c5
+    module: zephyr
+    author: Marcin Niestroj
+    email: m.niestroj@emb.dev
+    date: 2025-08-05
+    apply-command: >-
+      bash -c 'if [ $(west config manifest.file) = "west.yml" ]; then git apply $@; fi' --
+  - path: 0004-nsi-fcntl-add-O_CREAT-and-O_TRUNC.patch
+    sha256sum: dd53fd69065fa432a38a53176778a529ec7cf89b5823c42fd7fa1fcedfb1fd23
+    module: zephyr
+    author: Marcin Niestroj
+    email: m.niestroj@emb.dev
+    date: 2025-08-14
+    apply-command: >-
+      bash -c 'if [ $(west config manifest.file) = "west.yml" ]; then git apply $@; fi' --
+  - path: 0005-subsys-fs-nsim_mount-new-FS-for-mounting-host-filesy.patch
+    sha256sum: 7380f056216807ca15d220233e38b3b407c0b1fb825e5b4794ae6c926b13e4f0
+    module: zephyr
+    author: Marcin Niestroj
+    email: m.niestroj@emb.dev
+    date: 2025-08-14
+    apply-command: >-
+      bash -c 'if [ $(west config manifest.file) = "west.yml" ]; then git apply $@; fi' --
