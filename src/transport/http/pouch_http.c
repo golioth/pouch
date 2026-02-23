@@ -419,6 +419,7 @@ static int upload_pouch_cert(struct sync_context *sync)
     {
         return 0;
     }
+    LOG_WRN("Uploading device cert");
 
     struct pouch_cert device_cert;
     int err =  pouch_device_certificate_get(&device_cert);

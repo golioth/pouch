@@ -13,6 +13,8 @@ target_sources(app PRIVATE
   src/conn_monitor.c
 )
 
+zephyr_sources_ifdef(CONFIG_GOLIOTH_OTA src/fw_update.c)
+
 if (NOT CONFIG_POUCH_HTTP_TLS_LOAD_CA_FROM_FILESYSTEM)
     generate_inc_file_for_target(app src/isrgrootx1.der
         ${ZEPHYR_BINARY_DIR}/include/generated/pouch-ca-crt.inc)
