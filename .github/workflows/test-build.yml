@@ -1,24 +1,28 @@
-name: Tests
+name: Build Examples
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
+  workflow_call:
   workflow_dispatch:
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
 
 jobs:
   build:
     container: golioth/golioth-zephyr-base:0.17.0-SDK-v0
     strategy:
       matrix:
-        manifest:
-          - west.yml
-          - west-ncs.yml
+        include:
+          - manifest: west.yml
+            example: ble_gatt
+            board: nrf52840dk/nrf52840
+          - manifest: west-ncs.yml
+            example: ble_gatt
+            board: nrf52840dk/nrf52840
+          - manifest: west.yml
+            example: http_client
+            board: frdm_rw612
+          - manifest: west.yml
+            example: http_client
+            board: native_sim
+            no_sysbuild: true
       fail-fast: false
     env:
       ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-0.17.0
@@ -28,10 +32,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: pouch
+
       - name: Init and update west
         run: |
           west init -l pouch --mf ${{ matrix.manifest }}
           west update --narrow -o=--depth=1
+
       - name: Install pip packages
         run: |
           uv pip install \
@@ -52,15 +58,10 @@ jobs:
       - name: Compile
         shell: bash
         run: |
-          west build --sysbuild -p -b nrf52840dk/nrf52840 pouch/examples/ble_gatt
-      - name: Run tests
-        env:
-          ZEPHYR_BASE: ${{ github.workspace }}/zephyr
-          EXTRA_ZEPHYR_MODULES: ${{ github.workspace }}/pouch
-        run: ./zephyr/scripts/twister -v -T pouch/tests
+          if [[ "${{ matrix.no_sysbuild }}" == "true" ]]; then
+            SYSBUILD_FLAG=""
+          else
+            SYSBUILD_FLAG="--sysbuild"
+          fi
 
-      - name: Publish Test Report
-        uses: mikepenz/action-junit-report@v5
-        if: always()
-        with:
-          report_paths: 'twister-out/twister_suite_report.xml'
+          west build ${SYSBUILD_FLAG} -p -b ${{ matrix.board }} pouch/examples/${{ matrix.example }}

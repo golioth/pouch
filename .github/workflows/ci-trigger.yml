@@ -1,0 +1,26 @@
+name: "Trigger: PR and Merge"
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  trigger-lint:
+    name: Run Lint
+    uses: ./.github/workflows/lint.yml
+    secrets: inherit
+  trigger-build:
+    name: Run Build
+    uses: ./.github/workflows/test-build.yml
+    secrets: inherit
+  trigger-twister:
+    name: Run Twister
+    uses: ./.github/workflows/test-twister.yml
+    secrets: inherit
