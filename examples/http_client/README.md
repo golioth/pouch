@@ -102,6 +102,27 @@ private key files, respectively.
 After both files have been transferred, restart the device to initialize Pouch
 with the credentials.
 
+## Using NXP frdm_rw612 with WiFi
+
+Additional conf/overlay files are provided to use the NXP frdm_rw612
+board with WiFi rather than Ethernet.
+
+```bash
+west build -p -b frdm_rw612 --sysbuild examples/http_client/ -- \
+    -DEXTRA_CONF_FILE=boards/frdm_rw612_wifi.conf               \
+    -DEXTRA_DTC_OVERLAY_FILE=boards/frdm_rw612_wifi.overlay
+west flash
+```
+
+WiFi Credentails may be provisioned using shell commands. Note that
+althrough this stores the credentials, the auto_connect command will
+need to be issued after every boot in order for WiFi to connect.
+
+```
+uart:~$ wifi cred add -s <ssid> -p <password> -k 1
+uart:~$ wifi cred auto_connect
+```
+
 ## Using Native Simulator
 
 This example can be run using the Zephyr Native Simulator. Create a
