@@ -163,6 +163,8 @@ config POUCH_TRANSPORT_BLE_GATT
 config POUCH_TRANSPORT_HTTP_CLIENT
   bool "HTTP"
   imply HTTP_CLIENT
+  select EVENTS
+  select NET_CONNECTION_MANAGER
   help
     HTTP transport for Pouch
 

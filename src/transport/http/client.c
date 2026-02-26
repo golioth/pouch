@@ -12,7 +12,9 @@
 #include <zephyr/net/socket.h>
 #include <zephyr/net/http/client.h>
 #include <zephyr/net/tls_credentials.h>
+#include <zephyr/net/conn_mgr_monitor.h>
 #include <zephyr/sys/atomic.h>
+#include <zephyr/sys/clock.h>
 
 #include <pouch/transport/http/client.h>
 #include <pouch/transport/certificate.h>
@@ -38,6 +40,9 @@ static atomic_t pouch_cert_flags;
 #define SERVER_CERT_DOWNLOADED_BIT BIT(0)
 #define POUCH_CERT_UPLOADED_BIT BIT(1)
 
+K_EVENT_DEFINE(pouch_http_client_events);
+#define HTTP_CLIENT_CONN_READY BIT(0)
+
 static int _sock;
 
 #define IN_USE_FLAG BIT(0)
@@ -59,6 +64,30 @@ static struct get_server_cert_context
     uint8_t cert_buf[CONFIG_POUCH_HTTP_SERVER_CRT_MAX_SIZE];
     size_t pos;
 } _server_cert_ctx;
+
+static void l4_event_handler(uint64_t event,
+                             struct net_if *iface,
+                             void *info,
+                             size_t info_length,
+                             void *user_data)
+{
+    switch (event)
+    {
+        case NET_EVENT_L4_CONNECTED:
+            k_event_post(&pouch_http_client_events, HTTP_CLIENT_CONN_READY);
+            break;
+        case NET_EVENT_L4_DISCONNECTED:
+            k_event_clear(&pouch_http_client_events, HTTP_CLIENT_CONN_READY);
+            break;
+        default:
+            break;
+    }
+}
+
+NET_MGMT_REGISTER_EVENT_HANDLER(l4_cb,
+                                (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED),
+                                l4_event_handler,
+                                NULL);
 
 static int pouch_server_cert_response_callback(struct http_response *rsp,
                                                enum http_final_call final_data,
@@ -292,13 +321,19 @@ static int pouch_http_set_sockopt_tls(int sock, sec_tag_t sec_tag)
     return 0;
 }
 
-int pouch_http_client_init(sec_tag_t sec_tag)
+int pouch_http_client_init(sec_tag_t sec_tag, k_timeout_t wait_for_conn)
 {
     static struct zsock_addrinfo hints;
     struct zsock_addrinfo *addrs;
     int ret;
     int err = 0;
     _sock = 0;
+
+    if (0 == k_event_wait(&pouch_http_client_events, HTTP_CLIENT_CONN_READY, false, wait_for_conn))
+    {
+        LOG_ERR("Timeout awaiting connection");
+        return -ETIMEDOUT;
+    }
 
     atomic_clear_bit(&_sync_ctx.flags, IN_USE_FLAG);
 
@@ -476,9 +511,15 @@ static int send_pouch_uplink(struct sync_context *sync)
     return 0;
 }
 
-int pouch_http_client_sync(void)
+int pouch_http_client_sync(k_timeout_t wait_for_conn)
 {
     struct sync_context *sync = &_sync_ctx;
+
+    if (0 == k_event_wait(&pouch_http_client_events, HTTP_CLIENT_CONN_READY, false, wait_for_conn))
+    {
+        LOG_INF("Sync skipped, no connection available");
+        return -ETIMEDOUT;
+    }
 
     if (true == atomic_test_and_set_bit(&sync->flags, IN_USE_FLAG))
     {
