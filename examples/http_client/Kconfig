@@ -1,0 +1,47 @@
+# Copyright (c) 2026 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+source "$ZEPHYR_BASE/Kconfig"
+
+config EXAMPLE_HTTP_CLIENT_LOG_LEVEL
+    int "HTTP client example log level"
+    default 4
+
+config EXAMPLE_HTTP_CLIENT_SYNC_PERIOD_S
+    int "HTTP client example sync period (s)"
+    default 30
+
+config EXAMPLE_CREDENTIALS_DIR
+    string "Directory containing credentials"
+    default "/lfs1/credentials"
+    help
+      Directory on mounted file system containing credentials.
+
+config EXAMPLE_HTTP_CLIENT_TLS_CREDENTIALS
+    int "Sec Tag to use when storing TLS credentials"
+    default 515765868
+
+config EXAMPLE_HTTP_CLIENT_TLS_LOAD_CA_FROM_FILESYSTEM
+    bool "Load the cerver CA cert from LFS"
+    default n
+    help
+        Optionally load the CA certificate used for TLS/mTLS from EXAMPLE_CREDENTIALS_DIR/ca.der. If
+        this symbol is not selected, isrgrootx1 will be used.
+
+config EXAMPLE_HTTP_CLIENT_GW_DEVICE_CRT_FILENAME
+    string "Gateway device crt filename in filesystem"
+    default "crt.der"
+    help
+        The filename used to store the mTLS device certificate in the filesystem. By default this is
+        the same as the filename used for the Pouch device crt, but may be changed if different
+        credentials are desired for mTLS versus Pouch.
+
+config EXAMPLE_HTTP_CLIENT_GW_DEVICE_KEY_FILENAME
+    string "Gateway device key filename in filesystem"
+    default "key.der"
+    help
+        The filename used to store the mTLS device private key in the filesystem. By default this is
+        the same as the filename used for the Pouch device key, but may be changed if different
+        credentials are desired for mTLS versus Pouch.
+

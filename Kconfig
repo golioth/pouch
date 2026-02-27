@@ -148,6 +148,7 @@ endmenu
 
 choice
   prompt "Pouch transport"
+  optional
   help
     Select the transport protocol that will carry Pouch
 
@@ -159,6 +160,14 @@ config POUCH_TRANSPORT_BLE_GATT
   help
     BLE GATT transport for Pouch
 
+config POUCH_TRANSPORT_HTTP_CLIENT
+  bool "HTTP"
+  imply HTTP_CLIENT
+  select EVENTS
+  select NET_CONNECTION_MANAGER
+  help
+    HTTP transport for Pouch
+
 endchoice
 
 if POUCH_TRANSPORT_BLE_GATT
@@ -168,6 +177,14 @@ rsource "src/transport/gatt/Kconfig"
 endmenu
 
 endif
+
+if POUCH_TRANSPORT_HTTP_CLIENT
+
+menu "HTTP Transport Options"
+rsource "src/transport/http/Kconfig"
+endmenu
+
+endif # POUCH_TRANSPORT_HTTP_CLIENT
 
 module = POUCH
 module-str = Pouch
