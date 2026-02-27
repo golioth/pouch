@@ -1,4 +1,29 @@
 patches:
+  - path: ncs/zephyr/0001-modem-uart_isr-support-mdm-dtr-gpios.patch
+    sha256sum: 53b5acb22a3471b04bb38d297ef4bd5e3a2ed0464ab74b588f30408599307785
+    module: zephyr
+    author: Marcin Niestroj
+    email: m.niestroj@emb.dev
+    date: 2026-02-11
+    apply-command: >-
+      bash -c 'if [ $(west config manifest.file) = "west-ncs.yml" ]; then git am $@; fi' --
+  - path: ncs/zephyr/0002-dts-bindings-modem-add-common-autostarts-property.patch
+    sha256sum: abbdd4193332e4160dd5c0a29eaa1d0e5fde39b2de510fa215694fcdbdc5785a
+    module: zephyr
+    author: Marcin Niestroj
+    email: m.niestroj@emb.dev
+    date: 2026-02-12
+    apply-command: >-
+      bash -c 'if [ $(west config manifest.file) = "west-ncs.yml" ]; then git am $@; fi' --
+  - path: ncs/zephyr/0003-drivers-modem_cellular-add-Ready-signal-handling.patch
+    sha256sum: a2e3946a3794f3f19c94cd401755458c48c62a306cd39c924658daa5ca769dbc
+    module: zephyr
+    author: Marcin Niestroj
+    email: m.niestroj@emb.dev
+    date: 2026-02-12
+    apply-command: >-
+      bash -c 'if [ $(west config manifest.file) = "west-ncs.yml" ]; then git am $@; fi' --
+
   - path: zephyr/zephyr/0001-drivers-net-nsos-support-nrf_bsim.patch
     sha256sum: 76ee96ad695aba17be8a96d8fe908eec937238fbd9e21be09b8ad9a524b8b90b
     module: zephyr

@@ -1,0 +1,51 @@
+From 00bad68c943c8cea837fd5a862c55dd06289d641 Mon Sep 17 00:00:00 2001
+From: Marcin Niestroj <m.niestroj@emb.dev>
+Date: Thu, 12 Feb 2026 09:44:44 +0100
+Subject: [PATCH] dts: bindings: modem: add common 'autostarts' property
+
+This property can be used by various modems. Used it successfully with
+nRF91-SLM when waiting for "Ready" signal after automatic power-on.
+
+Signed-off-by: Marcin Niestroj <m.niestroj@emb.dev>
+---
+ dts/bindings/modem/quectel,bg95.yaml                 | 8 --------
+ dts/bindings/modem/zephyr,cellular-modem-device.yaml | 7 +++++++
+ 2 files changed, 7 insertions(+), 8 deletions(-)
+
+diff --git a/dts/bindings/modem/quectel,bg95.yaml b/dts/bindings/modem/quectel,bg95.yaml
+index 940cd41ea27..8011dd05fbf 100644
+--- a/dts/bindings/modem/quectel,bg95.yaml
++++ b/dts/bindings/modem/quectel,bg95.yaml
+@@ -10,11 +10,3 @@ include: zephyr,cellular-modem-device.yaml
+ properties:
+   mdm-power-gpios:
+     type: phandle-array
+-
+-  autostarts:
+-    type: boolean
+-    description: |
+-      Set for modem variants or carrier boards that start the module
+-      automatically when supply voltage is applied—that is, the modem
+-      asserts PWRKEY internally and does not require an external PWRKEY
+-      pulse.
+diff --git a/dts/bindings/modem/zephyr,cellular-modem-device.yaml b/dts/bindings/modem/zephyr,cellular-modem-device.yaml
+index d2ab0056841..205c0d3e0fb 100644
+--- a/dts/bindings/modem/zephyr,cellular-modem-device.yaml
++++ b/dts/bindings/modem/zephyr,cellular-modem-device.yaml
+@@ -44,6 +44,13 @@ properties:
+       When runtime power management is enabled, this closes the UART.
+       This requires modem to support waking up the UART using RING signal.
+ 
++  autostarts:
++    type: boolean
++    description: |
++      Set when the modem starts automatically at power-on without requiring
++      an external power or reset pulse. When set, the host waits for a ready
++      indication from the modem before sending AT commands.
++
+   cmux-idle-timeout-ms:
+     type: int
+     description: Time in milliseconds after which CMUX will enter power save mode.
+-- 
+2.53.0
+
