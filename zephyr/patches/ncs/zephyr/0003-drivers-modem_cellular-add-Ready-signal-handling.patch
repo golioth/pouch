@@ -1,0 +1,29 @@
+From f39324378c5ecfd4c37153ad0a5793dcf38a115b Mon Sep 17 00:00:00 2001
+From: Marcin Niestroj <m.niestroj@emb.dev>
+Date: Thu, 12 Feb 2026 09:46:16 +0100
+Subject: [PATCH] drivers: modem_cellular: add "Ready" signal handling
+
+This is the same as "APP RDY", but for other modems, such as nRF-SLM.
+
+Signed-off-by: Marcin Niestroj <m.niestroj@emb.dev>
+---
+ drivers/modem/modem_cellular.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/modem/modem_cellular.c b/drivers/modem/modem_cellular.c
+index 412ced1dfa8..be075c11070 100644
+--- a/drivers/modem/modem_cellular.c
++++ b/drivers/modem/modem_cellular.c
+@@ -622,7 +622,8 @@ MODEM_CHAT_MATCHES_DEFINE(unsol_matches,
+ 			  MODEM_CHAT_MATCH("+CREG: ", ",", modem_cellular_chat_on_cxreg),
+ 			  MODEM_CHAT_MATCH("+CEREG: ", ",", modem_cellular_chat_on_cxreg),
+ 			  MODEM_CHAT_MATCH("+CGREG: ", ",", modem_cellular_chat_on_cxreg),
+-			  MODEM_CHAT_MATCH("APP RDY", "", modem_cellular_chat_on_modem_ready));
++			  MODEM_CHAT_MATCH("APP RDY", "", modem_cellular_chat_on_modem_ready),
++			  MODEM_CHAT_MATCH("Ready", "", modem_cellular_chat_on_modem_ready));
+ 
+ MODEM_CHAT_MATCHES_DEFINE(abort_matches, MODEM_CHAT_MATCH("ERROR", "", NULL));
+ 
+-- 
+2.53.0
+
