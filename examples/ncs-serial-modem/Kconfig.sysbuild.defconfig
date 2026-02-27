@@ -1,0 +1,20 @@
+# Copyright (c) 2026 Golioth, Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+if BOARD_THINGY91X_NRF9151 || BOARD_THINGY91X_NRF9151_NS
+
+choice THINGY91X_LAYOUT
+	prompt "Pre-defined Thingy:91 X partition layout"
+	default THINGY91X_NO_PREDEFINED_LAYOUT
+
+config THINGY91X_NO_PREDEFINED_LAYOUT
+	bool "None [EXPERIMENTAL]"
+endchoice
+
+config PM_EXTERNAL_FLASH_MCUBOOT_SECONDARY
+	default n
+
+config PM_OVERRIDE_EXTERNAL_DRIVER_CHECK
+	default n
+
+endif # BOARD_THINGY91X_NRF9151 || BOARD_THINGY91X_NRF9151_NS
