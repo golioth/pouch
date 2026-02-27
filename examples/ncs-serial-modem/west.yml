@@ -1,0 +1,11 @@
+manifest:
+  projects:
+    - name: ncs-serial-modem
+      path: ncs-serial-modem
+      revision: v1.0.0
+      url: https://github.com/nrfconnect/ncs-serial-modem.git
+      import: true
+
+  self:
+    path: pouch
+    west-commands: scripts/west-commands.yml
