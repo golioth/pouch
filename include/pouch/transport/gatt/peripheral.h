@@ -9,6 +9,4 @@
 
 #include <pouch/transport/gatt/common/uuids.h>
 
-#define POUCH_GATT_ADV_DATA BT_DATA_BYTES(BT_DATA_SVC_DATA128, POUCH_GATT_UUID_SVC_VAL, 0xA5)
-
 int pouch_gatt_peripheral_init(void);
