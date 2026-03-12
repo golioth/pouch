@@ -14,8 +14,10 @@ manifest:
           - zephyr
           - cmsis_6
           - hal_nordic
+          - hal_nxp
           - mbedtls
           - mcuboot
+          - picolibc
           - segger
           - tfm-mcuboot
           - trusted-firmware-m
