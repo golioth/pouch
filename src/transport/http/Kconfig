@@ -16,9 +16,12 @@ config POUCH_HTTP_GW_PORT
 
 config POUCH_HTTP_TIMEOUT_S
     int "Pouch HTTP timeout (seconds)"
-    default 10
+    default 120
     help
-        Timeout for HTTP requests
+        Timeout for HTTP requests. This value must be long enough for
+        the entire uplink and downlink process to complete. When using
+        the OTA service, ensure this value is greater than the total
+        expected download time for the OTA component.
 
 config POUCH_HTTP_RCV_BUF_SIZE
     int "HTTP receive buffer size"
