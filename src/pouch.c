@@ -45,11 +45,13 @@ static int pouch_module_init(void)
 {
     k_work_queue_init(&pouch_work_q);
 
+    struct k_work_queue_config workq_config = {.name = "pouch_work"};
+
     k_work_queue_start(&pouch_work_q,
                        pouch_stack,
                        K_THREAD_STACK_SIZEOF(pouch_stack),
                        CONFIG_POUCH_THREAD_PRIORITY,
-                       NULL);
+                       &workq_config);
 
     k_work_init(&event_work, dispatch_events);
 
