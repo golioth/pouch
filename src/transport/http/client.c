@@ -43,7 +43,8 @@ static atomic_t pouch_cert_flags;
 K_EVENT_DEFINE(pouch_http_client_events);
 #define HTTP_CLIENT_CONN_READY BIT(0)
 
-static int _sock;
+static int _sock = -1;
+static sec_tag_t _sec_tag;
 
 #define IN_USE_FLAG BIT(0)
 
@@ -321,7 +322,7 @@ static int pouch_http_set_sockopt_tls(int sock, sec_tag_t sec_tag)
     return 0;
 }
 
-int pouch_http_client_init(sec_tag_t sec_tag, k_timeout_t wait_for_conn)
+static int setup_socket(sec_tag_t sec_tag, k_timeout_t wait_for_conn)
 {
     static struct zsock_addrinfo hints;
     struct zsock_addrinfo *addrs;
@@ -378,6 +379,7 @@ finish:
         if (_sock >= 0)
         {
             zsock_close(_sock);
+            _sock = -1;
         }
     }
     if (addrs)
@@ -386,6 +388,22 @@ finish:
     }
 
     return err;
+}
+
+static void close_socket(void)
+{
+    pouch_downlink_finish();
+    zsock_close(_sock);
+    _sock = -1;
+    atomic_clear_bit(&pouch_cert_flags, POUCH_CERT_UPLOADED_BIT);
+    atomic_clear_bit(&pouch_cert_flags, SERVER_CERT_DOWNLOADED_BIT);
+}
+
+int pouch_http_client_init(sec_tag_t sec_tag, k_timeout_t wait_for_conn)
+{
+    close_socket();
+    _sec_tag = sec_tag;
+    return 0;
 }
 
 static int fetch_server_cert(struct sync_context *sync)
@@ -413,6 +431,7 @@ static int fetch_server_cert(struct sync_context *sync)
     if (ret < 0)
     {
         LOG_ERR("Failed to send HTTP request for server cert");
+        close_socket();
         return ret;
     }
 
@@ -460,6 +479,7 @@ static int upload_pouch_cert(struct sync_context *sync)
     if (ret < 0)
     {
         LOG_ERR("Failed to send HTTP request: %d", errno);
+        close_socket();
         return ret;
     }
 
@@ -504,7 +524,8 @@ static int send_pouch_uplink(struct sync_context *sync)
     int err = http_client_req(_sock, &req, HTTP_TIMEOUT_MS, sync);
     if (err < 0)
     {
-        LOG_ERR("Failed to send HTTP request: %d", errno);
+        LOG_ERR("Failed to send HTTP request: %d", err);
+        close_socket();
         return err;
     }
 
@@ -514,11 +535,30 @@ static int send_pouch_uplink(struct sync_context *sync)
 int pouch_http_client_sync(k_timeout_t wait_for_conn)
 {
     struct sync_context *sync = &_sync_ctx;
+    int err;
 
     if (0 == k_event_wait(&pouch_http_client_events, HTTP_CLIENT_CONN_READY, false, wait_for_conn))
     {
         LOG_INF("Sync skipped, no connection available");
         return -ETIMEDOUT;
+    }
+
+    if (0 > _sock)
+    {
+        if (0 >= _sec_tag)
+        {
+            /* Sec Tag needs to be set by pouch_http_client_init() */
+            LOG_ERR("sec tag not set; run transport init");
+            return ENOENT;
+        }
+
+        err = setup_socket(_sec_tag, wait_for_conn);
+        if (0 != err)
+        {
+            LOG_ERR("Failed to setup socket: %d", err);
+            close_socket();
+            return err;
+        }
     }
 
     if (true == atomic_test_and_set_bit(&sync->flags, IN_USE_FLAG))
@@ -527,7 +567,7 @@ int pouch_http_client_sync(k_timeout_t wait_for_conn)
         return -EACCES;
     }
 
-    int err = fetch_server_cert(sync);
+    err = fetch_server_cert(sync);
     if (0 != err)
     {
         LOG_ERR("Failed to download server certificate: %d", err);
