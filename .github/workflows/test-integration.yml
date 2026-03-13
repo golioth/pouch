@@ -1,25 +1,22 @@
-name: Tests
+name: Pouch Integration Tests
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
   workflow_dispatch:
+    inputs:
+      manifest_yml:
+        required: true
+        type: string
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  workflow_call:
+    inputs:
+      manifest_yml:
+        required: true
+        type: string
 
 jobs:
-  build:
+  twister:
+    name: twister-${{ inputs.manifest_yml }}
     container: golioth/golioth-zephyr-base:0.17.0-SDK-v0
-    strategy:
-      matrix:
-        manifest:
-          - west.yml
-          - west-ncs.yml
-      fail-fast: false
     env:
       ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-0.17.0
     runs-on: ubuntu-24.04
@@ -30,14 +27,14 @@ jobs:
           path: pouch
       - name: Init and update west
         run: |
-          west init -l pouch --mf ${{ matrix.manifest }}
+          west init -l pouch --mf ${{ inputs.manifest_yml }}.yml
           west update --narrow -o=--depth=1
       - name: Install pip packages
         run: |
           uv pip install \
             -r zephyr/scripts/requirements-base.txt        \
             -r zephyr/scripts/requirements-build-test.txt  \
-            -r zephyr/scripts/requirements-run-test.txt         \
+            -r zephyr/scripts/requirements-run-test.txt    \
             -r pouch/requirements.txt
 
           uv pip install          \
@@ -49,17 +46,13 @@ jobs:
             jinja2                \
             click
 
-      - name: Compile
-        shell: bash
-        run: |
-          west build --sysbuild -p -b nrf52840dk/nrf52840 pouch/examples/ble_gatt
       - name: Run tests
         env:
           ZEPHYR_BASE: ${{ github.workspace }}/zephyr
           EXTRA_ZEPHYR_MODULES: ${{ github.workspace }}/pouch
         run: ./zephyr/scripts/twister -v -T pouch/tests
 
-      - name: Publish Test Report
+      - name: Publish Test Report (${{ inputs.manifest_yml }})
         uses: mikepenz/action-junit-report@v5
         if: always()
         with:
