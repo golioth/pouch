@@ -219,7 +219,7 @@ int pouch_downlink_push(const void *buf, size_t buf_len)
                     return -ENOMEM;
                 }
 
-                if (pouch_buf && pouch_bufview_available(&v) > block_size)
+                if (pouch_bufview_available(&v) > block_size)
                 {
                     const uint8_t *remaining = pouch_bufview_read(&v, 0);
                     remaining += block_size;
