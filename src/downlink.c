@@ -91,10 +91,10 @@ static void decrypt_blocks(struct k_work *work)
     }
 }
 
-static void block_downlink_push(struct pouch_buf *pouch_buf)
+static int block_downlink_push(struct pouch_buf *pouch_buf)
 {
     buf_queue_submit(&decrypt.queue, pouch_buf);
-    k_work_submit(&decrypt.work);
+    return k_work_submit(&decrypt.work);
 }
 
 void pouch_downlink_start(void)
@@ -143,7 +143,7 @@ static int pouch_downlink_parse_header(struct pouch_bufview *v, size_t *header_l
     return 0;
 }
 
-void pouch_downlink_push(const void *buf, size_t buf_len)
+int pouch_downlink_push(const void *buf, size_t buf_len)
 {
     const uint8_t *buf_p = buf;
 
@@ -154,13 +154,13 @@ void pouch_downlink_push(const void *buf, size_t buf_len)
         if (!pouch_buf)
         {
             LOG_WRN("No pouch_buf allocated");
-            return;
+            return -ENOMEM;
         }
 
         if (buf_size_get(pouch_buf) >= MAX_CIPHERTEXT_BLOCK_SIZE)
         {
             LOG_ERR("No more space for pouch header");
-            return;
+            return -ENOMEM;
         }
 
         size_t buf_written = MIN(buf_len, MAX_CIPHERTEXT_BLOCK_SIZE - buf_size_get(pouch_buf));
@@ -178,7 +178,10 @@ void pouch_downlink_push(const void *buf, size_t buf_len)
             int err = pouch_downlink_parse_header(&v, &header_len);
             if (err)
             {
-                return;
+                /* Match previous behavior but needs more differentiation. Future work tracked here:
+                 * https://github.com/golioth/firmware-issue-tracker/issues/924
+                 */
+                return 0;
             }
 
             pouch_header = true;
@@ -198,7 +201,7 @@ void pouch_downlink_push(const void *buf, size_t buf_len)
                 LOG_ERR("Block size %u is bigger than supported %u",
                         (unsigned int) block_size,
                         (unsigned int) (MAX_BLOCK_SIZE_FIELD_VALUE));
-                return;
+                return -ENOMEM;
             }
 
             if (pouch_bufview_available(&v) >= block_size)
@@ -213,6 +216,7 @@ void pouch_downlink_push(const void *buf, size_t buf_len)
                 if (!pouch_buf)
                 {
                     LOG_ERR("Failed to allocate pouch buf");
+                    return -ENOMEM;
                 }
 
                 if (pouch_buf && pouch_bufview_available(&v) > block_size)
@@ -227,10 +231,17 @@ void pouch_downlink_push(const void *buf, size_t buf_len)
                     buf_trim_end(pouch_buf_to_send, remaining_len);
                 }
 
-                block_downlink_push(pouch_buf_to_send);
+                int err = block_downlink_push(pouch_buf_to_send);
+                if (0 > err)
+                {
+                    LOG_ERR("Failed to enqueue block: %d", err);
+                    return err;
+                }
             }
         }
     }
+
+    return 0;
 }
 
 void pouch_downlink_finish(void)
