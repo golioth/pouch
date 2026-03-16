@@ -45,3 +45,14 @@ config EXAMPLE_HTTP_CLIENT_GW_DEVICE_KEY_FILENAME
         the same as the filename used for the Pouch device key, but may be changed if different
         credentials are desired for mTLS versus Pouch.
 
+config GOLIOTH_SAMPLE_WIFI_STACK_SIZE
+	int "WiFi manager stack size"
+	default 2048
+
+config GOLIOTH_SAMPLE_WIFI_INIT_PRIORITY
+	int "WiFi manager init priority"
+	default 90
+
+config GOLIOTH_SAMPLE_WIFI_THREAD_PRIORITY
+	int "WiFi manager thread priority"
+	default 7

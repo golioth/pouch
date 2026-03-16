@@ -10,6 +10,7 @@ project(http_transport)
 target_sources(app PRIVATE
   src/main.c
   src/credentials.c
+  src/wifi.c
 )
 
 zephyr_sources_ifdef(CONFIG_GOLIOTH_OTA src/fw_update.c)
