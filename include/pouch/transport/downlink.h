@@ -18,7 +18,7 @@
 void pouch_downlink_start(void);
 
 /** Push downlink data into Pouch */
-void pouch_downlink_push(const void *buf, size_t buf_len);
+int pouch_downlink_push(const void *buf, size_t buf_len);
 
 /** Finish the downlink session */
 void pouch_downlink_finish(void);
