@@ -145,13 +145,17 @@ int saead_downlink_pouch_start(pouch_id_t id)
     return session_pouch_start(&downlink, id);
 }
 
-struct pouch_buf *saead_downlink_block_decrypt(struct pouch_buf *block)
+struct pouch_buf *saead_downlink_block_buf_alloc(void)
 {
-    struct pouch_buf *decrypted = session_decrypt_block(&downlink, block);
-    buf_free(block);
-    if (decrypted == NULL)
+    return session_block_buf_alloc();
+}
+
+int saead_downlink_block_decrypt(const struct pouch_buf *block, struct pouch_buf *decrypted)
+{
+    int err = session_decrypt_block(&downlink, block, decrypted);
+    if (0 != err)
     {
-        return NULL;
+        return err;
     }
 
     // As we were able to decrypt a block, we know it's a legitimate session.
@@ -165,5 +169,5 @@ struct pouch_buf *saead_downlink_block_decrypt(struct pouch_buf *block)
         server.seqnum = downlink.id.value.sequential.seqnum;
     }
 
-    return decrypted;
+    return 0;
 }

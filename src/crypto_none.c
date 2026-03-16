@@ -6,6 +6,7 @@
 
 #include "crypto.h"
 #include <string.h>
+#include "block.h"
 
 static const char *device_id;
 
@@ -57,9 +58,19 @@ int crypto_header_get(struct encryption_info *encryption_info)
     return 0;
 }
 
-struct pouch_buf *crypto_decrypt_block(struct pouch_buf *block)
+struct pouch_buf *crypto_block_buf_alloc(void)
 {
-    return block;
+    return buf_alloc(MAX_PLAINTEXT_BLOCK_SIZE);
+}
+
+int crypto_decrypt_block(const struct pouch_buf *block, struct pouch_buf *decrypted)
+{
+    struct pouch_bufview v;
+    pouch_bufview_init(&v, block);
+
+    size_t payload_len = pouch_bufview_available(&v);
+    pouch_bufview_memcpy(&v, buf_claim(decrypted, payload_len), payload_len);
+    return 0;
 }
 
 struct pouch_buf *crypto_encrypt_block(struct pouch_buf *block)

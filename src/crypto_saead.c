@@ -112,9 +112,14 @@ int crypto_header_get(struct encryption_info *encryption_info)
     return saead_uplink_header_get(&encryption_info->saead_info_m);
 }
 
-struct pouch_buf *crypto_decrypt_block(struct pouch_buf *block)
+struct pouch_buf *crypto_block_buf_alloc(void)
 {
-    return saead_downlink_block_decrypt(block);
+    return saead_downlink_block_buf_alloc();
+}
+
+int crypto_decrypt_block(const struct pouch_buf *block, struct pouch_buf *decrypted)
+{
+    return saead_downlink_block_decrypt(block, decrypted);
 }
 
 struct pouch_buf *crypto_encrypt_block(struct pouch_buf *block)

@@ -69,19 +69,36 @@ static void consume_blocks(struct k_work *work)
 
 static void decrypt_blocks(struct k_work *work)
 {
+    /* Ensure memory can be allocated to store decrypted data */
+    struct pouch_buf *decrypted = crypto_block_buf_alloc();
+    if (NULL == decrypted)
+    {
+        LOG_ERR("Unable to allocate decrypt buffer");
+        return;
+    }
+
+    /* Ensure there is encrypted data to be decrypted */
     struct pouch_buf *encrypted = buf_queue_get(&decrypt.queue);
     if (encrypted == NULL)
     {
         LOG_DBG("No encrypted blocks available");
-        return;
+        goto free_and_return;
     }
 
-    struct pouch_buf *decrypted = crypto_decrypt_block(encrypted);
-    if (!decrypted)
+    /* Decrypt this block */
+    int err = crypto_decrypt_block(encrypted, decrypted);
+
+    /* Encrypted block was consumed; free buffer no matter the outcome */
+    buf_free(encrypted);
+
+    /* Test to see if decrypt buffer contains valid data */
+    if (0 != err)
     {
-        return;
+        LOG_ERR("Failed to decrypt block: %d", err);
+        goto free_and_return;
     }
 
+    /* Enqueue decrypted data */
     buf_queue_submit(&consume.buf_queue, decrypted);
     k_work_submit_to_queue(consume.work_queue, &consume.work);
 
@@ -89,6 +106,13 @@ static void decrypt_blocks(struct k_work *work)
     {
         k_work_submit(work);
     }
+
+    return;
+
+free_and_return:
+    /* Decrypt buffer was not enqueued */
+    buf_free(decrypted);
+    return;
 }
 
 static int block_downlink_push(struct pouch_buf *pouch_buf)

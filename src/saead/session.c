@@ -261,14 +261,15 @@ struct pouch_buf *session_encrypt_block(struct session *session, struct pouch_bu
     return encrypted;
 }
 
-struct pouch_buf *session_decrypt_block(struct session *session, struct pouch_buf *block)
+struct pouch_buf *session_block_buf_alloc(void)
 {
-    struct pouch_buf *decrypted = buf_alloc(MAX_PLAINTEXT_BLOCK_SIZE);
-    if (decrypted == NULL)
-    {
-        return NULL;
-    }
+    return buf_alloc(MAX_PLAINTEXT_BLOCK_SIZE);
+}
 
+int session_decrypt_block(struct session *session,
+                          const struct pouch_buf *block,
+                          struct pouch_buf *decrypted)
+{
     uint8_t nonce[NONCE_LEN];
     nonce_generate(session, POUCH_ROLE_SERVER, nonce);
 
@@ -279,8 +280,7 @@ struct pouch_buf *session_decrypt_block(struct session *session, struct pouch_bu
     if (ciphertext_len <= AUTH_TAG_LEN || ciphertext_len != pouch_bufview_available(&ciphertext))
     {
         LOG_ERR("Invalid ciphertext length: %u", ciphertext_len);
-        buf_free(decrypted);
-        return NULL;
+        return -EINVAL;
     }
 
     size_t payload_len = ciphertext_len - AUTH_TAG_LEN;
@@ -304,15 +304,13 @@ struct pouch_buf *session_decrypt_block(struct session *session, struct pouch_bu
     if (status != PSA_SUCCESS)
     {
         LOG_ERR("Failed decryption: %d", status);
-        buf_free(decrypted);
-        return NULL;
+        return status;
     }
 
     if (plaintext_len != payload_len)
     {
         LOG_ERR("Unexpected length");
-        buf_free(decrypted);
-        return NULL;
+        return -EINVAL;
     }
 
     // prepare for the next block:
@@ -321,5 +319,5 @@ struct pouch_buf *session_decrypt_block(struct session *session, struct pouch_bu
 
     atomic_set_bit(&session->flags, SESSION_VALID);
 
-    return decrypted;
+    return 0;
 }
