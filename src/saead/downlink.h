@@ -15,4 +15,5 @@ int saead_downlink_session_start(const struct session_id *id,
                                  psa_key_id_t private_key);
 void saead_downlink_session_end(void);
 int saead_downlink_pouch_start(pouch_id_t id);
-struct pouch_buf *saead_downlink_block_decrypt(struct pouch_buf *block);
+struct pouch_buf *saead_downlink_block_buf_alloc(void);
+int saead_downlink_block_decrypt(const struct pouch_buf *block, struct pouch_buf *decrypted);

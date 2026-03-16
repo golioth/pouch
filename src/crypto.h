@@ -28,10 +28,23 @@ int crypto_pouch_start(void);
 /** Construct the encryption info part of the pouch header */
 int crypto_header_get(struct encryption_info *encryption_info);
 
+/** Allocate a block buffer
+ *
+ * @return pointer to newly created buffer
+ * @return NULL on failure
+ */
+struct pouch_buf *crypto_block_buf_alloc(void);
+
 /**
  * Decrypt a block of data.
+ *
+ * @param block buffer where encrypted input is located
+ * @param decrypted buffer where decrypted data will be written. Only valid when return code is 0.
+ *
+ * @return 0 if successful
+ * @return negative error code on failure
  */
-struct pouch_buf *crypto_decrypt_block(struct pouch_buf *block);
+int crypto_decrypt_block(const struct pouch_buf *block, struct pouch_buf *decrypted);
 
 /**
  * Encrypt a block of data.
