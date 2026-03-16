@@ -69,7 +69,14 @@ static void consume_blocks(struct k_work *work)
 
 static void decrypt_blocks(struct k_work *work)
 {
-    struct pouch_buf *decrypted = crypto_decrypt_block(buf_queue_get(&decrypt.queue));
+    struct pouch_buf *encrypted = buf_queue_get(&decrypt.queue);
+    if (encrypted == NULL)
+    {
+        LOG_DBG("No encrypted blocks available");
+        return;
+    }
+
+    struct pouch_buf *decrypted = crypto_decrypt_block(encrypted);
     if (!decrypted)
     {
         return;
