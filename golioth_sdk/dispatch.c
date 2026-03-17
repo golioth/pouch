@@ -91,21 +91,4 @@ static void pouch_downlink_data(unsigned int stream_id, const void *data, size_t
     }
 }
 
-int golioth_sync_to_cloud(void)
-{
-    LOG_INF("Beginning Golioth Uplink");
-
-    STRUCT_SECTION_FOREACH(golioth_uplink_service, service)
-    {
-        if (NULL != service->uplink_cb)
-        {
-            service->uplink_cb();
-        }
-    }
-
-    pouch_uplink_close(K_FOREVER);
-
-    return 0;
-}
-
 POUCH_DOWNLINK_HANDLER(pouch_downlink_start, pouch_downlink_data);

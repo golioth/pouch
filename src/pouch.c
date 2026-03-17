@@ -9,6 +9,7 @@
 #include "crypto.h"
 
 #include <pouch/events.h>
+#include <pouch/uplink.h>
 
 #include <zephyr/kernel.h>
 #include <zephyr/sys/iterable_sections.h>

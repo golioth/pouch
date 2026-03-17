@@ -21,7 +21,7 @@ static void *init_pouch(void)
     return NULL;
 }
 
-ZTEST_SUITE(events, NULL, init_pouch, NULL, NULL, NULL);
+ZTEST_SUITE(events, NULL, init_pouch, NULL, transport_reset, NULL);
 
 K_SEM_DEFINE(event_rcvd, 0, UINT16_MAX);
 
@@ -50,6 +50,7 @@ POUCH_EVENT_HANDLER(event_handler, NULL);
 ZTEST(events, test_start_event)
 {
     start_events = 0;
+    k_sem_reset(&event_rcvd);
 
     transport_session_start();
     zassert_equal(k_sem_take(&event_rcvd, EVENT_TIMEOUT), 0);

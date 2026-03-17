@@ -19,7 +19,6 @@ LOG_MODULE_REGISTER(main);
 #include <pouch/transport/gatt/peripheral.h>
 #include <pouch/transport/gatt/common/types.h>
 
-#include <golioth/golioth.h>
 #include <golioth/settings_callbacks.h>
 
 #include <app_version.h>
@@ -29,25 +28,15 @@ static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET_OR(DT_ALIAS(sw0), gpi
 static struct gpio_callback button_cb_data;
 
 /**
- * The pouch event handler gets signalled when the pouch session starts and ends.
+ * Push timeseries application data to the cloud on every uplink
  */
-static void pouch_event_handler(enum pouch_event event, void *ctx)
+static void do_uplink(void)
 {
-    if (POUCH_EVENT_SESSION_START == event)
-    {
-        const char json[] = "{\"temp\":22}";
-
-        pouch_uplink_entry_write(".s/sensor",
-                                 POUCH_CONTENT_TYPE_JSON,
-                                 json,
-                                 strlen(json),
-                                 K_FOREVER);
-
-        golioth_sync_to_cloud();
-    }
+    const char *data = "{\"temp\":22}";
+    pouch_uplink_entry_write(".s/sensor", POUCH_CONTENT_TYPE_JSON, data, strlen(data), K_FOREVER);
 }
 
-POUCH_EVENT_HANDLER(pouch_event_handler, NULL);
+POUCH_UPLINK_HANDLER(do_uplink);
 
 /**
  * Settings handler for the "LED" setting.

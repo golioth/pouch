@@ -55,5 +55,9 @@ void transport_reset(void *unused)
     }
 
     pouch_uplink_finish(uplink);
+
+    // let processing run:
+    k_sleep(K_MSEC(1));
+
     uplink = NULL;
 }

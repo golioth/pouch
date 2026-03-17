@@ -30,6 +30,7 @@ K_SEM_DEFINE(write_done, 0, UINT16_MAX);
 
 static size_t write_data_len;
 static bool write_data_expect_fail;
+static bool uplink_handler_enabled;
 
 static void write_to_uplink(struct k_work *work)
 {
@@ -77,14 +78,27 @@ static size_t read_data(uint8_t **data, size_t len)
     return len;
 }
 
+K_MUTEX_DEFINE(handler_mut);
+
+static void uplink_handler(void)
+{
+    if (uplink_handler_enabled)
+    {
+        k_mutex_lock(&handler_mut, K_FOREVER);
+        write_entry(10, K_FOREVER);
+        k_mutex_unlock(&handler_mut);
+        // disabled by default:
+        uplink_handler_enabled = false;
+    }
+}
+POUCH_UPLINK_HANDLER(uplink_handler);
+
 ZTEST(uplink, test_pouch_header)
 {
     transport_session_start();
 
     // write some data to create a pouch
     zassert_ok(write_entry(1, K_FOREVER));
-
-    pouch_uplink_close(K_FOREVER);
 
     // let processing run:
     k_sleep(K_MSEC(1));
@@ -131,7 +145,6 @@ ZTEST(uplink, test_pouch_block)
                                         data,
                                         sizeof(data),
                                         K_FOREVER));
-    pouch_uplink_close(K_FOREVER);
 
     // let processing run:
     k_sleep(K_MSEC(1));
@@ -163,7 +176,6 @@ ZTEST(uplink, test_pouch_entry)
                                         data,
                                         sizeof(data),
                                         K_FOREVER));
-    pouch_uplink_close(K_FOREVER);
 
     // let processing run:
     k_sleep(K_MSEC(1));
@@ -201,18 +213,17 @@ ZTEST(uplink, test_pull_no_data)
     uint8_t *buf;
     size_t len = read_data(&buf, CONFIG_POUCH_BLOCK_SIZE);
     zassert_equal(len, 0, "expected to read 0 bytes, got %d", len);
+
+    // let processing run:
+    k_sleep(K_MSEC(1));
 }
 
 ZTEST(uplink, test_pull_partial)
 {
+    uplink_handler_enabled = true;
     transport_session_start();
 
-    // write some data to create a pouch
-    zassert_ok(write_entry(6, K_FOREVER));
-
-    pouch_uplink_close(K_FOREVER);
-
-    // let processing run:
+    // let uplink handler and processing run:
     k_sleep(K_MSEC(1));
 
     size_t len = CONFIG_POUCH_BLOCK_SIZE;
@@ -235,7 +246,7 @@ ZTEST(uplink, test_pull_partial)
         zassert_equal(result, POUCH_MORE_DATA, "expected POUCH_MORE_DATA, got %d", result);
     }
 
-    zassert_equal(offset, 42, "expected to read 42 bytes, got %d", offset);
+    zassert_equal(offset, 46, "expected to read 46 bytes, got %d", offset);
 
     free(buf);
 }
@@ -245,8 +256,6 @@ ZTEST(uplink, test_submit_before_session)
     zassert_ok(write_entry(6, K_FOREVER));
 
     transport_session_start();
-
-    pouch_uplink_close(K_FOREVER);
 
     // let processing run:
     k_sleep(K_MSEC(1));
@@ -269,7 +278,6 @@ ZTEST(uplink, test_submit_after_close)
                                         data1,
                                         sizeof(data1),
                                         K_FOREVER));
-    pouch_uplink_close(K_FOREVER);
 
     // let processing run:
     k_sleep(K_MSEC(1));
@@ -290,8 +298,6 @@ ZTEST(uplink, test_submit_after_close)
     // new session:
     transport_session_start();
 
-    pouch_uplink_close(K_FOREVER);
-
     // let processing run:
     k_sleep(K_MSEC(1));
 
@@ -302,28 +308,32 @@ ZTEST(uplink, test_submit_after_close)
 
 ZTEST(uplink, test_multithread_writer)
 {
+    // Block the uplink handler from finishing and closing up the pouch:
+    uplink_handler_enabled = true;
+    int err = k_mutex_lock(&handler_mut, K_NO_WAIT);
+    zassert_equal(err, 0, "expected success, got %d", err);
+
     transport_session_start();
     // push some data to start a pouch
     zassert_ok(write_entry(10, K_MSEC(1)));
 
-    // write another without blocking:
-    int err = write_entry(20, K_NO_WAIT);
-    zassert_equal(err, -EBUSY, "expected EBUSY, got %d", err);
-
-    // Write from this thread while the other is blocked, should block and yield.
+    // Write from this thread while the handler is blocked. Should be included in the pouch.
     const uint8_t data[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
     zassert_ok(pouch_uplink_entry_write("test/path",
                                         POUCH_CONTENT_TYPE_OCTET_STREAM,
                                         data,
                                         sizeof(data),
                                         K_MSEC(1)));
-    // wait for the k_work to finish its write:
-    k_sem_take(&write_done, K_FOREVER);
 
-    zassert_ok(pouch_uplink_close(K_FOREVER));
+    // unblock the uplink handler - should push an entry and close the pouch
+    k_mutex_unlock(&handler_mut);
+
+    k_sleep(K_MSEC(1));
 
     // let processing run:
     k_sleep(K_MSEC(1));
+
+    zassert_false(uplink_handler_enabled);
 
     /* Read out the data to make space in the ring buffer. Should return a full ring buffer's worth
      * of data.
@@ -389,8 +399,6 @@ ZTEST(uplink, test_stream_multiblock)
     zassert_equal(written, sizeof(data), "Unexpected write length %d", written);
 
     zassert_ok(pouch_stream_close(stream, K_NO_WAIT));
-
-    zassert_ok(pouch_uplink_close(K_FOREVER));
 
     // let processing run:
     k_sleep(K_MSEC(1));
@@ -475,7 +483,8 @@ ZTEST(uplink, test_stream_multi_stream)
     zassert_ok(pouch_stream_close(stream2, K_NO_WAIT));
 
     // let processing run:
-    k_sleep(K_MSEC(1));
+    k_sleep(K_MSEC(10));
+
     uint8_t *buf;
     size_t len = read_data(&buf, CONFIG_POUCH_BLOCK_SIZE);
 
@@ -540,8 +549,6 @@ ZTEST(uplink, test_stream_multi_block_multi_stream)
 
     zassert_ok(pouch_stream_close(stream1, K_NO_WAIT));
     zassert_ok(pouch_stream_close(stream2, K_NO_WAIT));
-
-    pouch_uplink_close(K_NO_WAIT);
 
     // let processing run:
     k_sleep(K_MSEC(1));
@@ -626,6 +633,9 @@ ZTEST(uplink, test_stream_max_count)
     {
         zassert_ok(pouch_stream_close(streams[i], K_NO_WAIT));
     }
+
+    // let processing run:
+    k_sleep(K_MSEC(1));
 }
 
 ZTEST(uplink, test_stream_empty)
@@ -637,8 +647,6 @@ ZTEST(uplink, test_stream_empty)
     zassert_not_null(stream, "Failed to open stream");
 
     zassert_ok(pouch_stream_close(stream, K_NO_WAIT));
-
-    pouch_uplink_close(K_FOREVER);
 
     // let processing run:
     k_sleep(K_MSEC(1));
@@ -663,9 +671,6 @@ ZTEST(uplink, test_stream_fail_to_close_stream)
     uint8_t data1[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
     size_t written = pouch_stream_write(stream, data1, sizeof(data1), K_NO_WAIT);
     zassert_equal(written, sizeof(data1), "Unexpected write length %d", written);
-
-    // close the pouch, but the stream is still open:
-    zassert_ok(pouch_uplink_close(K_FOREVER));
 
     transport_session_end();
 
@@ -706,8 +711,6 @@ ZTEST(uplink, test_stream_length_aligned_to_block_size)
     zassert_equal(written, data_len, "Unexpected write length %d", written);
 
     zassert_ok(pouch_stream_close(stream, K_NO_WAIT));
-
-    zassert_ok(pouch_uplink_close(K_FOREVER));
 
     // let processing run:
     k_sleep(K_MSEC(1));
