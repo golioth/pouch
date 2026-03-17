@@ -11,6 +11,14 @@ jobs:
       matrix:
         include:
           - manifest: examples/ncs-serial-modem/west.yml
+            target: thingy91x/nrf9151/ns
+            app: ncs-serial-modem
+            sysbuild: true
+          - manifest: west-ncs.yml
+            target: thingy91x/nrf5340/cpuapp
+            app: gateway
+            sysbuild: true
+          - manifest: examples/ncs-serial-modem/west.yml
             target: nrf9160dk/nrf9160/ns
             app: ncs-serial-modem
             sysbuild: true

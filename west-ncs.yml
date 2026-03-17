@@ -5,19 +5,21 @@ manifest:
       url: http://github.com/nrfconnect/sdk-nrf
       import:
         name-allowlist:
-          - nrf
-          - zephyr
           - cmsis_6
           - hal_nordic
-          - nrfxlib
+          - libmetal
+          - littlefs
           - mbedtls
           - mcuboot
+          - nrf
+          - nrfxlib
+          - oberon-psa-crypto
+          - open-amp
           - segger
           - tfm-mcuboot
-          - oberon-psa-crypto
           - trusted-firmware-m
-          - littlefs
           - zcbor
+          - zephyr
 
     - name: golioth
       path: modules/lib/golioth-firmware-sdk
