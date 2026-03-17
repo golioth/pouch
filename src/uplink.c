@@ -7,6 +7,7 @@
 #include "pouch.h"
 #include "header.h"
 #include "entry.h"
+#include "stream.h"
 #include "crypto.h"
 
 #include <pouch/uplink.h>
@@ -84,7 +85,7 @@ static void process_blocks(struct k_work *work)
         buf_queue_submit(&uplink.transport.queue, encrypted);
     }
 
-    if (pouch_is_closing())
+    if (pouch_is_closing() && !stream_is_open())
     {
         atomic_set_bit(uplink.flags, POUCH_CLOSED);
     }
@@ -128,6 +129,27 @@ uint32_t uplink_session_id(void)
 {
     return atomic_get(&uplink.id);
 }
+
+// emit uplink calls in event handler to ensure that they run in the pouch processing thread.
+static void event_handler(enum pouch_event evt, void *ctx)
+{
+    if (evt != POUCH_EVENT_SESSION_START)
+    {
+        return;
+    }
+
+    TYPE_SECTION_FOREACH(pouch_uplink_handler_t, pouch_uplink_handler, handler)
+    {
+        if (handler != NULL)
+        {
+            (*handler)();
+        }
+    }
+
+    pouch_uplink_close(K_FOREVER);
+}
+
+POUCH_EVENT_HANDLER(event_handler, NULL);
 
 // Transport API:
 

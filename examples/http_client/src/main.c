@@ -20,24 +20,18 @@ LOG_MODULE_REGISTER(http_transport, CONFIG_EXAMPLE_HTTP_CLIENT_LOG_LEVEL);
 #include <pouch/transport/certificate.h>
 #include <pouch/transport/http/client.h>
 
-#include <golioth/golioth.h>
 #include <golioth/settings_callbacks.h>
 
-static void pouch_event_handler(enum pouch_event event, void *ctx)
+static void do_uplink(void)
 {
-    if (POUCH_EVENT_SESSION_START == event)
-    {
-        pouch_uplink_entry_write(".s/sensor",
-                                 POUCH_CONTENT_TYPE_JSON,
-                                 "{\"temp\":22}",
-                                 sizeof("{\"temp\":22}") - 1,
-                                 K_FOREVER);
-
-        golioth_sync_to_cloud();
-    }
+    const char *payload = "{\"temp\":22}";
+    pouch_uplink_entry_write(".s/sensor",
+                             POUCH_CONTENT_TYPE_JSON,
+                             payload,
+                             strlen(payload),
+                             K_FOREVER);
 }
-
-POUCH_EVENT_HANDLER(pouch_event_handler, NULL);
+POUCH_UPLINK_HANDLER(do_uplink);
 
 static int led_setting_cb(bool new_value)
 {

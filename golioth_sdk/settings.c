@@ -213,4 +213,4 @@ static void settings_uplink(void)
 }
 
 GOLIOTH_DOWNLINK_HANDLER(settings, SETTINGS_DOWNLINK_PATH, NULL, settings_downlink);
-GOLIOTH_UPLINK_HANDLER(settings_status, settings_uplink);
+POUCH_UPLINK_HANDLER(settings_uplink);

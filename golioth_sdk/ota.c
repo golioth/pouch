@@ -319,4 +319,4 @@ GOLIOTH_DOWNLINK_HANDLER(ota_component,
                          "/" GOLIOTH_OTA_COMPONENT_PATH_PREFIX "*",
                          ota_receive_component_start,
                          ota_receive_component_data);
-GOLIOTH_UPLINK_HANDLER(ota_status, ota_uplink);
+POUCH_UPLINK_HANDLER(ota_uplink);

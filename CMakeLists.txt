@@ -42,6 +42,7 @@ if(CONFIG_POUCH)
     endif()
 
     zephyr_linker_sources(SECTIONS src/downlink_handlers.ld)
+    zephyr_linker_sources(SECTIONS src/uplink_handlers.ld)
     zephyr_linker_sources(SECTIONS src/event_handlers.ld)
 
     add_custom_command(OUTPUT header_decode.c header_encode.c

@@ -18,6 +18,24 @@
 
 struct pouch_stream;
 
+/** Pouch uplink handler function */
+typedef void (*pouch_uplink_handler_t)(void);
+
+/**
+ * Register a handler for pouch uplink.
+ *
+ * Allows the application to register a callback that gets called when the pouch
+ * uplink is started.
+ *
+ * The pouch uplink will be closed once all uplink handlers have been called,
+ * and all streams are closed.
+ */
+#define POUCH_UPLINK_HANDLER(handler)                                  \
+    static const TYPE_SECTION_ITERABLE(pouch_uplink_handler_t,         \
+                                       CONCAT(pouch_uplink_, handler), \
+                                       pouch_uplink_handler,           \
+                                       handlers) = handler
+
 /**
  * Write an entry to the pouch uplink.
  *

@@ -158,3 +158,8 @@ bool pouch_stream_is_valid(struct pouch_stream *stream)
 {
     return (stream != NULL) && (stream->session_id == uplink_session_id());
 }
+
+bool stream_is_open(void)
+{
+    return atomic_get(&open_streams) != 0;
+}
