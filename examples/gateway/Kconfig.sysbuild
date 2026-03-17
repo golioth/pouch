@@ -69,8 +69,4 @@ config PERIPHERAL_MOUNT_CREDS
 	help
 	  Mount credentials located ${BUILD_DIR}/creds under /creds mountpoint in Zephyr.
 
-choice BOOTLOADER
-	default BOOTLOADER_MCUBOOT if SOC != "native"
-endchoice
-
 source "share/sysbuild/Kconfig"
