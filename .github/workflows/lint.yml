@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Fetch depth must be greater than the number of commits included in the push in order to
           # compare against commit prior to merge. 15 is chosen as a reasonable default for the

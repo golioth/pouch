@@ -12,7 +12,7 @@ jobs:
     container: golioth/golioth-coverity-base:89df175
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           path: pouch
       - name: Init and update west
@@ -46,7 +46,7 @@ jobs:
             --form version="0" \
             --form description="Description" \
             https://scan.coverity.com/builds?project=golioth%2Fpouch
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: coverity_output
           path: pouch.tgz
