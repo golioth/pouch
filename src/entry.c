@@ -12,6 +12,7 @@
 #include <stdio.h>
 
 #include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/iterable_sections.h>
 #include <pouch/downlink.h>
 
 #include <zephyr/logging/log.h>
