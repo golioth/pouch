@@ -5,7 +5,6 @@
  */
 
 #include <stdlib.h>
-#include <zephyr/sys/byteorder.h>
 
 #include <pouch/downlink.h>
 #include <pouch/types.h>
@@ -13,6 +12,7 @@
 #include "cddl/header_decode.h"
 
 #include "block.h"
+#include "buf.h"
 #include "crypto.h"
 #include "downlink.h"
 #include "entry.h"
