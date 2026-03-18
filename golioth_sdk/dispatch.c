@@ -10,6 +10,7 @@ LOG_MODULE_REGISTER(glth_dispatch, CONFIG_GOLIOTH_LOG_LEVEL);
 #include <pouch/downlink.h>
 #include <pouch/events.h>
 #include <pouch/uplink.h>
+#include <zephyr/sys/iterable_sections.h>
 
 #include "dispatch.h"
 

@@ -9,6 +9,7 @@ LOG_MODULE_DECLARE(glth_settings);
 
 #include <errno.h>
 #include <stddef.h>
+#include <zephyr/sys/iterable_sections.h>
 
 #include "settings.h"
 
