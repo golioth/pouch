@@ -59,6 +59,7 @@ static void consume_blocks(struct k_work *work)
 
     pouch_downlink_block_push(pouch_buf);
 
+    /* buffers were allocated then enqueued in decrypt_blocks() */
     buf_free(pouch_buf);
 
     if (!buf_queue_is_empty(&consume.buf_queue))
@@ -89,6 +90,7 @@ static void decrypt_blocks(struct k_work *work)
     int err = crypto_decrypt_block(encrypted, decrypted);
 
     /* Encrypted block was consumed; free buffer no matter the outcome */
+    /* buffers were allocated then enqueued in pouch_downlink_push() */
     buf_free(encrypted);
 
     /* Test to see if decrypt buffer contains valid data */
@@ -99,6 +101,7 @@ static void decrypt_blocks(struct k_work *work)
     }
 
     /* Enqueue decrypted data */
+    /* buffers pushed to queue are freed in consume_blocks(). */
     buf_queue_submit(&consume.buf_queue, decrypted);
     k_work_submit_to_queue(consume.work_queue, &consume.work);
 
@@ -255,6 +258,7 @@ int pouch_downlink_push(const void *buf, size_t buf_len)
                     buf_trim_end(pouch_buf_to_send, remaining_len);
                 }
 
+                /* buffers pushed to queue are freed in decrypt_blocks(). */
                 int err = block_downlink_push(pouch_buf_to_send);
                 if (0 > err)
                 {
