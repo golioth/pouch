@@ -13,7 +13,6 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/sys/iterable_sections.h>
-#include <zephyr/sys/ring_buffer.h>
 
 K_THREAD_STACK_DEFINE(pouch_stack, CONFIG_POUCH_THREAD_STACK_SIZE);
 

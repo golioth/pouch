@@ -15,9 +15,6 @@
 #include <pouch/transport/uplink.h>
 
 #include <stdlib.h>
-#include <zephyr/init.h>
-#include <zephyr/sys/iterable_sections.h>
-#include <zephyr/sys/ring_buffer.h>
 
 enum flags
 {
