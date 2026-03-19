@@ -10,7 +10,6 @@
 #include "../cert.h"
 #include <stdint.h>
 #include <psa/crypto.h>
-#include <zephyr/sys/byteorder.h>
 #include <mbedtls/base64.h>
 
 #include <zephyr/logging/log.h>
