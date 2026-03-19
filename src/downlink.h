@@ -9,4 +9,4 @@
 #include <zephyr/kernel.h>
 
 /** Initialize the pouch downlink handler */
-void downlink_init(struct k_work_q *pouch_work_queue);
+int downlink_init(struct k_work_q *pouch_work_queue);
