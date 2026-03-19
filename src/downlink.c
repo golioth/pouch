@@ -20,108 +20,68 @@
 
 POUCH_LOG_REGISTER(downlink, CONFIG_POUCH_LOG_LEVEL);
 
-static struct pouch_buf *pouch_buf;
+static struct pouch_buf *encrypted;
 static bool pouch_header;
 
 static struct
 {
     pouch_buf_queue_t queue;
     struct k_work work;
+    struct pouch_buf *decrypted;
+    struct k_work_q *work_queue;
 } decrypt;
 
-static struct
-{
-    pouch_buf_queue_t buf_queue;
-    struct k_work_q *work_queue;
-    struct k_work work;
-} consume;
-
 static void decrypt_blocks(struct k_work *work);
-static void consume_blocks(struct k_work *work);
 
-void downlink_init(struct k_work_q *pouch_work_queue)
+int downlink_init(struct k_work_q *pouch_work_queue)
 {
     buf_queue_init(&decrypt.queue);
     k_work_init(&decrypt.work, decrypt_blocks);
+    decrypt.work_queue = pouch_work_queue;
 
-    buf_queue_init(&consume.buf_queue);
-    consume.work_queue = pouch_work_queue;
-    k_work_init(&consume.work, consume_blocks);
-}
-
-static void consume_blocks(struct k_work *work)
-{
-    struct pouch_buf *pouch_buf = buf_queue_get(&consume.buf_queue);
-    if (!pouch_buf)
+    decrypt.decrypted = crypto_block_buf_alloc();
+    if (!decrypt.decrypted)
     {
-        return;
+        POUCH_LOG_ERR("Failed to allocate decrypt buf");
+        return -ENOMEM;
     }
 
-    pouch_downlink_block_push(pouch_buf);
-
-    /* buffers were allocated then enqueued in decrypt_blocks() */
-    buf_free(pouch_buf);
-
-    if (!buf_queue_is_empty(&consume.buf_queue))
-    {
-        k_work_submit_to_queue(consume.work_queue, work);
-    }
+    return 0;
 }
 
 static void decrypt_blocks(struct k_work *work)
 {
-    /* Ensure memory can be allocated to store decrypted data */
-    struct pouch_buf *decrypted = crypto_block_buf_alloc();
-    if (NULL == decrypted)
+    struct pouch_buf *encrypted_block;
+    while ((encrypted_block = buf_queue_get(&decrypt.queue)) != NULL)
     {
-        POUCH_LOG_ERR("Unable to allocate decrypt buffer");
-        return;
+        // Reset the target buffer
+        buf_restore(decrypt.decrypted, POUCH_BUF_STATE_INITIAL);
+
+        /* Decrypt this block */
+        int err = crypto_decrypt_block(encrypted_block, decrypt.decrypted);
+
+        /* Encrypted block was consumed; free buffer no matter the outcome */
+        /* buffers were allocated then enqueued in pouch_downlink_push() */
+        buf_free(encrypted_block);
+
+        /* Test to see if decrypt buffer contains valid data */
+        if (err)
+        {
+            POUCH_LOG_ERR("Failed to decrypt block: %d", err);
+            // TODO: Abort the downlink
+            return;
+        }
+
+        pouch_downlink_block_push(decrypt.decrypted);
+
+        k_yield();  // let other threads run
     }
-
-    /* Ensure there is encrypted data to be decrypted */
-    struct pouch_buf *encrypted = buf_queue_get(&decrypt.queue);
-    if (encrypted == NULL)
-    {
-        POUCH_LOG_DBG("No encrypted blocks available");
-        goto free_and_return;
-    }
-
-    /* Decrypt this block */
-    int err = crypto_decrypt_block(encrypted, decrypted);
-
-    /* Encrypted block was consumed; free buffer no matter the outcome */
-    /* buffers were allocated then enqueued in pouch_downlink_push() */
-    buf_free(encrypted);
-
-    /* Test to see if decrypt buffer contains valid data */
-    if (0 != err)
-    {
-        POUCH_LOG_ERR("Failed to decrypt block: %d", err);
-        goto free_and_return;
-    }
-
-    /* Enqueue decrypted data */
-    /* buffers pushed to queue are freed in consume_blocks(). */
-    buf_queue_submit(&consume.buf_queue, decrypted);
-    k_work_submit_to_queue(consume.work_queue, &consume.work);
-
-    if (!buf_queue_is_empty(&decrypt.queue))
-    {
-        k_work_submit(work);
-    }
-
-    return;
-
-free_and_return:
-    /* Decrypt buffer was not enqueued */
-    buf_free(decrypted);
-    return;
 }
 
 static int block_downlink_push(struct pouch_buf *pouch_buf)
 {
     buf_queue_submit(&decrypt.queue, pouch_buf);
-    return k_work_submit(&decrypt.work);
+    return k_work_submit_to_queue(decrypt.work_queue, &decrypt.work);
 }
 
 void pouch_downlink_start(void)
@@ -130,8 +90,8 @@ void pouch_downlink_start(void)
 
     pouch_header = false;
 
-    pouch_buf = buf_alloc(MAX_CIPHERTEXT_BLOCK_SIZE);
-    if (!pouch_buf)
+    encrypted = buf_alloc(MAX_CIPHERTEXT_BLOCK_SIZE);
+    if (!encrypted)
     {
         POUCH_LOG_ERR("Failed to allocate pouch buf");
         return;
@@ -179,26 +139,26 @@ int pouch_downlink_push(const void *buf, size_t buf_len)
 
     while (buf_len)
     {
-        if (!pouch_buf)
+        if (!encrypted)
         {
             POUCH_LOG_WRN("No pouch_buf allocated");
             return -ENOMEM;
         }
 
-        if (buf_size_get(pouch_buf) >= MAX_CIPHERTEXT_BLOCK_SIZE)
+        if (buf_size_get(encrypted) >= MAX_CIPHERTEXT_BLOCK_SIZE)
         {
             POUCH_LOG_ERR("No more space for pouch header");
             return -ENOMEM;
         }
 
-        size_t buf_written = MIN(buf_len, MAX_CIPHERTEXT_BLOCK_SIZE - buf_size_get(pouch_buf));
-        buf_write(pouch_buf, buf_p, buf_written);
+        size_t buf_written = MIN(buf_len, MAX_CIPHERTEXT_BLOCK_SIZE - buf_size_get(encrypted));
+        buf_write(encrypted, buf_p, buf_written);
 
         buf_p += buf_written;
         buf_len -= buf_written;
 
         struct pouch_bufview v;
-        pouch_bufview_init(&v, pouch_buf);
+        pouch_bufview_init(&v, encrypted);
 
         if (!pouch_header)
         {
@@ -214,8 +174,8 @@ int pouch_downlink_push(const void *buf, size_t buf_len)
 
             pouch_header = true;
 
-            /* Align first block with pouch_buf start */
-            buf_trim_start(pouch_buf, header_len);
+            /* Align first block with encrypted start */
+            buf_trim_start(encrypted, header_len);
 
             POUCH_LOG_HEXDUMP(pouch_bufview_read(&v, 0), pouch_bufview_available(&v), "remaining");
         }
@@ -238,10 +198,10 @@ int pouch_downlink_push(const void *buf, size_t buf_len)
                               (int) block_size,
                               (int) pouch_bufview_available(&v));
 
-                struct pouch_buf *pouch_buf_to_send = pouch_buf;
+                struct pouch_buf *encrypted_block = encrypted;
 
-                pouch_buf = buf_alloc(MAX_CIPHERTEXT_BLOCK_SIZE);
-                if (!pouch_buf)
+                encrypted = buf_alloc(MAX_CIPHERTEXT_BLOCK_SIZE);
+                if (!encrypted)
                 {
                     POUCH_LOG_ERR("Failed to allocate pouch buf");
                     return -ENOMEM;
@@ -255,12 +215,12 @@ int pouch_downlink_push(const void *buf, size_t buf_len)
 
                     POUCH_LOG_HEXDUMP(remaining, remaining_len, "remaining");
 
-                    buf_write(pouch_buf, remaining, remaining_len);
-                    buf_trim_end(pouch_buf_to_send, remaining_len);
+                    buf_write(encrypted, remaining, remaining_len);
+                    buf_trim_end(encrypted_block, remaining_len);
                 }
 
                 /* buffers pushed to queue are freed in decrypt_blocks(). */
-                int err = block_downlink_push(pouch_buf_to_send);
+                int err = block_downlink_push(encrypted_block);
                 if (0 > err)
                 {
                     POUCH_LOG_ERR("Failed to enqueue block: %d", err);
@@ -275,6 +235,6 @@ int pouch_downlink_push(const void *buf, size_t buf_len)
 
 void pouch_downlink_finish(void)
 {
-    buf_free(pouch_buf);
-    pouch_buf = NULL;
+    buf_free(encrypted);
+    encrypted = NULL;
 }

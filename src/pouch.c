@@ -59,7 +59,12 @@ POUCH_APPLICATION_STARTUP_HOOK(pouch_module_init);
 
 int pouch_init(const struct pouch_config *config)
 {
-    downlink_init(&pouch_work_q);
+    int err = downlink_init(&pouch_work_q);
+    if (err)
+    {
+        return err;
+    }
+
     uplink_init();
 
     return crypto_init(config);
