@@ -7,6 +7,7 @@
 #include <zephyr/fs/fs.h>
 #include <pouch/pouch.h>
 #include <mbedtls/pk.h>
+#include <mbedtls/psa_util.h>
 #include <zephyr/net/tls_credentials.h>
 
 #include <zephyr/logging/log.h>
@@ -35,17 +36,18 @@ static const uint8_t tls_ca_crt[] = {
 };
 #endif  // CONFIG_EXAMPLE_HTTP_CLIENT_TLS_LOAD_CA_FROM_FILESYSTEM
 
-static int psa_rng_for_mbedtls(void *p_rng, unsigned char *output, size_t output_len)
-{
-    return psa_generate_random(output, output_len);
-}
-
 /** Load the raw private key data into PSA */
 static psa_key_id_t import_raw_pk(const uint8_t *private_key, size_t size)
 {
     mbedtls_pk_context pk;
     mbedtls_pk_init(&pk);
-    int err = mbedtls_pk_parse_key(&pk, private_key, size, NULL, 0, psa_rng_for_mbedtls, NULL);
+    int err = mbedtls_pk_parse_key(&pk,
+                                   private_key,
+                                   size,
+                                   NULL,
+                                   0,
+                                   mbedtls_psa_get_random,
+                                   MBEDTLS_PSA_RANDOM_STATE);
     if (err)
     {
         LOG_ERR("Failed to parse key: -0x%x", -err);
