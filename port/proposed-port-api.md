@@ -10,6 +10,12 @@ Opaque pointers have been avoided throughout so that the API functions
 don't allocate memory (statically or dynamically). The caller controls
 its own memory when instantiating typedefs.
 
+This proposal considers the following as required Pouch dependencies:
+
+- PSA (from platform)
+- mbedTLS (from platform)
+- ZCBOR (library)
+
 ### Atomic
 
 `port/include/pouch/port.h`
@@ -403,3 +409,9 @@ but more exploration is needed to scope this work.
   - `golioth_settings_receive_one()`: STRUCT_SECTION_FOREACH
 
 </details>
+
+## Logging
+
+We will follow [the pattern established in the Golioth Firmware SDK
+](https://github.com/golioth/golioth-firmware-sdk/blob/faa07040089ea055cb91386e183ae2c61c860ec5/include/golioth/golioth_sys.h#L195-L306)to
+implement portable logging with a `PORT_LOG*(TAG, ...)` format.
