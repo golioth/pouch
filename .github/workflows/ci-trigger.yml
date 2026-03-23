@@ -24,3 +24,27 @@ jobs:
     name: Run Twister
     uses: ./.github/workflows/test-twister.yml
     secrets: inherit
+  test-hil:
+    name: Run HIL Tests
+    uses: ./.github/workflows/test-hil.yml
+    secrets: inherit
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - hil_board: nrf52840dk
+            west_board: nrf52840dk/nrf52840
+            manifest_yml: west
+            binary_file: zephyr.signed.hex
+          - hil_board: nrf52840dk
+            west_board: nrf52840dk/nrf52840
+            manifest_yml: west-ncs
+            binary_file: merged.hex
+
+    with:
+      hil_board: ${{ matrix.hil_board }}
+      west_board: ${{ matrix.west_board }}
+      manifest_yml: ${{ matrix.manifest_yml }}
+      binary_file: ${{ matrix.binary_file}}
+      binary_blob: ${{ matrix.binary_blob }}
