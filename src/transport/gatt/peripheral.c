@@ -11,36 +11,20 @@
 
 #include <pouch/transport/gatt/common/uuids.h>
 
-#include "transport/sar/receiver.h"
-#include "transport/sar/sender.h"
-#include "transport/endpoints/endpoints.h"
+#include "../sar/receiver.h"
+#include "../sar/sender.h"
+#include "../endpoints/endpoints.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(pouch_gatt, CONFIG_POUCH_GATT_LOG_LEVEL);
 
 #define BT_ATT_OVERHEAD 3
 
-#define CHAR_INIT_RECVEIVER(_endpoint)                                   \
-    {                                                                    \
-        .bearer =                                                        \
-            {                                                            \
-                .send = bearer_send,                                     \
-                .abort = bearer_abort,                                   \
-                .window = CONFIG_POUCH_TRANSPORT_GATT_WINDOW_SIZE,       \
-            },                                                           \
-        .type = CHAR_RECEIVER,                                           \
-        .receiver = &((struct pouch_receiver){.endpoint = (_endpoint)}), \
-    }
-#define CHAR_INIT_SENDER(_endpoint)                                  \
-    {                                                                \
-        .bearer =                                                    \
-            {                                                        \
-                .send = bearer_send,                                 \
-                .abort = bearer_abort,                               \
-                .window = CONFIG_POUCH_TRANSPORT_GATT_WINDOW_SIZE,   \
-            },                                                       \
-        .type = CHAR_SENDER,                                         \
-        .sender = &((struct pouch_sender){.endpoint = (_endpoint)}), \
+#define BEARER_INIT                                        \
+    {                                                      \
+        .send = bearer_send,                               \
+        .abort = bearer_abort,                             \
+        .window = CONFIG_POUCH_TRANSPORT_GATT_WINDOW_SIZE, \
     }
 
 enum characteristic_type
@@ -190,14 +174,33 @@ static void ccc_changed(const struct bt_gatt_attr *ccc_attr, uint16_t value)
 /***************************************************
  * Pouch characteristics contexts:
  **************************************************/
-
-static struct pouch_characteristic downlink = CHAR_INIT_RECVEIVER(&pouch_endpoint_downlink);
-static struct pouch_characteristic uplink = CHAR_INIT_SENDER(&pouch_endpoint_uplink);
-static struct pouch_characteristic info = CHAR_INIT_SENDER(&pouch_endpoint_info);
+static struct pouch_characteristic downlink = {
+    .bearer = BEARER_INIT,
+    .type = CHAR_RECEIVER,
+    .receiver = &pouch_endpoint_downlink,
+};
+static struct pouch_characteristic uplink = {
+    .bearer = BEARER_INIT,
+    .type = CHAR_SENDER,
+    .sender = &pouch_endpoint_uplink,
+};
+static struct pouch_characteristic info = {
+    .bearer = BEARER_INIT,
+    .type = CHAR_SENDER,
+    .sender = &pouch_endpoint_info,
+};
 
 #if IS_ENABLED(CONFIG_POUCH_ENCRYPTION_SAEAD)
-static struct pouch_characteristic server_cert = CHAR_INIT_RECVEIVER(&pouch_endpoint_server_cert);
-static struct pouch_characteristic device_cert = CHAR_INIT_SENDER(&pouch_endpoint_device_cert);
+static struct pouch_characteristic server_cert = {
+    .bearer = BEARER_INIT,
+    .type = CHAR_RECEIVER,
+    .receiver = &pouch_endpoint_server_cert,
+};
+static struct pouch_characteristic device_cert = {
+    .bearer = BEARER_INIT,
+    .type = CHAR_SENDER,
+    .sender = &pouch_endpoint_device_cert,
+};
 #endif
 
 #if IS_ENABLED(CONFIG_POUCH_TRANSPORT_GATT_PERM_AUTHEN)

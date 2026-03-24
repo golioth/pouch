@@ -8,22 +8,12 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include "types.h"
 
 /**
  * @file uplink.h
  * @brief Uplink API for Pouch Transport layer implementations
  */
-
-/** Return type for Pouch data filling functions */
-enum pouch_result
-{
-    /** No more data is available */
-    POUCH_NO_MORE_DATA,
-    /** More data is available */
-    POUCH_MORE_DATA,
-    /** An error occurred */
-    POUCH_ERROR,
-};
 
 /** Uplink structure */
 struct pouch_uplink;
