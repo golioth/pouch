@@ -28,13 +28,13 @@ generate_inc_file_for_target(${lib_name}
 
 add_custom_command(OUTPUT info_decode.c
     COMMAND zcbor code
-      -c ${ZEPHYR_POUCH_MODULE_DIR}/port/zephyr/transport/gatt/info.cddl
+      -c ${ZEPHYR_POUCH_MODULE_DIR}/src/transport/info.cddl
       -s
       -t pouch_gatt_info
       -d --include-prefix cddl/
       --output-c ${CMAKE_CURRENT_BINARY_DIR}/info_decode.c
       --output-h ${CMAKE_CURRENT_BINARY_DIR}/include/cddl/info_decode.h
     BYPRODUCTS include/cddl/info_decode.h include/cddl/info_decode_types.h
-    DEPENDS ${ZEPHYR_POUCH_MODULE_DIR}/port/zephyr/transport/gatt/info.cddl)
+    DEPENDS ${ZEPHYR_POUCH_MODULE_DIR}/src/transport/info.cddl)
 
 zephyr_library_include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)

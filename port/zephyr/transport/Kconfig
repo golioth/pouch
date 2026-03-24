@@ -26,5 +26,16 @@ config POUCH_TRANSPORT_HTTP_CLIENT
 
 endchoice
 
+config POUCH_TRANSPORT_ACK_TIMEOUT_MS
+    int "Pouch Transport ACK timeout (ms)"
+    default 1000
+    help
+        The timeout, in milliseconds, that a receiver will wait
+        for new packets before retransmitting an acknowledgement
+
 rsource "gatt/Kconfig"
 rsource "http/Kconfig"
+
+module = POUCH_TRANSPORT
+module-str = Pouch Transport
+source "subsys/logging/Kconfig.template.log_config"

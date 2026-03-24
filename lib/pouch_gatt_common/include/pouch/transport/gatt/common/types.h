@@ -5,6 +5,7 @@
 #include <zephyr/toolchain.h>
 #include <stdint.h>
 #include <stddef.h>
+#include "uuids.h"
 
 #define POUCH_GATT_VERSION 1
 
