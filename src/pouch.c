@@ -7,6 +7,7 @@
 #include "downlink.h"
 #include "uplink.h"
 #include "crypto.h"
+#include "pouch/port.h"
 
 #include <pouch/events.h>
 #include <pouch/uplink.h>
@@ -41,7 +42,7 @@ void pouch_event_emit(enum pouch_event event)
     k_work_submit_to_queue(&pouch_work_q, &event_work);
 }
 
-static int pouch_module_init(void)
+static void pouch_module_init(void)
 {
     k_work_queue_init(&pouch_work_q);
 
@@ -54,10 +55,8 @@ static int pouch_module_init(void)
                        &workq_config);
 
     k_work_init(&event_work, dispatch_events);
-
-    return 0;
 }
-SYS_INIT(pouch_module_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+POUCH_APPLICATION_STARTUP_HOOK(pouch_module_init);
 
 int pouch_init(const struct pouch_config *config)
 {
