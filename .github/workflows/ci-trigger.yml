@@ -24,3 +24,29 @@ jobs:
     name: Run Twister
     uses: ./.github/workflows/test-twister.yml
     secrets: inherit
+  trigger-test-summaries:
+    name: Publish JUnit Summaries
+    if: success() || failure()
+    needs:
+      - trigger-twister
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Gather summaries
+        uses: actions/download-artifact@v8
+        with:
+          path: summary
+          pattern: ci-summary-*
+          merge-multiple: true
+
+      - name: Publish Test Report
+        uses: phoenix-actions/test-reporting@v15
+        if: success() || failure()
+        with:
+          name: Firmware Test Summary
+          path: summary/*.xml
+          reporter: java-junit
+          list-tests: failed
+          output-to: step-summary
