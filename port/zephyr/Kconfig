@@ -147,7 +147,7 @@ config MBEDTLS_USER_CONFIG_FILE
 endmenu
 
 # Transport choices
-rsource "transport/Kconfig"
+rsource "transport/*/Kconfig"
 
 module = POUCH
 module-str = Pouch

@@ -1,0 +1,43 @@
+/*
+ * Copyright (c) 2025 Golioth, Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <string.h>
+#include <pouch/types.h>
+#include <pouch/transport/certificate.h>
+#include "sar/sender.h"
+
+static struct pouch_cert cert;
+static size_t offset;
+
+static int start(struct pouch_sender *s)
+{
+    offset = 0;
+    return pouch_device_certificate_get(&cert);
+}
+
+static enum pouch_result fill(struct pouch_sender *s, void *dst, size_t *dst_len)
+{
+    enum pouch_result res = POUCH_MORE_DATA;
+    if (offset + *dst_len >= cert.size)
+    {
+        res = POUCH_NO_MORE_DATA;
+        *dst_len = cert.size - offset;
+    }
+
+    memcpy(dst, &cert.buffer[offset], *dst_len);
+    offset += *dst_len;
+
+    return res;
+}
+
+static const struct pouch_sender_handler_api api = {
+    .start = start,
+    .fill = fill,
+};
+
+struct pouch_sender pouch_topic_device_cert = {
+    .handler = &api,
+};

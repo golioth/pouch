@@ -11,3 +11,5 @@ endmenu
 
 # SDK
 rsource "golioth_sdk/Kconfig"
+
+rsource "src/transport/Kconfig"
