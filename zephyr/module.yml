@@ -1,6 +1,12 @@
 build:
   cmake: port/zephyr
   kconfig: port/zephyr/Kconfig
+  settings:
+    board_root: .
+samples:
+  - examples
+runners:
+  - file: scripts/runners/__init__.py
 package-managers:
   pip:
     requirement-files:

@@ -1,0 +1,27 @@
+sample:
+  name: Pouch Gateway with custom connect
+common:
+  tags: bluetooth
+  harness: pytest
+  harness_config:
+    pytest_dut_scope: module
+  sysbuild: true
+  platform_allow:
+    - nrf52_bsim
+  integration_platforms:
+    - nrf52_bsim
+  timeout: 120
+tests:
+  pouch.gateway_custom_connect.lesc:
+    extra_args:
+      - SB_CONFIG_PERIPHERAL_MOUNT_CREDS=y
+      - peripheral_ble_gatt_example_0_CONFIG_PICOLIBC=y
+      - peripheral_ble_gatt_example_0_CONFIG_FILE_SYSTEM_NSIM_MOUNT=y
+      - peripheral_ble_gatt_example_0_CONFIG_EXAMPLE_SYNC_PERIOD_S=2
+  pouch.gateway_custom_connect.auth:
+    extra_args:
+      - SB_CONFIG_PERIPHERAL_MOUNT_CREDS=y
+      - peripheral_ble_gatt_example_0_CONFIG_PICOLIBC=y
+      - peripheral_ble_gatt_example_0_CONFIG_FILE_SYSTEM_NSIM_MOUNT=y
+      - peripheral_ble_gatt_example_0_CONFIG_EXAMPLE_SYNC_PERIOD_S=2
+      - gateway_custom_connect_CONFIG_POUCH_GATEWAY_GATT_SCAN_FILTER_BONDED=y

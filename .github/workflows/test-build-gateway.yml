@@ -1,0 +1,104 @@
+name: Build Gateway Examples
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - manifest: west-ncs.yml
+            target: nrf9160dk/nrf9160/ns
+            app: gateway
+            sysbuild: true
+          - manifest: west-ncs.yml
+            target: thingy91x/nrf9151/ns
+            app: gateway
+            sysbuild: true
+          - manifest: west-zephyr.yml
+            target: frdm_rw612
+            artifact_suffix: -ethernet
+            app: gateway
+            sysbuild: false
+            blobs: hal_nxp
+          - manifest: west-zephyr.yml
+            target: frdm_rw612
+            artifact_suffix: -wifi
+            app: gateway
+            sysbuild: false
+            blobs: hal_nxp
+            extra_args: -DEXTRA_CONF_FILE=boards/frdm_rw612_wifi.conf
+          - manifest: west-zephyr.yml
+            target: native_sim
+            app: gateway
+            sysbuild: false
+            extra_args: -DCONFIG_POUCH_GATEWAY_CLOUD=n
+          - manifest: west-zephyr.yml
+            target: mg100
+            app: gateway
+            sysbuild: true
+    container: golioth/golioth-zephyr-base:0.17.0-SDK-v0
+    env:
+      ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-0.17.0
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          path: pouch
+
+      - name: Init and update west
+        run: |
+          west init -l pouch --mf ${{ matrix.manifest }}
+          west update --narrow -o=--depth=1
+          git config --global user.email user@git-scm.com
+          git config --global user.name "Git User"
+          west patch apply || true
+
+      - name: Install pip packages
+        run: |
+          uv pip install \
+            -r pouch/requirements.txt \
+            -r zephyr/scripts/requirements-base.txt
+
+          uv pip install            \
+            cryptography==41.0.7  \
+            pyasn1                \
+            pyyaml                \
+            cbor>=1.0.0           \
+            imgtool>=1.9.0        \
+            jinja2                \
+            click
+
+      - name: Fetch Binary Blobs
+        if: ${{ matrix.blobs }}
+        run: west blobs fetch -a ${{ matrix.blobs }}
+
+      - name: Build
+        id: build
+        env:
+          TARGET: ${{ matrix.target }}
+          SUFFIX: ${{ matrix.artifact_suffix }}
+        shell: bash
+        run: |
+          west build \
+            -b $TARGET \
+            pouch/examples/${{ matrix.app }} \
+            ${{ matrix.sysbuild && '--sysbuild' || '--no-sysbuild' }} \
+            -- ${{ matrix.extra_args }}
+
+          echo "ARTIFACT_TARGET=${TARGET//\//-}${SUFFIX}" >> $GITHUB_OUTPUT
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.app }}-${{ steps.build.outputs.ARTIFACT_TARGET }}
+          path: |
+            build/${{ matrix.sysbuild && matrix.app || '' }}/zephyr/zephyr.hex
+            build/${{ matrix.sysbuild && matrix.app || '' }}/zephyr/zephyr.elf
+            build/${{ matrix.sysbuild && matrix.app || '' }}/zephyr/zephyr.map
+            ${{ ((matrix.manifest == 'west-ncs.yml') && 'build/merged.hex') || '' }}
+            ${{ (matrix.sysbuild && (matrix.manifest == 'west-ncs.yml') && 'build/dfu_application.zip') || '' }}

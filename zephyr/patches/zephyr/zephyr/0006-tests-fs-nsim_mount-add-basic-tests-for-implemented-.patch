@@ -1,0 +1,358 @@
+From 20f3456b3e9a36471fe36087f7ac63137c592b6a Mon Sep 17 00:00:00 2001
+From: Marcin Niestroj <m.niestroj@emb.dev>
+Date: Tue, 5 Aug 2025 15:51:59 +0200
+Subject: [PATCH] tests: fs: nsim_mount: add basic tests for implemented
+ operations
+
+Signed-off-by: Marcin Niestroj <m.niestroj@emb.dev>
+---
+ tests/subsys/fs/nsim_mount/CMakeLists.txt     | 21 +++++
+ tests/subsys/fs/nsim_mount/prj.conf           | 13 +++
+ tests/subsys/fs/nsim_mount/src/main.c         | 10 +++
+ tests/subsys/fs/nsim_mount/src/mount.c        | 83 +++++++++++++++++++
+ tests/subsys/fs/nsim_mount/src/mount.h        | 17 ++++
+ .../fs/nsim_mount/src/test_nsim_mount_basic.c | 31 +++++++
+ .../nsim_mount/src/test_nsim_mount_dirops.c   | 33 ++++++++
+ .../src/test_nsim_mount_open_flags.c          | 54 ++++++++++++
+ tests/subsys/fs/nsim_mount/testcase.yaml      | 11 +++
+ 9 files changed, 273 insertions(+)
+ create mode 100644 tests/subsys/fs/nsim_mount/CMakeLists.txt
+ create mode 100644 tests/subsys/fs/nsim_mount/prj.conf
+ create mode 100644 tests/subsys/fs/nsim_mount/src/main.c
+ create mode 100644 tests/subsys/fs/nsim_mount/src/mount.c
+ create mode 100644 tests/subsys/fs/nsim_mount/src/mount.h
+ create mode 100644 tests/subsys/fs/nsim_mount/src/test_nsim_mount_basic.c
+ create mode 100644 tests/subsys/fs/nsim_mount/src/test_nsim_mount_dirops.c
+ create mode 100644 tests/subsys/fs/nsim_mount/src/test_nsim_mount_open_flags.c
+ create mode 100644 tests/subsys/fs/nsim_mount/testcase.yaml
+
+diff --git a/tests/subsys/fs/nsim_mount/CMakeLists.txt b/tests/subsys/fs/nsim_mount/CMakeLists.txt
+new file mode 100644
+index 00000000000..810ea7f7e13
+--- /dev/null
++++ b/tests/subsys/fs/nsim_mount/CMakeLists.txt
+@@ -0,0 +1,21 @@
++# SPDX-License-Identifier: Apache-2.0
++
++cmake_minimum_required(VERSION 3.20.0)
++find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
++project(nsim_mount)
++
++file(GLOB app_sources src/*.c)
++
++target_sources(app PRIVATE
++  ${app_sources}
++  ../common/test_fs_util.c
++  ../common/test_fs_open_flags.c
++  ../common/test_fs_dirops.c
++  ../common/test_fs_basic.c
++)
++
++file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test_fs)
++
++target_compile_definitions(app PRIVATE
++  TEST_FS_DIR="${CMAKE_CURRENT_BINARY_DIR}/test_fs"
++)
+diff --git a/tests/subsys/fs/nsim_mount/prj.conf b/tests/subsys/fs/nsim_mount/prj.conf
+new file mode 100644
+index 00000000000..b9e80676199
+--- /dev/null
++++ b/tests/subsys/fs/nsim_mount/prj.conf
+@@ -0,0 +1,13 @@
++CONFIG_FILE_SYSTEM=y
++CONFIG_FILE_SYSTEM_MKFS=y
++CONFIG_FILE_SYSTEM_NSIM_MOUNT=y
++CONFIG_MAIN_STACK_SIZE=4096
++
++# Performance tests need custom buffer allocation
++CONFIG_COMMON_LIBC_MALLOC_ARENA_SIZE=8192
++
++CONFIG_LOG=y
++CONFIG_FS_LOG_LEVEL_DBG=y
++
++CONFIG_ZTEST=y
++CONFIG_ZTEST_STACK_SIZE=4096
+diff --git a/tests/subsys/fs/nsim_mount/src/main.c b/tests/subsys/fs/nsim_mount/src/main.c
+new file mode 100644
+index 00000000000..396405c85da
+--- /dev/null
++++ b/tests/subsys/fs/nsim_mount/src/main.c
+@@ -0,0 +1,10 @@
++/*
++ * Copyright (c) 2025 Golioth, Inc.
++ * Copyright (c) 2025 Marcin Niestroj
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#include <zephyr/ztest.h>
++
++ZTEST_SUITE(nsim_mount, NULL, NULL, NULL, NULL, NULL);
+diff --git a/tests/subsys/fs/nsim_mount/src/mount.c b/tests/subsys/fs/nsim_mount/src/mount.c
+new file mode 100644
+index 00000000000..ebb13aae032
+--- /dev/null
++++ b/tests/subsys/fs/nsim_mount/src/mount.c
+@@ -0,0 +1,83 @@
++/*
++ * Copyright (c) 2025 Golioth, Inc.
++ * Copyright (c) 2025 Marcin Niestroj
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#include <string.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <zephyr/fs/fs.h>
++
++#include <zephyr/logging/log.h>
++LOG_MODULE_REGISTER(mount);
++
++#include "mount.h"
++
++struct fs_mount_t test_mp = {
++	.type = FS_NSIM_MOUNT,
++	.mnt_point = "/test_fs",
++	.fs_data = TEST_FS_DIR,
++	.storage_dev = NULL,
++};
++
++static int fs_rm_child(const char *path, struct fs_dir_t *dp)
++{
++	struct fs_dirent entry;
++	char *path_child;
++	int err;
++
++	err = fs_readdir(dp, &entry);
++	if (err) {
++		LOG_ERR("Failed to readdir during rm: %d", err);
++		return err;
++	}
++
++	if (entry.name[0] == '\0') {
++		return -EAGAIN;
++	}
++
++	path_child = malloc(strlen(path) + strlen(entry.name) + sizeof("/"));
++	if (!path_child) {
++		return -ENOMEM;
++	}
++
++	sprintf(path_child, "%s/%s", path, entry.name);
++
++	if (entry.type == FS_DIR_ENTRY_DIR) {
++		err = fs_rm_all(path_child);
++		if (err) {
++			goto free_child_path;
++		}
++	}
++
++	LOG_INF("Unlinking %s", path_child);
++
++	err = fs_unlink(path_child);
++
++free_child_path:
++	free(path_child);
++
++	return err;
++}
++
++int fs_rm_all(const char *path)
++{
++	struct fs_dir_t dp = {};
++	int err = 0;
++
++	LOG_INF("rm all %s", path);
++
++	err = fs_opendir(&dp, path);
++	if (err) {
++		LOG_ERR("opendir failed: %d", err);
++		return err;
++	}
++
++	while (err == 0) {
++		err = fs_rm_child(path, &dp);
++	}
++
++	return fs_closedir(&dp);
++}
+diff --git a/tests/subsys/fs/nsim_mount/src/mount.h b/tests/subsys/fs/nsim_mount/src/mount.h
+new file mode 100644
+index 00000000000..6aaee89bb36
+--- /dev/null
++++ b/tests/subsys/fs/nsim_mount/src/mount.h
+@@ -0,0 +1,17 @@
++/*
++ * Copyright (c) 2025 Golioth, Inc.
++ * Copyright (c) 2025 Marcin Niestroj
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#ifndef __FS_MOUNT_H__
++#define __FS_MOUNT_H__
++
++#include <zephyr/fs/fs.h>
++
++extern struct fs_mount_t test_mp;
++
++int fs_rm_all(const char *path);
++
++#endif /* __FS_MOUNT_H__ */
+diff --git a/tests/subsys/fs/nsim_mount/src/test_nsim_mount_basic.c b/tests/subsys/fs/nsim_mount/src/test_nsim_mount_basic.c
+new file mode 100644
+index 00000000000..2d14d9b84cd
+--- /dev/null
++++ b/tests/subsys/fs/nsim_mount/src/test_nsim_mount_basic.c
+@@ -0,0 +1,31 @@
++/*
++ * Copyright (c) 2025 Golioth, Inc.
++ * Copyright (c) 2025 Marcin Niestroj
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#include <string.h>
++#include <zephyr/ztest.h>
++#include <zephyr/fs/fs.h>
++
++#include "mount.h"
++
++void test_fs_basic(void);
++
++struct fs_mount_t *fs_basic_test_mp = &test_mp;
++
++ZTEST(nsim_mount, test_nsim_mount_basic)
++{
++	zassert_equal(fs_mount(&test_mp), 0,
++		      "mount failed");
++	zassert_equal(fs_rm_all(test_mp.mnt_point), 0,
++		      "rm all failed");
++	zassert_equal(fs_unmount(&test_mp), 0,
++		      "unmount small failed");
++
++	/* Common basic tests.
++	 * (File system is mounted and unmounted during that test.)
++	 */
++	test_fs_basic();
++}
+diff --git a/tests/subsys/fs/nsim_mount/src/test_nsim_mount_dirops.c b/tests/subsys/fs/nsim_mount/src/test_nsim_mount_dirops.c
+new file mode 100644
+index 00000000000..ef7da83dc1b
+--- /dev/null
++++ b/tests/subsys/fs/nsim_mount/src/test_nsim_mount_dirops.c
+@@ -0,0 +1,33 @@
++/*
++ * Copyright (c) 2025 Golioth, Inc.
++ * Copyright (c) 2025 Marcin Niestroj
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#include <string.h>
++#include <stdlib.h>
++#include <zephyr/ztest.h>
++#include <zephyr/fs/fs.h>
++
++#include "mount.h"
++
++void test_fs_dirops(void);
++
++/* Mount structure needed by test_fs_basic tests. */
++struct fs_mount_t *fs_dirops_test_mp = &test_mp;
++
++ZTEST(nsim_mount, test_nsim_mount_dirops)
++{
++	zassert_equal(fs_mount(&test_mp), 0,
++		      "mount failed");
++	zassert_equal(fs_rm_all(test_mp.mnt_point), 0,
++		      "rm all failed");
++	zassert_equal(fs_unmount(&test_mp), 0,
++		      "unmount small failed");
++
++	/* Common dirops tests.
++	 * (File system is mounted and unmounted during that test.)
++	 */
++	test_fs_dirops();
++}
+diff --git a/tests/subsys/fs/nsim_mount/src/test_nsim_mount_open_flags.c b/tests/subsys/fs/nsim_mount/src/test_nsim_mount_open_flags.c
+new file mode 100644
+index 00000000000..4a1a175a7c3
+--- /dev/null
++++ b/tests/subsys/fs/nsim_mount/src/test_nsim_mount_open_flags.c
+@@ -0,0 +1,54 @@
++/*
++ * Copyright (c) 2025 Golioth, Inc.
++ * Copyright (c) 2025 Marcin Niestroj
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#include <zephyr/ztest.h>
++
++#include "mount.h"
++
++void test_fs_open_flags(void);
++/* Expected by test_fs_open_flags() */
++const char *test_fs_open_flags_file_path = "/test_fs" "/the_file";
++
++static void mount(struct fs_mount_t *mp)
++{
++	TC_PRINT("Mount %s\n", mp->mnt_point);
++
++	zassert_equal(fs_mount(mp), 0, "Failed to mount partition");
++}
++
++static void unmount(struct fs_mount_t *mp)
++{
++	TC_PRINT("Unmounting %s\n", mp->mnt_point);
++
++	zassert_equal(fs_unmount(mp), 0,
++		      "Failed to unmount partition");
++}
++
++static void cleanup(struct fs_mount_t *mp)
++{
++	TC_PRINT("Clean %s\n", mp->mnt_point);
++
++	zassert_equal(fs_rm_all(mp->mnt_point), TC_PASS,
++		      "Failed to clean partition");
++}
++
++ZTEST(nsim_mount, test_nsim_mount_open_flags)
++
++{
++	/* Using smallest partition for this tests as they do not write
++	 * a lot of data, basically they just check flags.
++	 */
++	struct fs_mount_t *mp = &test_mp;
++
++	mp->flags = 0;
++	mount(mp);
++	cleanup(mp);
++
++	test_fs_open_flags();
++
++	unmount(mp);
++}
+diff --git a/tests/subsys/fs/nsim_mount/testcase.yaml b/tests/subsys/fs/nsim_mount/testcase.yaml
+new file mode 100644
+index 00000000000..e8693894deb
+--- /dev/null
++++ b/tests/subsys/fs/nsim_mount/testcase.yaml
+@@ -0,0 +1,11 @@
++common:
++  tags:
++    - filesystem
++    - nsim_mount
++  platform_allow:
++    - native_sim
++    - native_sim/native/64
++  integration_platforms:
++    - native_sim
++tests:
++  filesystem.nsim_mount.default: {}
+-- 
+2.51.0
+

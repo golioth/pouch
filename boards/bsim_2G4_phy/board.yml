@@ -1,0 +1,5 @@
+boards:
+- name: bsim_2G4_phy
+  vendor: zephyr
+  socs:
+  - name: native

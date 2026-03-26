@@ -1,0 +1,93 @@
+config POUCH_GATEWAY
+    bool "Pouch Gateway"
+
+if POUCH_GATEWAY
+
+config POUCH_GATEWAY_NUM_BLOCKS
+    int "Number of blocks in downlink/uplink buffer"
+    default 10
+    help
+      The number of blocks available for buffering uplink or downlink
+      data between a node device and the cloud. Each block is equal
+      to CONFIG_GOLIOTH_BLOCKWISE_UPLOAD_MAX_BLOCK_SIZE in length.
+
+config POUCH_GATEWAY_DEVICE_CERT_MAX_LEN
+    int "Device certificate maximum length"
+    default 1024
+    help
+      Maximum length of device certificate.
+
+config POUCH_GATEWAY_SERVER_CERT_MAX_LEN
+    int "Server certificate maximum length"
+    default 4096
+    help
+      Maximum length of server certificate.
+
+config POUCH_GATEWAY_SERVER_CERT_PEM
+    string "Server certificate PEM file"
+    default "server-prod.pem"
+    help
+        Location of the CoAP server certificate in PEM format. Path
+        may be absolute or relative to the Pouch gateway `src/gateway`
+        directory.
+
+config POUCH_GATEWAY_DOWNLINK_BLOCK_TIMEOUT
+    int "Downlink timeout"
+    default 10
+    help
+      The time in seconds that the downlink module will wait for a
+      block to become available in the buffer. This should be larger
+      than the duration it takes to send one block to the node device.
+
+config POUCH_GATEWAY_CLOUD
+    bool "Send pouches to cloud"
+    default y
+
+config POUCH_GATEWAY_SERVER_CERT_BUILTIN
+    bool
+    default y if !POUCH_GATEWAY_CLOUD
+
+config POUCH_GATT_INFO_WINDOW_SIZE
+    int "Info GATT Window Size"
+    range 1 127
+    default 4
+    help
+        The number of unacknowledged packets that can be received by
+        the device on the info characteristic. Larger numbers can
+        increase throughput but will use more RAM.
+
+config POUCH_GATT_DEVICE_CERT_WINDOW_SIZE
+    int "Device Cert GATT Window Size"
+    range 1 127
+    default 4
+    help
+        The number of unacknowledged packets that can be received by
+        the device on the device certificate characteristic. Larger
+        numbers can increase throughput but will use more RAM.
+
+config POUCH_GATT_UPLINK_WINDOW_SIZE
+    int "Uplink GATT Window Size"
+    range 1 127
+    default 4
+    help
+        The number of unacknowledged packets that can be received by
+        the device on the uplink characteristic. Larger numbers can
+        increase throughput but will use more RAM.
+
+module = POUCH_GATEWAY
+module-str = Pouch Gateway Library
+source "subsys/logging/Kconfig.template.log_config"
+
+config POUCH_GATEWAY_GATT_SCAN_FILTER_BONDED
+    bool "Scan filter by bonded status"
+    help
+      Filter scanned devices by bonded status. Use it for
+      authenticated connections, so that discovered devices will be
+      ignored when not bonded already. Bonding can be triggered
+      explicitly by calling pouch_gateway_bonding_enable() API.
+
+module = POUCH_GATEWAY_GATT
+module-str = Pouch Gateway GATT Library
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # POUCH_GATEWAY

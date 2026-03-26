@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/test-build-gateway.yml
+
+  release:
+    name: Release
+    needs: [build]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release artifacts
+        run: |
+          mkdir -p release
+
+          mv artifacts/gateway-nrf9160dk-nrf9160-ns/merged.hex \
+            release/nrf9160dk_nrf9160.hex
+          mv artifacts/gateway-nrf9160dk-nrf9160-ns/gateway/zephyr/zephyr.elf \
+            release/nrf9160dk_nrf9160_ns.elf
+
+          mv artifacts/gateway-thingy91x-nrf9151-ns/merged.hex \
+            release/thingy91x_nrf9151.hex
+          mv artifacts/gateway-thingy91x-nrf9151-ns/gateway/zephyr/zephyr.elf \
+            release/thingy91x_nrf9151_ns.elf
+
+          mv artifacts/gateway-frdm_rw612-ethernet/zephyr.hex \
+            release/frdm_rw612-ethernet.hex
+          mv artifacts/gateway-frdm_rw612-ethernet/zephyr.elf \
+            release/frdm_rw612-ethernet.elf
+          mv artifacts/gateway-frdm_rw612-wifi/zephyr.hex \
+            release/frdm_rw612-wifi.hex
+          mv artifacts/gateway-frdm_rw612-wifi/zephyr.elf \
+            release/frdm_rw612-wifi.elf
+
+          mv artifacts/gateway-mg100/zephyr.hex \
+            release/mg100.hex
+          mv artifacts/gateway-mg100/zephyr.elf \
+            release/mg100.elf
+
+      - name: List release artifacts
+        run: |
+          ls release/*.elf
+          ls release/*.hex
+
+      - name: Upload release artifacts
+        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8
+        with:
+          files: |
+            release/*.elf
+            release/*.hex
