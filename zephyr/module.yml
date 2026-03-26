@@ -1,5 +1,5 @@
 build:
-  cmake: .
+  cmake: port/zephyr
   kconfig: Kconfig
 package-managers:
   pip:
