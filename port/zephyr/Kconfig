@@ -173,7 +173,7 @@ endchoice
 if POUCH_TRANSPORT_BLE_GATT
 
 menu "BLE GATT Transport Options"
-rsource "../../src/transport/gatt/Kconfig"
+rsource "transport/gatt/Kconfig"
 endmenu
 
 endif
@@ -181,7 +181,7 @@ endif
 if POUCH_TRANSPORT_HTTP_CLIENT
 
 menu "HTTP Transport Options"
-rsource "../../src/transport/http/Kconfig"
+rsource "transport/http/Kconfig"
 endmenu
 
 endif # POUCH_TRANSPORT_HTTP_CLIENT

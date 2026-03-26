@@ -38,9 +38,9 @@ if(CONFIG_POUCH)
     # Transports
 
     if (CONFIG_POUCH_TRANSPORT_BLE_GATT)
-        add_subdirectory(../../src/transport/gatt example_gatt)
+        add_subdirectory(transport/gatt example_gatt)
     endif()
     if (CONFIG_POUCH_TRANSPORT_HTTP_CLIENT)
-        add_subdirectory(../../src/transport/http example_http)
+        add_subdirectory(transport/http example_http)
     endif()
 endif()
