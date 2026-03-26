@@ -1,15 +1,13 @@
-# Copyright (c) 2025 Golioth, Inc.
+# Copyright (c) 2026 Golioth, Inc.
 #
 # SPDX-License-Identifier: Apache-2.0
 
 if(CONFIG_POUCH)
-    zephyr_include_directories(include)
+    target_include_directories(pouch PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
 
-    zephyr_library_named(pouch)
+    set(pouch_source_files)
 
-    zephyr_library_sources(
-      ${CMAKE_CURRENT_BINARY_DIR}/header_decode.c
-      ${CMAKE_CURRENT_BINARY_DIR}/header_encode.c
+    list(APPEND pouch_source_files
       src/pouch.c
       src/uplink.c
       src/header.c
@@ -20,48 +18,39 @@ if(CONFIG_POUCH)
       src/downlink.c
     )
 
-    zephyr_library_sources_ifdef(CONFIG_POUCH_ENCRYPTION_NONE src/crypto_none.c)
-    zephyr_library_sources_ifdef(CONFIG_POUCH_ENCRYPTION_SAEAD
-        src/crypto_saead.c
-        src/cert.c
-        src/saead/session.c
-        src/saead/uplink.c
-        src/saead/downlink.c
-    )
+    if (CONFIG_POUCH_ENCRYPTION_NONE)
+        list(APPEND pouch_source_files src/crypto_none.c)
+    endif (CONFIG_POUCH_ENCRYPTION_NONE)
 
-    if (DEFINED CONFIG_POUCH_CA_CERT_FILENAME)
-        find_file(ca_cert ${CONFIG_POUCH_CA_CERT_FILENAME}
-            PATHS
-            ${CMAKE_CURRENT_SOURCE_DIR}
-            ${APP_DIR}
-            REQUIRED)
+    if (CONFIG_POUCH_ENCRYPTION_SAEAD)
+        list(APPEND pouch_source_files
+            src/crypto_saead.c
+            src/cert.c
+            src/saead/session.c
+            src/saead/uplink.c
+            src/saead/downlink.c
+        )
+    endif (CONFIG_POUCH_ENCRYPTION_SAEAD)
 
-        generate_inc_file_for_target(pouch
-            ${ca_cert}
-            ${ZEPHYR_BINARY_DIR}/include/generated/golioth_ca_cert.inc)
-    endif()
+    target_sources(pouch PRIVATE ${pouch_source_files})
 
-    zephyr_linker_sources(SECTIONS src/downlink_handlers.ld)
-    zephyr_linker_sources(SECTIONS src/uplink_handlers.ld)
-    zephyr_linker_sources(SECTIONS src/event_handlers.ld)
+    add_custom_command(
+        OUTPUT
+            ${CMAKE_CURRENT_BINARY_DIR}/header_decode.c
+            ${CMAKE_CURRENT_BINARY_DIR}/header_encode.c
+        COMMAND zcbor code -c ${CMAKE_CURRENT_LIST_DIR}/src/header.cddl -t pouch_header -sde
+            --include-prefix cddl/ --oc header.c --oh ../include/cddl/header.h
+        BYPRODUCTS
+            ${CMAKE_CURRENT_BINARY_DIR}/include/cddl/header_decode.h
+            ${CMAKE_CURRENT_BINARY_DIR}/include/cddl/header_encode.h
+            ${CMAKE_CURRENT_BINARY_DIR}/include/cddl/header_types.h
+        DEPENDS ${CMAKE_CURRENT_LIST_DIR}/src/header.cddl)
 
-    add_custom_command(OUTPUT header_decode.c header_encode.c
-        COMMAND zcbor code -c ${CMAKE_CURRENT_LIST_DIR}/src/header.cddl -t pouch_header -sde --include-prefix cddl/ --oc header.c --oh include/cddl/header.h
-        BYPRODUCTS include/cddl/header_decode.h include/cddl/header_encode.h include/cddl/header_types.h
-        DEPENDS src/header.cddl)
+    add_custom_target(pouch_generate_headers DEPENDS
+        ${CMAKE_CURRENT_BINARY_DIR}/header_decode.c
+        ${CMAKE_CURRENT_BINARY_DIR}/header_encode.c)
 
-    zephyr_library_include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
-
-    zephyr_library_link_libraries(mbedTLS)
-
-    # Transports
-
-    if (CONFIG_POUCH_TRANSPORT_BLE_GATT)
-        add_subdirectory(src/transport/gatt)
-    endif()
-    if (CONFIG_POUCH_TRANSPORT_HTTP_CLIENT)
-        add_subdirectory(src/transport/http)
-    endif()
+    add_dependencies(pouch pouch_generate_headers)
 
     if (DEFINED CONFIG_POUCH_ENCRYPTION_SAEAD AND NOT DEFINED CONFIG_POUCH_VALIDATE_SERVER_CERT)
         message(WARNING " \n"
@@ -80,10 +69,10 @@ if(CONFIG_POUCH)
                 " **************************************************")
     endif()
 
-    add_subdirectory(golioth_sdk)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/golioth_sdk golioth_sdk)
 
 endif()
 
 # Libraries
 
-add_subdirectory(lib)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib lib)
