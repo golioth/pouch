@@ -3,6 +3,7 @@
 
 manifest:
   version: 0.8
+  group-filter: [+babblesim]
 
   projects:
     - name: zephyr
@@ -17,12 +18,22 @@ manifest:
           - hal_nxp
           - mbedtls
           - mcuboot
+          - nrf_hw_models
           - picolibc
           - segger
           - tfm-mcuboot
           - trusted-firmware-m
           - littlefs
           - zcbor
+        path-allowlist:
+          - "tools/bsim"
+          - "tools/bsim/*"
+          - "tools/bsim/*/*"
+
+    - name: golioth
+      path: modules/lib/golioth-firmware-sdk
+      revision: 60f0e8ab323b6a812fd68759817bc1e27f3258e5
+      url: https://github.com/golioth/golioth-firmware-sdk.git
 
   self:
     path: pouch

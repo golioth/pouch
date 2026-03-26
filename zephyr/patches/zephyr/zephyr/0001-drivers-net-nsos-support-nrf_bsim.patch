@@ -1,0 +1,34 @@
+From 073a10f50ff7275970471af29f27b6ba5c4b17b5 Mon Sep 17 00:00:00 2001
+From: Marcin Niestroj <m.niestroj@emb.dev>
+Date: Tue, 14 Jan 2025 16:53:03 +0100
+Subject: [PATCH] drivers: net: nsos: support nrf_bsim
+
+hw_irq_ctrl_set_irq() is different for native_sim and nrf_bsim, as for the
+latter there is additional argument needed. Support that by detecting
+CONFIG_NATIVE_SIMULATOR_MCU_N at build time and passing its value to
+'native_simulator' cmake target for use with hw_irq_ctrl_set_irq() API.
+
+Signed-off-by: Marcin Niestroj <m.niestroj@emb.dev>
+---
+ drivers/net/nsos_adapt.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/net/nsos_adapt.c b/drivers/net/nsos_adapt.c
+index d1631efc651..9e908982e38 100644
+--- a/drivers/net/nsos_adapt.c
++++ b/drivers/net/nsos_adapt.c
+@@ -1164,7 +1164,11 @@ static void nsos_adapt_poll_triggered(void)
+ 	}
+ 
+ 	if (ret > 0) {
++#ifdef NSI_PRIMARY_MCU_N
++		hw_irq_ctrl_set_irq(NSI_PRIMARY_MCU_N, NSOS_IRQ);
++#else
+ 		hw_irq_ctrl_set_irq(NSOS_IRQ);
++#endif
+ 		nsos_adapt_poll_time = nsi_hws_get_time() + 1;
+ 	} else {
+ 		nsos_adapt_poll_time = nsi_hws_get_time() + NSOS_EPOLL_WAIT_INTERVAL;
+-- 
+2.51.0
+

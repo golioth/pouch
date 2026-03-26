@@ -5,3 +5,5 @@ build/
 twister-out*/
 sdkconfig
 sdkconfig.old
+*.py[cod]
+*.egg

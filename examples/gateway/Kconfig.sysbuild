@@ -1,0 +1,76 @@
+# Copyright (c) 2025 Golioth, Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+menu "Gateway configuration"
+
+config POUCH_GATEWAY_CLOUD
+	bool "Send pouches to cloud"
+	default y
+	help
+	  Disabling cloud communication allows to test Pouch Gateway
+	  functionality without relying on communication with backend. All
+	  pouches received from Bluetooth nodes are dropped in that case.
+
+config GOLIOTH_COAP_HOST_URI
+	string "CoAP server URI"
+	default "coaps://coap.golioth.io"
+	help
+	  The URI of the CoAP server.
+
+endmenu
+
+menu "BabbleSim components"
+	depends on SOC = "native"
+
+config BSIM_HANDBRAKE
+	bool "Handbrake"
+	default y if POUCH_GATEWAY_CLOUD
+
+endmenu
+
+menu "BabbleSim peripherals"
+	depends on SOC = "native"
+
+config PERIPHERAL_ZEPHYR
+	bool "Zephyr"
+	help
+	  Zephyr peripheral sample.
+
+config PERIPHERAL_ZEPHYR_NUM
+	int "Number of Zephyr peripherals"
+	default 1
+	depends on PERIPHERAL_ZEPHYR
+
+config PERIPHERAL_PERIODIC_UPLINK
+	bool "Periodic uplink"
+	help
+	  Periodic uplink sample.
+
+config PERIPHERAL_PERIODIC_UPLINK_NUM
+	int "Number of periodic uplink peripherals"
+	default 1
+	depends on PERIPHERAL_PERIODIC_UPLINK
+
+config PERIPHERAL_BLE_GATT_EXAMPLE
+	bool "BLE GATT example"
+	default y
+	help
+	  BLE GATT sample.
+
+config PERIPHERAL_BLE_GATT_EXAMPLE_NUM
+	int "Number of BLE GATT example peripherals"
+	default 1
+	depends on PERIPHERAL_BLE_GATT_EXAMPLE
+
+endmenu
+
+config PERIPHERAL_MOUNT_CREDS
+	bool "Mount credentials under /creds directory"
+	help
+	  Mount credentials located ${BUILD_DIR}/creds under /creds mountpoint in Zephyr.
+
+choice BOOTLOADER
+	default BOOTLOADER_MCUBOOT if SOC != "native"
+endchoice
+
+source "share/sysbuild/Kconfig"

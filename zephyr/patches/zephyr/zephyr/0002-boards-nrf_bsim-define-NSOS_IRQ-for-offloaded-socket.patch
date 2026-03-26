@@ -1,0 +1,56 @@
+From dacb35a6427d1f177bada3e10cea8162af5c0757 Mon Sep 17 00:00:00 2001
+From: Marcin Niestroj <m.niestroj@emb.dev>
+Date: Tue, 14 Jan 2025 17:02:25 +0100
+Subject: [PATCH] boards: nrf_bsim: define NSOS_IRQ for offloaded sockets
+ support
+
+Define NSOS_IRQ as 25. For nrf52_bsim this is the same as SWI5_EGU5.
+
+Reduce number of included header for native_simulator build to minimum, so
+that build passes without missing header errors.
+
+This is clearly a workaround for now, but a final solution is yet to be
+developed once nrf52_bsim proves to be beneficial in long term.
+
+Signed-off-by: Marcin Niestroj <m.niestroj@emb.dev>
+---
+ boards/native/nrf_bsim/board_soc.h | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/boards/native/nrf_bsim/board_soc.h b/boards/native/nrf_bsim/board_soc.h
+index e0b1cb60a59..a99916ec2cf 100644
+--- a/boards/native/nrf_bsim/board_soc.h
++++ b/boards/native/nrf_bsim/board_soc.h
+@@ -19,6 +19,7 @@
+ #ifndef BOARDS_POSIX_NRF_BSIM_BOARD_SOC_H
+ #define BOARDS_POSIX_NRF_BSIM_BOARD_SOC_H
+ 
++#ifdef CONFIG_SOC_SERIES_BSIM_NRFXX
+ #include <zephyr/toolchain.h>
+ #include <zephyr/sys/util.h>
+ 
+@@ -27,9 +28,11 @@
+ #include <zephyr/types.h>
+ #include <stddef.h>
+ #include <zephyr/irq.h>
+-#include <nrfx.h>
+ #include "cmsis.h"
+ #include "soc_nrf_common.h"
++#endif /* CONFIG_SOC_SERIES_BSIM_NRFXX */
++
++#include <nrfx.h>
+ 
+ /* For offloading interrupts we can use any free interrupt */
+ #if defined(CONFIG_BOARD_NRF52_BSIM)
+@@ -42,6 +45,8 @@
+ #define OFFLOAD_SW_IRQ SWI00_IRQn
+ #endif
+ 
++#define NSOS_IRQ 25
++
+ #define FLASH_PAGE_ERASE_MAX_TIME_US	89700UL
+ #define FLASH_PAGE_MAX_CNT		256UL
+ 
+-- 
+2.51.0
+

@@ -155,5 +155,8 @@ source "subsys/logging/Kconfig.template.log_config"
 
 endif
 
+# Gateway
+rsource "../../src/gateway/Kconfig"
+
 # Libraries and SDK
 rsource "../../Kconfig"

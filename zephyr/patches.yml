@@ -1,4 +1,20 @@
 patches:
+  - path: zephyr/zephyr/0001-drivers-net-nsos-support-nrf_bsim.patch
+    sha256sum: 25ce052740bb44d2d575a7f3187817cf1f22aa41c6328982f0f1b3c4f8ad7593
+    module: zephyr
+    author: Marcin Niestroj
+    email: m.niestroj@emb.dev
+    date: 2025-01-14
+    apply-command: >-
+      bash -c 'if [ $(west config manifest.file) = "west-zephyr.yml" ]; then git am $@; fi' --
+  - path: zephyr/zephyr/0002-boards-nrf_bsim-define-NSOS_IRQ-for-offloaded-socket.patch
+    sha256sum: 13916913dc7f11cd4d5d3ef875da739818e90fac8847f2ce244f3f6705c03149
+    module: zephyr
+    author: Marcin Niestroj
+    email: m.niestroj@emb.dev
+    date: 2025-01-14
+    apply-command: >-
+      bash -c 'if [ $(west config manifest.file) = "west-zephyr.yml" ]; then git am $@; fi' --
   - path: zephyr/zephyr/0003-nsi-move-nsos_fcntl-to-more-generic-nsi_fcntl.patch
     sha256sum: 0830899d226a3b7cd1f7b002b8cd746857a41f2a19ee899bfc5cf15773f296c5
     module: zephyr
@@ -21,5 +37,13 @@ patches:
     author: Marcin Niestroj
     email: m.niestroj@emb.dev
     date: 2025-08-14
+    apply-command: >-
+      bash -c 'if [ $(west config manifest.file) = "west-zephyr.yml" ]; then git am $@; fi' --
+  - path: zephyr/zephyr/0006-tests-fs-nsim_mount-add-basic-tests-for-implemented-.patch
+    sha256sum: 5117af152443b7d703e7c8b0fafa76a1d3cf34e5077b1587fbe09583129bbaad
+    module: zephyr
+    author: Marcin Niestroj
+    email: m.niestroj@emb.dev
+    date: 2025-08-05
     apply-command: >-
       bash -c 'if [ $(west config manifest.file) = "west-zephyr.yml" ]; then git am $@; fi' --
