@@ -2,6 +2,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+if POUCH_TRANSPORT_BLE_GATT
+
+menu "BLE GATT Transport Options"
+
 config POUCH_TRANSPORT_GATT_CUD_ATTRIBUTES
     bool "Include CUD attributes for each characteristic"
     help
@@ -42,3 +46,7 @@ config POUCH_GATT_SERVER_CERT_WINDOW_SIZE
 module = POUCH_GATT
 module-str = Pouch GATT
 source "subsys/logging/Kconfig.template.log_config"
+
+endmenu # "BLE GATT Transport Options"
+
+endif # POUCH_TRANSPORT_BLE_GATT

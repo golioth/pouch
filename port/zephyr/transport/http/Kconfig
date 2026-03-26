@@ -2,6 +2,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+if POUCH_TRANSPORT_HTTP_CLIENT
+
+menu "HTTP Transport Options"
+
 config POUCH_HTTP_GW_URI
     string "Pouch gateway address"
     default "gw.golioth.io"
@@ -45,3 +49,7 @@ config POUCH_HTTP_SERVER_CRT_MAX_SIZE
 module = POUCH_HTTP_CLIENT
 module-str = Pouch HTTP Client
 source "subsys/logging/Kconfig.template.log_config"
+
+endmenu # "HTTP Transport Options"
+
+endif # POUCH_TRANSPORT_HTTP_CLIENT
