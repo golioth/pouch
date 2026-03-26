@@ -1,6 +1,6 @@
 build:
   cmake: port/zephyr
-  kconfig: Kconfig
+  kconfig: port/zephyr/Kconfig
 package-managers:
   pip:
     requirement-files:
