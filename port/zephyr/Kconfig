@@ -146,45 +146,8 @@ config MBEDTLS_USER_CONFIG_FILE
 
 endmenu
 
-choice
-  prompt "Pouch transport"
-  optional
-  help
-    Select the transport protocol that will carry Pouch
-
-config POUCH_TRANSPORT_BLE_GATT
-  bool "BLE GATT"
-  depends on BT
-  select BT_GATT_DYNAMIC_DB
-  select POUCH_TRANSPORT_GATT_COMMON
-  help
-    BLE GATT transport for Pouch
-
-config POUCH_TRANSPORT_HTTP_CLIENT
-  bool "HTTP"
-  imply HTTP_CLIENT
-  select EVENTS
-  select NET_CONNECTION_MANAGER
-  help
-    HTTP transport for Pouch
-
-endchoice
-
-if POUCH_TRANSPORT_BLE_GATT
-
-menu "BLE GATT Transport Options"
-rsource "transport/gatt/Kconfig"
-endmenu
-
-endif
-
-if POUCH_TRANSPORT_HTTP_CLIENT
-
-menu "HTTP Transport Options"
-rsource "transport/http/Kconfig"
-endmenu
-
-endif # POUCH_TRANSPORT_HTTP_CLIENT
+# Transport choices
+rsource "transport/Kconfig"
 
 module = POUCH
 module-str = Pouch
