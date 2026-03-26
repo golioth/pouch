@@ -14,9 +14,9 @@
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/iterable_sections.h>
 #include <pouch/downlink.h>
+#include <pouch/port.h>
 
-#include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(entry, CONFIG_POUCH_LOG_LEVEL);
+POUCH_LOG_REGISTER(entry, CONFIG_POUCH_LOG_LEVEL);
 
 #define ENTRY_HEADER_OVERHEAD 5
 
@@ -62,9 +62,9 @@ static const char *entry_content_format_str(int content_format)
 
 static void downlink_start(unsigned int stream_id, const char *path, uint16_t content_type)
 {
-    LOG_DBG("Entry stream_id: %u", stream_id);
-    LOG_DBG("Entry path: %s", path);
-    LOG_DBG("Entry content_type: %u", content_type);
+    POUCH_LOG_DBG("Entry stream_id: %u", stream_id);
+    POUCH_LOG_DBG("Entry path: %s", path);
+    POUCH_LOG_DBG("Entry content_type: %u", content_type);
 
     STRUCT_SECTION_FOREACH(pouch_downlink_handler, handler)
     {
@@ -74,9 +74,9 @@ static void downlink_start(unsigned int stream_id, const char *path, uint16_t co
 
 static void downlink_data(unsigned int stream_id, const void *data, size_t len, bool is_last)
 {
-    LOG_DBG("Entry stream_id: %u", stream_id);
-    LOG_DBG("Entry is_last: %d", (int) is_last);
-    LOG_HEXDUMP_DBG(data, len, "Entry data");
+    POUCH_LOG_DBG("Entry stream_id: %u", stream_id);
+    POUCH_LOG_DBG("Entry is_last: %d", (int) is_last);
+    POUCH_LOG_HEXDUMP(data, len, "Entry data");
 
     STRUCT_SECTION_FOREACH(pouch_downlink_handler, handler)
     {
@@ -99,11 +99,11 @@ static void pouch_downlink_entries_push(struct pouch_bufview *v)
         content_type = pouch_bufview_read_be16(v);
         path_len = pouch_bufview_read_byte(v);
 
-        LOG_DBG("data_len %u", (unsigned int) data_len);
-        LOG_DBG("content_type %s (%u)",
-                entry_content_format_str(content_type),
-                (unsigned int) content_type);
-        LOG_DBG("path_len %u", (unsigned int) path_len);
+        POUCH_LOG_DBG("data_len %u", (unsigned int) data_len);
+        POUCH_LOG_DBG("content_type %s (%u)",
+                      entry_content_format_str(content_type),
+                      (unsigned int) content_type);
+        POUCH_LOG_DBG("path_len %u", (unsigned int) path_len);
 
         path = pouch_bufview_read(v, path_len);
         data = pouch_bufview_read(v, data_len);
@@ -135,8 +135,10 @@ static void pouch_downlink_stream_push(struct pouch_bufview *v,
         content_type = pouch_bufview_read_be16(v);
         path_len = pouch_bufview_read_byte(v);
 
-        LOG_DBG("content_type %s (%d)", entry_content_format_str(content_type), (int) content_type);
-        LOG_DBG("path_len %zu", path_len);
+        POUCH_LOG_DBG("content_type %s (%d)",
+                      entry_content_format_str(content_type),
+                      (int) content_type);
+        POUCH_LOG_DBG("path_len %zu", path_len);
 
         path = pouch_bufview_read(v, path_len);
 
@@ -165,7 +167,7 @@ void pouch_downlink_block_push(struct pouch_buf *pouch_buf)
     bool is_last;
     block_decode_hdr(&v, &block_size, &stream_id, &is_stream, &is_first, &is_last);
 
-    LOG_HEXDUMP_DBG(pouch_bufview_read(&v, 0), pouch_bufview_available(&v), "block bufview");
+    POUCH_LOG_HEXDUMP(pouch_bufview_read(&v, 0), pouch_bufview_available(&v), "block bufview");
 
     if (is_stream)
     {

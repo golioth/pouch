@@ -4,11 +4,11 @@
 
 #include <pouch/transport/downlink.h>
 #include <pouch/downlink.h>
+#include <pouch/port.h>
 #include <pouch/pouch.h>
 #include <zephyr/ztest.h>
 
-#include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(downlink_test);
+POUCH_LOG_REGISTER(downlink_test, POUCH_LOG_LEVEL_DBG);
 
 struct pouch_test_item_entry
 {
@@ -52,9 +52,9 @@ ZTEST_SUITE(downlink, NULL, init_pouch, NULL, NULL, NULL);
 
 static void downlink_start(unsigned int stream_id, const char *path, uint16_t content_type)
 {
-    LOG_DBG("Entry stream_id: %u", stream_id);
-    LOG_DBG("Entry path: %s", path);
-    LOG_DBG("Entry content_type: %u", content_type);
+    POUCH_LOG_DBG("Entry stream_id: %u", stream_id);
+    POUCH_LOG_DBG("Entry path: %s", path);
+    POUCH_LOG_DBG("Entry content_type: %u", content_type);
 
     zassert_str_equal(path, "/.s/lorem", "invalid path");
     zassert_equal(content_type, POUCH_CONTENT_TYPE_JSON, "invalid content_type");
@@ -65,10 +65,10 @@ static void downlink_start(unsigned int stream_id, const char *path, uint16_t co
 
 static void downlink_data(unsigned int stream_id, const void *data, size_t len, bool is_last)
 {
-    LOG_DBG("Entry stream_id: %u", stream_id);
-    LOG_DBG("Entry len: %zu", len);
-    LOG_DBG("Entry is_last: %d", (int) is_last);
-    LOG_HEXDUMP_DBG(data, len, "Entry data");
+    POUCH_LOG_DBG("Entry stream_id: %u", stream_id);
+    POUCH_LOG_DBG("Entry len: %zu", len);
+    POUCH_LOG_DBG("Entry is_last: %d", (int) is_last);
+    POUCH_LOG_HEXDUMP(data, len, "Entry data");
 
     zassert_mem_equal(data,
                       &downlink_api.entry->data[downlink_api.offset],

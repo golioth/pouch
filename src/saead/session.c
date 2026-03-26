@@ -10,13 +10,13 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <pouch/port.h>
 #include <psa/crypto.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/base64.h>
 
-#include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(saead_session, CONFIG_POUCH_LOG_LEVEL);
+POUCH_LOG_REGISTER(saead_session, CONFIG_POUCH_LOG_LEVEL);
 
 /**
  * String length required to base64 encode a buffer of a given length, excluding the 0 terminator.
@@ -52,7 +52,7 @@ int session_id_generate(struct session_id *id)
         status = psa_generate_random(id->value.random, sizeof(id->value.random));
         if (status != PSA_SUCCESS)
         {
-            LOG_ERR("Failed to generate session ID: %d", status);
+            POUCH_LOG_ERR("Failed to generate session ID: %d", status);
             return -EIO;
         }
 
@@ -62,7 +62,7 @@ int session_id_generate(struct session_id *id)
     status = psa_generate_random(id->value.sequential.tag, sizeof(id->value.sequential.tag));
     if (status != PSA_SUCCESS)
     {
-        LOG_ERR("Failed to generate session ID tag: %d", status);
+        POUCH_LOG_ERR("Failed to generate session ID tag: %d", status);
         return -EIO;
     }
 
@@ -114,7 +114,7 @@ psa_key_id_t session_key_generate(const struct session_id *id,
 
     if (pubkey->len == 0)
     {
-        LOG_ERR("Missing server key");
+        POUCH_LOG_ERR("Missing server key");
         return PSA_KEY_ID_NULL;
     }
 
@@ -124,7 +124,7 @@ psa_key_id_t session_key_generate(const struct session_id *id,
         PSA_ALG_KEY_AGREEMENT(PSA_ALG_ECDH, PSA_ALG_HKDF(PSA_ALG_SHA_256)));
     if (status != PSA_SUCCESS)
     {
-        LOG_ERR("Couldn't set up key derivation: %d", status);
+        POUCH_LOG_ERR("Couldn't set up key derivation: %d", status);
         goto exit;
     }
 
@@ -136,7 +136,7 @@ psa_key_id_t session_key_generate(const struct session_id *id,
                                               pubkey->len);
     if (status != PSA_SUCCESS)
     {
-        LOG_ERR("Failed key agreement: %d", status);
+        POUCH_LOG_ERR("Failed key agreement: %d", status);
         goto exit;
     }
 
@@ -144,7 +144,7 @@ psa_key_id_t session_key_generate(const struct session_id *id,
     ssize_t info_len = session_key_info_build(id, algorithm, max_block_size_log, info);
     if (info_len < 0)
     {
-        LOG_ERR("Failed session key build: %d", info_len);
+        POUCH_LOG_ERR("Failed session key build: %d", info_len);
         goto exit;
     }
 
@@ -152,7 +152,7 @@ psa_key_id_t session_key_generate(const struct session_id *id,
         psa_key_derivation_input_bytes(&operation, PSA_KEY_DERIVATION_INPUT_INFO, info, info_len);
     if (status != PSA_SUCCESS)
     {
-        LOG_ERR("Failed info input: %d", status);
+        POUCH_LOG_ERR("Failed info input: %d", status);
         goto exit;
     }
 
@@ -165,7 +165,7 @@ psa_key_id_t session_key_generate(const struct session_id *id,
     status = psa_key_derivation_output_key(&key_attributes, &operation, &key);
     if (status != PSA_SUCCESS)
     {
-        LOG_ERR("Failed key derivation: %d", status);
+        POUCH_LOG_ERR("Failed key derivation: %d", status);
         goto exit;
     }
 
@@ -203,14 +203,14 @@ struct pouch_buf *session_encrypt_block(struct session *session, struct pouch_bu
     struct pouch_buf *encrypted = buf_alloc(MAX_CIPHERTEXT_BLOCK_SIZE);
     if (encrypted == NULL)
     {
-        LOG_ERR("Couldn't allocate encrypted block");
+        POUCH_LOG_ERR("Couldn't allocate encrypted block");
         return NULL;
     }
 
     uint8_t nonce[NONCE_LEN];
     nonce_generate(session, POUCH_ROLE_DEVICE, nonce);
 
-    LOG_DBG("Session key: %d", session->key);
+    POUCH_LOG_DBG("Session key: %d", session->key);
 
     struct pouch_bufview plaintext;
     pouch_bufview_init(&plaintext, block);
@@ -218,7 +218,7 @@ struct pouch_buf *session_encrypt_block(struct session *session, struct pouch_bu
     size_t plaintext_len = pouch_bufview_read_be16(&plaintext);
     if (plaintext_len != pouch_bufview_available(&plaintext))
     {
-        LOG_ERR("Invalid plaintext length: %u", plaintext_len);
+        POUCH_LOG_ERR("Invalid plaintext length: %u", plaintext_len);
         buf_free(encrypted);
         return NULL;
     }
@@ -242,14 +242,14 @@ struct pouch_buf *session_encrypt_block(struct session *session, struct pouch_bu
                          &ciphertext_len);
     if (status != PSA_SUCCESS)
     {
-        LOG_ERR("Couldn't encrypt: %d", status);
+        POUCH_LOG_ERR("Couldn't encrypt: %d", status);
         buf_free(encrypted);
         return NULL;
     }
 
     if (ciphertext_len != encrypted_len)
     {
-        LOG_ERR("Unexpected length");
+        POUCH_LOG_ERR("Unexpected length");
         buf_free(encrypted);
         return NULL;
     }
@@ -279,7 +279,7 @@ int session_decrypt_block(struct session *session,
     size_t ciphertext_len = pouch_bufview_read_be16(&ciphertext);
     if (ciphertext_len <= AUTH_TAG_LEN || ciphertext_len != pouch_bufview_available(&ciphertext))
     {
-        LOG_ERR("Invalid ciphertext length: %u", ciphertext_len);
+        POUCH_LOG_ERR("Invalid ciphertext length: %u", ciphertext_len);
         return -EINVAL;
     }
 
@@ -303,13 +303,13 @@ int session_decrypt_block(struct session *session,
                          &plaintext_len);
     if (status != PSA_SUCCESS)
     {
-        LOG_ERR("Failed decryption: %d", status);
+        POUCH_LOG_ERR("Failed decryption: %d", status);
         return status;
     }
 
     if (plaintext_len != payload_len)
     {
-        LOG_ERR("Unexpected length");
+        POUCH_LOG_ERR("Unexpected length");
         return -EINVAL;
     }
 
