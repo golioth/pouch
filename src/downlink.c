@@ -7,6 +7,7 @@
 #include <stdlib.h>
 
 #include <pouch/downlink.h>
+#include <pouch/port.h>
 #include <pouch/types.h>
 #include <pouch/transport/downlink.h>
 #include "cddl/header_decode.h"
@@ -17,8 +18,7 @@
 #include "downlink.h"
 #include "entry.h"
 
-#include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(downlink, CONFIG_POUCH_LOG_LEVEL);
+POUCH_LOG_REGISTER(downlink, CONFIG_POUCH_LOG_LEVEL);
 
 static struct pouch_buf *pouch_buf;
 static bool pouch_header;
@@ -74,7 +74,7 @@ static void decrypt_blocks(struct k_work *work)
     struct pouch_buf *decrypted = crypto_block_buf_alloc();
     if (NULL == decrypted)
     {
-        LOG_ERR("Unable to allocate decrypt buffer");
+        POUCH_LOG_ERR("Unable to allocate decrypt buffer");
         return;
     }
 
@@ -82,7 +82,7 @@ static void decrypt_blocks(struct k_work *work)
     struct pouch_buf *encrypted = buf_queue_get(&decrypt.queue);
     if (encrypted == NULL)
     {
-        LOG_DBG("No encrypted blocks available");
+        POUCH_LOG_DBG("No encrypted blocks available");
         goto free_and_return;
     }
 
@@ -96,7 +96,7 @@ static void decrypt_blocks(struct k_work *work)
     /* Test to see if decrypt buffer contains valid data */
     if (0 != err)
     {
-        LOG_ERR("Failed to decrypt block: %d", err);
+        POUCH_LOG_ERR("Failed to decrypt block: %d", err);
         goto free_and_return;
     }
 
@@ -126,14 +126,14 @@ static int block_downlink_push(struct pouch_buf *pouch_buf)
 
 void pouch_downlink_start(void)
 {
-    LOG_DBG("Pouch downlink start");
+    POUCH_LOG_DBG("Pouch downlink start");
 
     pouch_header = false;
 
     pouch_buf = buf_alloc(MAX_CIPHERTEXT_BLOCK_SIZE);
     if (!pouch_buf)
     {
-        LOG_ERR("Failed to allocate pouch buf");
+        POUCH_LOG_ERR("Failed to allocate pouch buf");
         return;
     }
 }
@@ -147,23 +147,24 @@ static int pouch_downlink_parse_header(struct pouch_bufview *v, size_t *header_l
     ret = cbor_decode_pouch_header(header_raw, pouch_bufview_available(v), &header, header_len);
     if (ret != ZCBOR_SUCCESS)
     {
-        LOG_DBG("Failed to decode pouch header: %d", ret);
+        POUCH_LOG_DBG("Failed to decode pouch header: %d", ret);
         return -EIO;
     }
 
-    LOG_HEXDUMP_DBG(header_raw, *header_len, "pouch header raw");
+    POUCH_LOG_HEXDUMP(header_raw, *header_len, "pouch header raw");
 
-    LOG_DBG("Header version %d", (int) header.version);
-    LOG_DBG("Encryption type %s",
-            (int) header.encryption_info_m.Union_choice == encryption_info_union_plaintext_info_m_c
-                ? "Plaintext"
-                : "SAEAD");
-    LOG_DBG("Payload len %d", (int) *header_len);
+    POUCH_LOG_DBG("Header version %d", (int) header.version);
+    POUCH_LOG_DBG("Encryption type %s",
+                  (int) header.encryption_info_m.Union_choice
+                          == encryption_info_union_plaintext_info_m_c
+                      ? "Plaintext"
+                      : "SAEAD");
+    POUCH_LOG_DBG("Payload len %d", (int) *header_len);
 
     int err = crypto_downlink_start(&header.encryption_info_m);
     if (err)
     {
-        LOG_ERR("Invalid header: %d", err);
+        POUCH_LOG_ERR("Invalid header: %d", err);
         return err;
     }
 
@@ -174,19 +175,19 @@ int pouch_downlink_push(const void *buf, size_t buf_len)
 {
     const uint8_t *buf_p = buf;
 
-    LOG_HEXDUMP_DBG(buf, buf_len, "Pouch downlink push: ");
+    POUCH_LOG_HEXDUMP(buf, buf_len, "Pouch downlink push: ");
 
     while (buf_len)
     {
         if (!pouch_buf)
         {
-            LOG_WRN("No pouch_buf allocated");
+            POUCH_LOG_WRN("No pouch_buf allocated");
             return -ENOMEM;
         }
 
         if (buf_size_get(pouch_buf) >= MAX_CIPHERTEXT_BLOCK_SIZE)
         {
-            LOG_ERR("No more space for pouch header");
+            POUCH_LOG_ERR("No more space for pouch header");
             return -ENOMEM;
         }
 
@@ -216,7 +217,7 @@ int pouch_downlink_push(const void *buf, size_t buf_len)
             /* Align first block with pouch_buf start */
             buf_trim_start(pouch_buf, header_len);
 
-            LOG_HEXDUMP_DBG(pouch_bufview_read(&v, 0), pouch_bufview_available(&v), "remaining");
+            POUCH_LOG_HEXDUMP(pouch_bufview_read(&v, 0), pouch_bufview_available(&v), "remaining");
         }
 
         if (pouch_bufview_available(&v) > sizeof(uint16_t))
@@ -225,24 +226,24 @@ int pouch_downlink_push(const void *buf, size_t buf_len)
 
             if (block_size > MAX_BLOCK_SIZE_FIELD_VALUE)
             {
-                LOG_ERR("Block size %u is bigger than supported %u",
-                        (unsigned int) block_size,
-                        (unsigned int) (MAX_BLOCK_SIZE_FIELD_VALUE));
+                POUCH_LOG_ERR("Block size %u is bigger than supported %u",
+                              (unsigned int) block_size,
+                              (unsigned int) (MAX_BLOCK_SIZE_FIELD_VALUE));
                 return -ENOMEM;
             }
 
             if (pouch_bufview_available(&v) >= block_size)
             {
-                LOG_DBG("Block ready %d available %d",
-                        (int) block_size,
-                        (int) pouch_bufview_available(&v));
+                POUCH_LOG_DBG("Block ready %d available %d",
+                              (int) block_size,
+                              (int) pouch_bufview_available(&v));
 
                 struct pouch_buf *pouch_buf_to_send = pouch_buf;
 
                 pouch_buf = buf_alloc(MAX_CIPHERTEXT_BLOCK_SIZE);
                 if (!pouch_buf)
                 {
-                    LOG_ERR("Failed to allocate pouch buf");
+                    POUCH_LOG_ERR("Failed to allocate pouch buf");
                     return -ENOMEM;
                 }
 
@@ -252,7 +253,7 @@ int pouch_downlink_push(const void *buf, size_t buf_len)
                     remaining += block_size;
                     size_t remaining_len = pouch_bufview_available(&v) - block_size;
 
-                    LOG_HEXDUMP_DBG(remaining, remaining_len, "remaining");
+                    POUCH_LOG_HEXDUMP(remaining, remaining_len, "remaining");
 
                     buf_write(pouch_buf, remaining, remaining_len);
                     buf_trim_end(pouch_buf_to_send, remaining_len);
@@ -262,7 +263,7 @@ int pouch_downlink_push(const void *buf, size_t buf_len)
                 int err = block_downlink_push(pouch_buf_to_send);
                 if (0 > err)
                 {
-                    LOG_ERR("Failed to enqueue block: %d", err);
+                    POUCH_LOG_ERR("Failed to enqueue block: %d", err);
                     return err;
                 }
             }
