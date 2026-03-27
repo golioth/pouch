@@ -50,3 +50,7 @@ jobs:
           reporter: java-junit
           list-tests: failed
           output-to: step-summary
+  trigger-build-esp-idf:
+    name: PortMigration Build ESP-IDF
+    uses: ./.github/workflows/test-build-esp-idf.yml
+    secrets: inherit
