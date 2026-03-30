@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         manifest_yml:
-          - west
+          - west-zephyr
           - west-ncs
       fail-fast: false
     env:
