@@ -12,6 +12,7 @@
 
 #include <pouch/uplink.h>
 #include <pouch/events.h>
+#include <pouch/port.h>
 #include <pouch/transport/uplink.h>
 
 #include <stdlib.h>
@@ -135,7 +136,7 @@ static void event_handler(enum pouch_event evt, void *ctx)
         return;
     }
 
-    TYPE_SECTION_FOREACH(pouch_uplink_handler_t, pouch_uplink_handler, handler)
+    POUCH_TYPE_SECTION_FOREACH(pouch_uplink_handler_t, pouch_uplink_handler, handler)
     {
         if (handler != NULL)
         {

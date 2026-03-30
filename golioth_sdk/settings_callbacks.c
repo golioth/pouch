@@ -9,13 +9,13 @@ LOG_MODULE_DECLARE(glth_settings);
 
 #include <errno.h>
 #include <stddef.h>
-#include <zephyr/sys/iterable_sections.h>
+#include <pouch/port.h>
 
 #include "settings.h"
 
 int golioth_settings_receive_one(const struct setting_value *value)
 {
-    STRUCT_SECTION_FOREACH(golioth_settings_handler, setting)
+    POUCH_STRUCT_SECTION_FOREACH(golioth_settings_handler, setting)
     {
         if (0 == strcmp(setting->key, value->key))
         {

@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include <zephyr/sys/iterable_sections.h>
+#include <pouch/port.h>
 
 /**
  * @file events.h
@@ -50,7 +50,7 @@ struct pouch_event_handler
  * @param _callback The callback function to be called when the event occurs
  * @param _ctx The context to be passed to the callback
  */
-#define POUCH_EVENT_HANDLER(_callback, _ctx) \
-    static const STRUCT_SECTION_ITERABLE(    \
-        pouch_event_handler,                 \
-        CONCAT(_pouch_event_handler_, _callback)) = {.callback = _callback, .ctx = _ctx};
+#define POUCH_EVENT_HANDLER(_callback, _ctx)    \
+    static const POUCH_STRUCT_SECTION_ITERABLE( \
+        pouch_event_handler,                    \
+        _pouch_event_handler_##_callback) = {.callback = _callback, .ctx = _ctx};

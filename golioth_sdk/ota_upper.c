@@ -8,9 +8,9 @@
 LOG_MODULE_REGISTER(ota_upper, CONFIG_GOLIOTH_LOG_LEVEL);
 
 #include <zephyr/kernel.h>
-#include <zephyr/sys/iterable_sections.h>
 
 #include <golioth/ota.h>
+#include <pouch/port.h>
 
 #include "ota.h"
 
@@ -20,7 +20,7 @@ static int golioth_ota_set_status(const char *name, enum golioth_ota_state state
 {
     int ret = -ENOENT;
 
-    STRUCT_SECTION_FOREACH(golioth_ota_registered_component, component)
+    POUCH_STRUCT_SECTION_FOREACH(golioth_ota_registered_component, component)
     {
         if (0 == strcmp(component->name, name))
         {
@@ -57,7 +57,7 @@ int golioth_ota_manifest_receive_one(const struct golioth_ota_component *compone
     LOG_DBG("  version: %s", component->version);
     LOG_DBG("  size: %d", component->size);
 
-    STRUCT_SECTION_FOREACH(golioth_ota_registered_component, registered)
+    POUCH_STRUCT_SECTION_FOREACH(golioth_ota_registered_component, registered)
     {
         if (0 == strcmp(component->package, registered->name))
         {
@@ -76,13 +76,13 @@ int golioth_ota_manifest_receive_one(const struct golioth_ota_component *compone
 void golioth_ota_manifest_complete(void)
 {
     size_t num_components = 0;
-    STRUCT_SECTION_COUNT(golioth_ota_registered_component, &num_components);
+    POUCH_STRUCT_SECTION_COUNT(golioth_ota_registered_component, &num_components);
     struct golioth_ota_manifest_component components[num_components];
 
     for (int i = 0; i < num_components; i++)
     {
         struct golioth_ota_registered_component *registered;
-        STRUCT_SECTION_GET(golioth_ota_registered_component, i, &registered);
+        POUCH_STRUCT_SECTION_GET(golioth_ota_registered_component, i, &registered);
         components[i].name = registered->name;
         components[i].current = registered->version;
         components[i].target = registered->data->target;
@@ -90,7 +90,7 @@ void golioth_ota_manifest_complete(void)
         components[i].size = registered->data->size;
     }
 
-    STRUCT_SECTION_FOREACH(golioth_ota_manifest_handler, handler)
+    POUCH_STRUCT_SECTION_FOREACH(golioth_ota_manifest_handler, handler)
     {
         handler->receive(components, num_components);
     }
@@ -105,7 +105,7 @@ int golioth_ota_receive_component(const char *name,
 {
     LOG_DBG("Received %d bytes at offset %d for %s@%s", len, offset, name, version);
 
-    STRUCT_SECTION_FOREACH(golioth_ota_registered_component, registered)
+    POUCH_STRUCT_SECTION_FOREACH(golioth_ota_registered_component, registered)
     {
         if (0 == strcmp(registered->name, name))
         {
@@ -131,14 +131,14 @@ bool golioth_ota_get_status(int component_idx,
                             enum golioth_ota_state *state)
 {
     int count = 0;
-    STRUCT_SECTION_COUNT(golioth_ota_registered_component, &count);
+    POUCH_STRUCT_SECTION_COUNT(golioth_ota_registered_component, &count);
     if (component_idx >= count)
     {
         return false;
     }
 
     struct golioth_ota_registered_component *component = NULL;
-    STRUCT_SECTION_GET(golioth_ota_registered_component, component_idx, &component);
+    POUCH_STRUCT_SECTION_GET(golioth_ota_registered_component, component_idx, &component);
 
     *name = component->name;
     *current_version = component->version;

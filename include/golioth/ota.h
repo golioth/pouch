@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/sys/iterable_sections.h>
+#include <pouch/port.h>
 
 #define GOLIOTH_OTA_COMPONENT_HASH_BIN_LEN 32
 
@@ -43,9 +43,9 @@ struct golioth_ota_manifest_handler
  *
  * @param _handler The manifest handler to register.
  */
-#define GOLIOTH_OTA_MANIFEST_HANDLER(_handler)                                            \
-    const STRUCT_SECTION_ITERABLE(golioth_ota_manifest_handler, ota_manifest_handler) = { \
-        .receive = _handler,                                                              \
+#define GOLIOTH_OTA_MANIFEST_HANDLER(_handler)                                                  \
+    const POUCH_STRUCT_SECTION_ITERABLE(golioth_ota_manifest_handler, ota_manifest_handler) = { \
+        .receive = _handler,                                                                    \
     }
 
 /* Component handler registration */
@@ -95,8 +95,8 @@ struct golioth_ota_registered_component
         .target = _version,                                                     \
         .state = 0,                                                             \
     };                                                                          \
-    const STRUCT_SECTION_ITERABLE(golioth_ota_registered_component,             \
-                                  CONCAT(ota_component_, _name)) = {            \
+    const POUCH_STRUCT_SECTION_ITERABLE(golioth_ota_registered_component,       \
+                                        ota_component_##_name) = {              \
         .name = _package,                                                       \
         .version = _version,                                                    \
         .receive = _receive,                                                    \

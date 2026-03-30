@@ -10,7 +10,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <zephyr/sys/iterable_sections.h>
+#include <pouch/port.h>
 
 /**
  * @file downlink.h
@@ -63,8 +63,7 @@ struct pouch_downlink_handler
  * @param _data_cb The callback function to be called when the downlink pouch entry/stream is
  * reassembled
  */
-#define POUCH_DOWNLINK_HANDLER(_start_cb, _data_cb)                                       \
-    static const STRUCT_SECTION_ITERABLE(pouch_downlink_handler,                          \
-                                         CONCAT(_pouch_downlink_handler_, _callback)) = { \
-        .start_cb = _start_cb,                                                            \
-        .data_cb = _data_cb};
+#define POUCH_DOWNLINK_HANDLER(_start_cb, _data_cb) \
+    static const POUCH_STRUCT_SECTION_ITERABLE(     \
+        pouch_downlink_handler,                     \
+        _pouch_downlink_handler_##_callback) = {.start_cb = _start_cb, .data_cb = _data_cb};

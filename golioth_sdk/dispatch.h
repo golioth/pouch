@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include <zephyr/sys/iterable_sections.h>
+#include <pouch/port.h>
 
 typedef int golioth_downlink_id_t;
 
@@ -40,8 +40,8 @@ struct golioth_downlink_service
     static struct golioth_downlink_service_data _name##_data = {                                 \
         .downlink_id = DOWNLINK_ID_INVALID,                                                      \
     };                                                                                           \
-    static STRUCT_SECTION_ITERABLE(golioth_downlink_service,                                     \
-                                   CONCAT(_golioth_downlink_service_, _name)) = {                \
+    static POUCH_STRUCT_SECTION_ITERABLE(golioth_downlink_service,                               \
+                                         _golioth_downlink_service_##_name) = {                  \
         .path = _path,                                                                           \
         .start_cb = _start_cb,                                                                   \
         .data_cb = _data_cb,                                                                     \

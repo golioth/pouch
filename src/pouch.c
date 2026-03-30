@@ -7,13 +7,12 @@
 #include "downlink.h"
 #include "uplink.h"
 #include "crypto.h"
-#include "pouch/port.h"
 
 #include <pouch/events.h>
+#include <pouch/port.h>
 #include <pouch/uplink.h>
 
 #include <zephyr/kernel.h>
-#include <zephyr/sys/iterable_sections.h>
 
 K_THREAD_STACK_DEFINE(pouch_stack, CONFIG_POUCH_THREAD_STACK_SIZE);
 
@@ -28,7 +27,7 @@ static void dispatch_events(struct k_work *work)
 
     while (0 == k_msgq_get(&pouch_event_q, &event, K_NO_WAIT))
     {
-        STRUCT_SECTION_FOREACH(pouch_event_handler, handler)
+        POUCH_STRUCT_SECTION_FOREACH(pouch_event_handler, handler)
         {
             handler->callback(event, handler->ctx);
         }

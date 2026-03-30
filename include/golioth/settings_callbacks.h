@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include <golioth/settings_types.h>
+#include <pouch/port.h>
 
 /**
  * Callback function types for GOLIOTH_SETTINGS_HANDLER() *
@@ -51,14 +52,13 @@ struct golioth_settings_handler
  *                  Golioth.
  * @param _function The callback function to execute.
  */
-#define GOLIOTH_SETTINGS_HANDLER(_name, _function)                         \
-    static const STRUCT_SECTION_ITERABLE(golioth_settings_handler,         \
-                                         CONCAT(handler_, _function)) = {  \
-        .key = #_name,                                                     \
-        .type = _Generic((_function),                                      \
-            golioth_int_setting_cb: GOLIOTH_SETTING_VALUE_TYPE_INT,        \
-            golioth_bool_setting_cb: GOLIOTH_SETTING_VALUE_TYPE_BOOL,      \
-            golioth_float_setting_cb: GOLIOTH_SETTING_VALUE_TYPE_FLOAT,    \
-            golioth_string_setting_cb: GOLIOTH_SETTING_VALUE_TYPE_STRING), \
-        .generic = _function,                                              \
+#define GOLIOTH_SETTINGS_HANDLER(_name, _function)                                                \
+    static const POUCH_STRUCT_SECTION_ITERABLE(golioth_settings_handler, handler_##_function) = { \
+        .key = #_name,                                                                            \
+        .type = _Generic((_function),                                                             \
+            golioth_int_setting_cb: GOLIOTH_SETTING_VALUE_TYPE_INT,                               \
+            golioth_bool_setting_cb: GOLIOTH_SETTING_VALUE_TYPE_BOOL,                             \
+            golioth_float_setting_cb: GOLIOTH_SETTING_VALUE_TYPE_FLOAT,                           \
+            golioth_string_setting_cb: GOLIOTH_SETTING_VALUE_TYPE_STRING),                        \
+        .generic = _function,                                                                     \
     }
