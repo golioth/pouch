@@ -1,0 +1,13 @@
+[sections:golioth_settings_handler_sections]
+entries:
+    ._golioth_settings_handler.static+
+
+[scheme:golioth_settings_handler_iterable]
+entries:
+    golioth_settings_handler_sections -> flash_rodata
+
+[mapping:golioth_settings_handler]
+archive: *
+entries:
+    * (golioth_settings_handler_iterable);
+        golioth_settings_handler_sections -> flash_rodata KEEP() SORT(name) SURROUND(golioth_settings_handler)
