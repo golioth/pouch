@@ -12,7 +12,6 @@
 #include <stdio.h>
 
 #include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/iterable_sections.h>
 #include <pouch/downlink.h>
 #include <pouch/port.h>
 
@@ -66,7 +65,7 @@ static void downlink_start(unsigned int stream_id, const char *path, uint16_t co
     POUCH_LOG_DBG("Entry path: %s", path);
     POUCH_LOG_DBG("Entry content_type: %u", content_type);
 
-    STRUCT_SECTION_FOREACH(pouch_downlink_handler, handler)
+    POUCH_STRUCT_SECTION_FOREACH(pouch_downlink_handler, handler)
     {
         handler->start_cb(stream_id, path, content_type);
     }
@@ -78,7 +77,7 @@ static void downlink_data(unsigned int stream_id, const void *data, size_t len, 
     POUCH_LOG_DBG("Entry is_last: %d", (int) is_last);
     POUCH_LOG_HEXDUMP(data, len, "Entry data");
 
-    STRUCT_SECTION_FOREACH(pouch_downlink_handler, handler)
+    POUCH_STRUCT_SECTION_FOREACH(pouch_downlink_handler, handler)
     {
         handler->data_cb(stream_id, data, len, is_last);
     }

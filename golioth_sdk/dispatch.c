@@ -9,8 +9,8 @@ LOG_MODULE_REGISTER(glth_dispatch, CONFIG_GOLIOTH_LOG_LEVEL);
 
 #include <pouch/downlink.h>
 #include <pouch/events.h>
+#include <pouch/port.h>
 #include <pouch/uplink.h>
-#include <zephyr/sys/iterable_sections.h>
 
 #include "dispatch.h"
 
@@ -21,7 +21,7 @@ static void pouch_downlink_start(unsigned int stream_id, const char *path, uint1
     LOG_DBG("Downlink start: %d, %s, %d", stream_id, path, content_type);
     LOG_INF("Receiving Downlink entry on path %s", path);
 
-    STRUCT_SECTION_FOREACH(golioth_downlink_service, service)
+    POUCH_STRUCT_SECTION_FOREACH(golioth_downlink_service, service)
     {
         size_t path_len = strlen(service->path);
         bool partial = service->path[path_len - 1] == '*';
@@ -65,7 +65,7 @@ static void pouch_downlink_data(unsigned int stream_id, const void *data, size_t
     }
     else
     {
-        STRUCT_SECTION_FOREACH(golioth_downlink_service, service)
+        POUCH_STRUCT_SECTION_FOREACH(golioth_downlink_service, service)
         {
             if (service->data->downlink_id == stream_id)
             {
