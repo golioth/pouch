@@ -10,16 +10,16 @@ jobs:
     strategy:
       matrix:
         include:
-          - manifest: west.yml
+          - manifest: west-zephyr.yml
             example: ble_gatt
             board: nrf52840dk/nrf52840
           - manifest: west-ncs.yml
             example: ble_gatt
             board: nrf52840dk/nrf52840
-          - manifest: west.yml
+          - manifest: west-zephyr.yml
             example: http_client
             board: frdm_rw612
-          - manifest: west.yml
+          - manifest: west-zephyr.yml
             example: http_client
             board: native_sim
             no_sysbuild: true

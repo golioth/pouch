@@ -17,7 +17,7 @@ jobs:
           path: pouch
       - name: Init and update west
         run: |
-          west init -l pouch --mf west.yml
+          west init -l pouch --mf west-zephyr.yml
           west update --narrow -o=--depth=1
       - name: Install pip packages
         run: |
