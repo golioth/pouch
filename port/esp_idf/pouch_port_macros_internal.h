@@ -20,6 +20,64 @@
     }
 
 /*--------------------------------------------------
+ * Iterable Sections
+ *------------------------------------------------*/
+
+/* Helper macros for this port */
+#define ESPIDF_ITERABLE_START(secname) _##secname##_start
+#define ESPIDF_ITERABLE_END(secname) _##secname##_end
+
+#define POUCH_TYPE_SECTION_START_INTERNAL(secname) ESPIDF_ITERABLE_START(secname)
+
+#define POUCH_STRUCT_SECTION_COUNT_INTERNAL(struct_type, dst)           \
+    do                                                                  \
+    {                                                                   \
+        extern struct struct_type ESPIDF_ITERABLE_START(struct_type)[]; \
+        extern struct struct_type ESPIDF_ITERABLE_END(struct_type)[];   \
+        *(dst) = ((uintptr_t) ESPIDF_ITERABLE_END(struct_type)          \
+                  - (uintptr_t) ESPIDF_ITERABLE_START(struct_type))     \
+            / sizeof(struct struct_type);                               \
+    } while (0)
+
+#define POUCH_TYPE_SECTION_FOREACH_INTERNAL(type, secname, iterator)                               \
+    extern type ESPIDF_ITERABLE_START(secname)[];                                                  \
+    extern type ESPIDF_ITERABLE_END(secname)[];                                                    \
+    for (type *iterator = ESPIDF_ITERABLE_START(secname); iterator < ESPIDF_ITERABLE_END(secname); \
+         iterator++)
+
+
+#define POUCH_STRUCT_SECTION_GET_INTERNAL(struct_type, i, dst)          \
+    do                                                                  \
+    {                                                                   \
+        extern struct struct_type ESPIDF_ITERABLE_START(struct_type)[]; \
+        *(dst) = &ESPIDF_ITERABLE_START(struct_type)[i];                \
+    } while (0)
+
+/**
+ * @brief Defines a new element for an iterable section for a generic type.
+ *
+ * A matching section must be added to the linker script. For ESP-IDF, use a linker fragment (.lf)
+ * file. The sections/entrires/scheme/mapping values in the linker script must match the variables
+ * passed by this macro.
+ *
+ * Register your linker fragment by adding a directive to the idf_component_register() call in
+ * CMakeLists.txt:
+ *   LDFRAGMENTS my_linker_fragment.lf
+ *
+ * This topic is detailed in the ESP-IDF documentation:
+ * https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-guides/linker-script-generation.html#creating-and-specifying-a-linker-fragment-file
+ *
+ * And example linker fragment is available in the ESP-IDF tree:
+ * https://github.com/espressif/esp-idf/blob/master/examples/build_system/cmake/plugins/components/plugins/linker.lf
+ *
+ * The concept of Iterable Sections is based on the Zephyr RTOS definition:
+ * https://docs.zephyrproject.org/latest/kernel/iterable_sections/index.html
+ */
+#define POUCH_TYPE_SECTION_ITERABLE_INTERNAL(type, varname, secname, section_postfix) \
+    __attribute__((used)) __attribute__((aligned(__alignof__(type))))                 \
+    __attribute__((section("._" #secname ".static." #section_postfix "_"))) type varname
+
+/*--------------------------------------------------
  * Logging
  *------------------------------------------------*/
 
