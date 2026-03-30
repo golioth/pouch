@@ -34,6 +34,92 @@
 #define POUCH_APPLICATION_STARTUP_HOOK(_function) POUCH_APPLICATION_STARTUP_HOOK_INTERNAL(_function)
 
 /*--------------------------------------------------
+ * Iterable Sections
+ *------------------------------------------------*/
+
+/**
+ * @brief Iterable section start symbol for a struct type
+ *
+ * @param[in] struct_type data type of section
+ */
+#define POUCH_STRUCT_SECTION_START(struct_type) POUCH_TYPE_SECTION_START_INTERNAL(struct_type)
+
+/**
+ * @brief Count elements in a section.
+ *
+ * @param[in]  struct_type Struct type
+ * @param[out] dst Pointer to location where result is written.
+ */
+#define POUCH_STRUCT_SECTION_COUNT(struct_type, dst) \
+    POUCH_STRUCT_SECTION_COUNT_INTERNAL(struct_type, dst)
+
+/**
+ * @brief Iterate over a specified iterable section for a generic type
+ *
+ * @param[in]  type Type of element
+ * @param[in]  secname Name of output section
+ * @param[out]  iterator Struct pointer provided by macro, incremented for each iteration.
+ */
+#define POUCH_TYPE_SECTION_FOREACH(type, secname, iterator) \
+    POUCH_TYPE_SECTION_FOREACH_INTERNAL(type, secname, iterator)
+
+/**
+ * @brief Get element from section.
+ *
+ * @param[in]  struct_type Struct type.
+ * @param[in]  i Index.
+ * @param[out] dst Pointer to location where pointer to element is written.
+ */
+#define POUCH_STRUCT_SECTION_GET(struct_type, i, dst) \
+    POUCH_STRUCT_SECTION_GET_INTERNAL(struct_type, i, dst)
+
+/**
+ * @brief Defines a new element for an iterable section for a generic type.
+ *
+ * @note This function requires a matching directive in the linker script. Please see the definition
+ * of POUCH_TYPE_SECTION_ITERABLE_INTERNAL in the port you are using for more information.
+ *
+ * @param[in]  type Data type of variable
+ * @param[in]  varname Name of variable to place in section
+ * @param[in]  secname Type name of iterable section.
+ * @param[in]  section_postfix Postfix to use in section name
+ */
+#define POUCH_TYPE_SECTION_ITERABLE(type, varname, secname, section_postfix) \
+    POUCH_TYPE_SECTION_ITERABLE_INTERNAL(type, varname, secname, section_postfix)
+
+/**
+ * @brief iterable section start symbol for a struct type
+ *
+ * @param[in]  struct_type Data type of section
+ *
+ * @note: this is a wrapper macro that doesn't need porting
+ */
+#define POUCH_STRUCT_SECTION_START_EXTERN(struct_type) \
+    extern struct struct_type POUCH_STRUCT_SECTION_START(struct_type)[]
+
+/**
+ * @brief Iterate over a specified iterable section.
+ *
+ * @param[in]   struct_type Data type of section
+ * @param[out]  iterator Struct pointer provided by macro, incremented for each iteration.
+ *
+ * @note: this is a wrapper macro that doesn't need porting
+ */
+#define POUCH_STRUCT_SECTION_FOREACH(struct_type, iterator) \
+    POUCH_TYPE_SECTION_FOREACH(struct struct_type, struct_type, iterator)
+
+/**
+ * @brief Defines a new element for an iterable section.
+ *
+ * @param[in]  struct_type Data type of section
+ * @param[in]  varname Name of variable to place in section
+ *
+ * @note: this is a wrapper macro that doesn't need porting
+ */
+#define POUCH_STRUCT_SECTION_ITERABLE(struct_type, varname) \
+    POUCH_TYPE_SECTION_ITERABLE(struct struct_type, varname, struct_type, varname)
+
+/*--------------------------------------------------
  * Logging
  *------------------------------------------------*/
 

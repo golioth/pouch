@@ -21,6 +21,38 @@
     SYS_INIT(_function##_app_startup_hook, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY)
 
 /*--------------------------------------------------
+ * Iterable Sections
+ *------------------------------------------------*/
+
+#include <zephyr/sys/iterable_sections.h>
+
+#define POUCH_TYPE_SECTION_START_INTERNAL(secname) TYPE_SECTION_START(secname)
+
+#define POUCH_STRUCT_SECTION_COUNT_INTERNAL(struct_type, dst) STRUCT_SECTION_COUNT(struct_type, dst)
+
+#define POUCH_TYPE_SECTION_FOREACH_INTERNAL(type, secname, iterator) \
+    TYPE_SECTION_FOREACH(type, secname, iterator)
+
+#define POUCH_STRUCT_SECTION_GET_INTERNAL(struct_type, i, dst) \
+    STRUCT_SECTION_GET(struct_type, i, dst)
+
+/**
+ * @brief Defines a new element for an iterable section for a generic type.
+ *
+ * A matching section must be added to the linker script. For Zephyr, use an .ld file that calls
+ * ITERABLE_SECTION_ROM() or ITERABLE_SECTION_RAM() to define the section using the same values as
+ * are passed to this macro.
+ *
+ * Register your linker file by adding a directive to CMakeLists.txt:
+ *   zephyr_linker_sources(SECTIONS my_linker_file.ld)
+ *
+ * Learn more about Iterable Sections in the Zephyr documentation:
+ * https://docs.zephyrproject.org/latest/kernel/iterable_sections/index.html
+ */
+#define POUCH_TYPE_SECTION_ITERABLE_INTERNAL(type, varname, secname, section_postfix) \
+    TYPE_SECTION_ITERABLE(type, varname, secname, section_postfix)
+
+/*--------------------------------------------------
  * Logging
  *------------------------------------------------*/
 
