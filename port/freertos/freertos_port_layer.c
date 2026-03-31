@@ -1,0 +1,38 @@
+/*
+ * Copyright (c) 2015-2016, Intel Corporation.
+ * Copyright (c) 2026 Golioth, Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <stdint.h>
+
+/*--------------------------------------------------
+ * Big Endian
+ *------------------------------------------------*/
+
+/**
+ * Big Endine implementation based on:
+ * https://github.com/zephyrproject-rtos/zephyr/blob/v4.3.0/include/zephyr/sys/byteorder.h
+ */
+
+uint16_t pouch_get_be16(const uint8_t src[2])
+{
+    return ((uint16_t) src[0] << 8) | src[1];
+}
+
+uint32_t pouch_get_be32(const uint8_t src[4])
+{
+    return ((uint32_t) pouch_get_be16(&src[0]) << 16) | pouch_get_be16(&src[2]);
+}
+
+uint64_t pouch_get_be64(const uint8_t src[8])
+{
+    return ((uint64_t) pouch_get_be32(&src[0]) << 32) | pouch_get_be32(&src[4]);
+}
+
+void pouch_put_be16(uint16_t val, uint8_t dst[2])
+{
+    dst[0] = val >> 8;
+    dst[1] = val;
+}
