@@ -90,6 +90,137 @@
 #define POUCH_APPLICATION_STARTUP_HOOK(_function) POUCH_APPLICATION_STARTUP_HOOK_INTERNAL(_function)
 
 /*--------------------------------------------------
+ * Atomic
+ *------------------------------------------------*/
+
+#include <limits.h>
+
+typedef pouch_atomic_internal_t pouch_atomic_t;
+
+/**
+ * @brief Define number of bits in pouch_atomic_t
+ */
+#define POUCH_ATOMIC_BITS (sizeof(pouch_atomic_t) * CHAR_BIT)
+
+/**
+ * @brief Initialize a pouch_atomic_t
+ *
+ * @param i Value to assign to atomic variable.
+ */
+#define POUCH_ATOMIC_INIT(i) (i)
+
+/**
+ * @brief Define an array of pouch_atomic_t variables
+ *
+ * Defines an array of pouch_atomic_t that contain a combined number of bits at least /p num_bits
+ * in size. When used at file scope the array will be initialized to 0, otherwise uninitialized.
+ *
+ * @param name Name of array to define.
+ * @param num_bits Minimum nuber of bits contained by all array members combined.
+ */
+#define POUCH_ATOMIC_DEFINE(name, num_bits) \
+    pouch_atomic_t name[DIV_ROUND_UP(num_bits, POUCH_ATOMIC_BITS)]
+
+/**
+ * @brief Atomic decrement by 1.
+ *
+ * @param target Address of atomic variable
+ * @return Value of target before decrement
+ */
+long pouch_atomic_dec(pouch_atomic_t *target);
+
+/**
+ * @brief Atomic increment by 1.
+ *
+ * @param target Address of atomic variable
+ * @return Value of target before increment
+ */
+long pouch_atomic_inc(pouch_atomic_t *target);
+
+/**
+ * @brief Atomic get.
+ *
+ * @param target Address of atomic variable
+ * @return Value of target
+ */
+long pouch_atomic_get_value(const pouch_atomic_t *target);
+
+/**
+ * @brief Atomic clear.
+ *
+ * @param target Address of atomic variable to set to 0
+ * @return Value of target before clear.
+ */
+long pouch_atomic_clear(pouch_atomic_t *target);
+
+/**
+ * @brief Atomic set.
+ *
+ * @param target Address of atomic variable
+ * @param value Value to set
+ * @return Value of target before set.
+ */
+long pouch_atomic_set(pouch_atomic_t *target, long value);
+
+/**
+ * @brief Atomically clear a bit
+ *
+ * A pointer to an array of pouch_atomic_t may be supplied as the /p target when /p bit is larger
+ * than POUCH_ATOMIC_BITS. See POUCH_ATOMIC_DEFINE().
+ *
+ * @param target Address of atomic variable
+ * @param bit Bit number to be cleared
+ */
+void pouch_atomic_clear_bit(pouch_atomic_t *target, int bit);
+
+/**
+ * @brief Atomically set a bit
+ *
+ * A pointer to an array of pouch_atomic_t may be supplied as the /p target when /p bit is larger
+ * than POUCH_ATOMIC_BITS. See POUCH_ATOMIC_DEFINE().
+ *
+ * @param target Address of atomic variable
+ * @param bit Bit number to be set
+ */
+void pouch_atomic_set_bit(pouch_atomic_t *target, int bit);
+
+/**
+ * @brief Atomically test the state of a bit
+ *
+ * A pointer to an array of pouch_atomic_t may be supplied as the /p target when /p bit is larger
+ * than POUCH_ATOMIC_BITS. See POUCH_ATOMIC_DEFINE().
+ *
+ * @param target Address of atomic variable
+ * @param bit Bit number to test
+ * @return true if bit is set, false if bit is clear
+ */
+bool pouch_atomic_test_bit(const pouch_atomic_t *target, int bit);
+
+/**
+ * @brief Atomically clear bit and return its previous state
+ *
+ * A pointer to an array of pouch_atomic_t may be supplied as the /p target when /p bit is larger
+ * than POUCH_ATOMIC_BITS. See POUCH_ATOMIC_DEFINE().
+ *
+ * @param target Address of atomic variable
+ * @param bit Bit number to test
+ * @return false if bit was already clear, true if it wasn't
+ */
+bool pouch_atomic_test_and_clear_bit(pouch_atomic_t *target, int bit);
+
+/**
+ * @brief Atomically set bit and return its previous state
+ *
+ * A pointer to an array of pouch_atomic_t may be supplied as the /p target when /p bit is larger
+ * than POUCH_ATOMIC_BITS. See POUCH_ATOMIC_DEFINE().
+ *
+ * @param target Address of atomic variable
+ * @param bit Bit number to test
+ * @return true if bit was already set, false if it wasn't
+ */
+bool pouch_atomic_test_and_set_bit(pouch_atomic_t *target, int bit);
+
+/*--------------------------------------------------
  * Big Endian
  *------------------------------------------------*/
 
