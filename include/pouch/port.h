@@ -34,6 +34,42 @@
 #define POUCH_APPLICATION_STARTUP_HOOK(_function) POUCH_APPLICATION_STARTUP_HOOK_INTERNAL(_function)
 
 /*--------------------------------------------------
+ * Big Endian
+ *------------------------------------------------*/
+
+/**
+ *  @brief Get a 16-bit integer stored in big-endian format.
+ *
+ *  @param src Big-endian 16-bit integer.
+ *  @return 16-bit integer in host endianness.
+ */
+uint16_t pouch_get_be16(const uint8_t src[2]);
+
+/**
+ *  @brief Get a 32-bit integer stored in big-endian format.
+ *
+ *  @param src Big-endian 32-bit integer.
+ *  @return 32-bit integer in host endianness.
+ */
+uint32_t pouch_get_be32(const uint8_t src[4]);
+
+/**
+ *  @brief Get a 64-bit integer stored in big-endian format.
+ *
+ *  @param src Big-endian 64-bit integer.
+ *  @return 64-bit integer in host endianness.
+ */
+uint64_t pouch_get_be64(const uint8_t src[8]);
+
+/**
+ *  @brief Put a 16-bit integer as big-endian to arbitrary location.
+ *
+ *  @param val 16-bit integer in host endianness.
+ *  @param dst Address to store the result.
+ */
+void pouch_put_be16(uint16_t val, uint8_t dst[2]);
+
+/*--------------------------------------------------
  * Iterable Sections
  *------------------------------------------------*/
 
