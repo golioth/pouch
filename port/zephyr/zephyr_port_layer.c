@@ -6,7 +6,74 @@
 
 #include <pouch/port.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <zephyr/kernel.h>
+
+/*--------------------------------------------------
+ * Atomic
+ *------------------------------------------------*/
+
+#include <zephyr/sys/atomic.h>
+
+/*
+ * The Zephyr atomic implementation uses atomic_t that is a typedef of long so this compile-time
+ * assert should always evaluate to true. This is here to catch any unexpected changes to the
+ * bit-width in the future.
+ */
+POUCH_STATIC_ASSERT(sizeof(pouch_atomic_t) == sizeof(long),
+                    "Pouch atomic port API requires sizeof(pouch_atomic_t) == sizeof(long)");
+
+/* Zephyr atomic_t is a typedef for long so no need to cast in these wrappers */
+
+long pouch_atomic_dec(pouch_atomic_t *target)
+{
+    return atomic_dec(target);
+}
+
+long pouch_atomic_inc(pouch_atomic_t *target)
+{
+    return atomic_inc(target);
+}
+
+long pouch_atomic_get_value(const pouch_atomic_t *target)
+{
+    return atomic_get(target);
+}
+
+long pouch_atomic_clear(pouch_atomic_t *target)
+{
+    return atomic_clear(target);
+}
+
+long pouch_atomic_set(pouch_atomic_t *target, long value)
+{
+    return atomic_set(target, (atomic_t) value);
+}
+
+void pouch_atomic_clear_bit(pouch_atomic_t *target, int bit)
+{
+    atomic_clear_bit(target, bit);
+}
+
+void pouch_atomic_set_bit(pouch_atomic_t *target, int bit)
+{
+    atomic_set_bit(target, bit);
+}
+
+bool pouch_atomic_test_bit(const pouch_atomic_t *target, int bit)
+{
+    return atomic_test_bit(target, bit);
+}
+
+bool pouch_atomic_test_and_clear_bit(pouch_atomic_t *target, int bit)
+{
+    return atomic_test_and_clear_bit(target, bit);
+}
+
+bool pouch_atomic_test_and_set_bit(pouch_atomic_t *target, int bit)
+{
+    return atomic_test_and_set_bit(target, bit);
+}
 
 /*--------------------------------------------------
  * Big Endian

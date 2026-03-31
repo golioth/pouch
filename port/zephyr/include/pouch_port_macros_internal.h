@@ -9,6 +9,14 @@
 #include <zephyr/kernel.h>
 
 /*--------------------------------------------------
+ * Atomic
+ *------------------------------------------------*/
+
+#include <zephyr/sys/atomic_types.h>
+
+typedef atomic_t pouch_atomic_internal_t;
+
+/*--------------------------------------------------
  * Application Startup Hook
  *------------------------------------------------*/
 
