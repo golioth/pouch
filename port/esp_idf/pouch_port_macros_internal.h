@@ -105,3 +105,11 @@
     ESP_LOG_BUFFER_HEX_LEVEL(tag, buf, size, ESP_LOG_DEBUG)
 
 #define POUCH_LOG_FLUSH_INTERNAL()
+
+/*--------------------------------------------------
+ * Miscellaneous
+ *------------------------------------------------*/
+
+#include <esp_assert.h>
+
+#define POUCH_STATIC_ASSERT_INTERNAL(EXPR, ...) ESP_STATIC_ASSERT(EXPR, __VA_ARGS__)
