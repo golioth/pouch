@@ -11,8 +11,6 @@
 #include <stdint.h>
 #include <psa/crypto.h>
 #include <pouch/port.h>
-#include <zephyr/sys/byteorder.h>
-#include <mbedtls/base64.h>
 
 POUCH_LOG_REGISTER(saead_uplink, CONFIG_POUCH_LOG_LEVEL);
 
