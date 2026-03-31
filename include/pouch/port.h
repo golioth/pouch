@@ -12,6 +12,8 @@
  * Misc
  *------------------------------------------------*/
 
+#define POUCH_STATIC_ASSERT(EXPR, ...) POUCH_STATIC_ASSERT_INTERNAL(EXPR, __VA_ARGS__)
+
 #ifndef STRINGIFY
 #define STRINGIFY(s) #s
 #endif
