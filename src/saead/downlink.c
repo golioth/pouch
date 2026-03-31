@@ -11,7 +11,6 @@
 #include <stdint.h>
 #include <pouch/port.h>
 #include <psa/crypto.h>
-#include <mbedtls/base64.h>
 
 POUCH_LOG_REGISTER(saead_downlink, CONFIG_POUCH_LOG_LEVEL);
 
