@@ -16,6 +16,10 @@
 #define STRINGIFY(s) #s
 #endif
 
+#ifndef DIV_ROUND_UP
+#define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
+#endif
+
 /*--------------------------------------------------
  * Application Startup Hook
  *------------------------------------------------*/
