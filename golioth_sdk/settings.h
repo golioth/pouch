@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <golioth/settings_callbacks.h>
+#include <pouch/golioth/settings_callbacks.h>
 
 struct setting_value
 {

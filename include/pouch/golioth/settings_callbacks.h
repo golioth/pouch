@@ -9,7 +9,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <golioth/settings_types.h>
+#include <pouch/golioth/settings_types.h>
 #include <pouch/port.h>
 
 /**
