@@ -148,6 +148,20 @@ void test_logging(void)
 }
 
 /*--------------------------------------------------
+ * Micsellaneous
+ *------------------------------------------------*/
+
+POUCH_STATIC_ASSERT(5 == 5, "Five should equal five!");
+
+const int test_round = DIV_ROUND_UP(9, 5);
+
+void test_misc(void)
+{
+    POUCH_LOG_WRN("Test misc");
+    POUCH_LOG_INF("Round up 9/5: %d", test_round);
+}
+
+/*--------------------------------------------------
  * Main
  *------------------------------------------------*/
 
@@ -161,4 +175,5 @@ void app_main(void)
     test_other_logging();
     test_iterable_sections();
     test_big_endian();
+    test_misc();
 }
