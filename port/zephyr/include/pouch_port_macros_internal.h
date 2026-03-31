@@ -80,3 +80,11 @@
 #define POUCH_LOG_HEXDUMP_INTERNAL(tag, buf, size, label) LOG_HEXDUMP_DBG(buf, size, label)
 
 #define POUCH_LOG_FLUSH_INTERNAL() LOG_PANIC()
+
+/*--------------------------------------------------
+ * Miscellaneous
+ *------------------------------------------------*/
+
+#include <zephyr/toolchain/gcc.h>
+
+#define POUCH_STATIC_ASSERT_INTERNAL(EXPR, ...) BUILD_ASSERT(EXPR, __VA_ARGS__)
