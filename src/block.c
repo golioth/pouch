@@ -7,7 +7,7 @@
 #include "block.h"
 #include <stdlib.h>
 #include <string.h>
-#include <zephyr/sys/byteorder.h>
+#include <pouch/port.h>
 
 /* Block format:
  *
@@ -54,13 +54,13 @@ void block_decode_hdr(struct pouch_bufview *v,
 
 static void update_block_header(struct pouch_buf *block, size_t size, uint8_t flags)
 {
-    sys_put_be16(size, buf_claim(block, sizeof(uint16_t)));
+    pouch_put_be16(size, buf_claim(block, sizeof(uint16_t)));
     *buf_claim(block, 1) |= flags;
 }
 
 static void write_block_header(struct pouch_buf *block, size_t size, uint8_t id, uint8_t flags)
 {
-    sys_put_be16(size, buf_claim(block, sizeof(uint16_t)));
+    pouch_put_be16(size, buf_claim(block, sizeof(uint16_t)));
     *buf_claim(block, 1) = id | flags;
 }
 
@@ -76,7 +76,7 @@ size_t block_size_get(const struct pouch_buf *block)
 
 void block_size_write(struct pouch_buf *block, uint16_t size)
 {
-    sys_put_be16(size, buf_claim(block, sizeof(uint16_t)));
+    pouch_put_be16(size, buf_claim(block, sizeof(uint16_t)));
 }
 
 struct pouch_buf *block_alloc(void)

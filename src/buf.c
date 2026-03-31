@@ -7,7 +7,7 @@
 #include "buf.h"
 #include <stdlib.h>
 #include <string.h>
-#include <zephyr/sys/byteorder.h>
+#include <pouch/port.h>
 
 static atomic_t bufs;
 
@@ -157,17 +157,17 @@ uint8_t pouch_bufview_read_byte(struct pouch_bufview *v)
 
 uint16_t pouch_bufview_read_be16(struct pouch_bufview *v)
 {
-    return sys_get_be16(bufview_read(v, sizeof(uint16_t)));
+    return pouch_get_be16(bufview_read(v, sizeof(uint16_t)));
 }
 
 uint32_t pouch_bufview_read_be32(struct pouch_bufview *v)
 {
-    return sys_get_be32(bufview_read(v, sizeof(uint32_t)));
+    return pouch_get_be32(bufview_read(v, sizeof(uint32_t)));
 }
 
 uint64_t pouch_bufview_read_be64(struct pouch_bufview *v)
 {
-    return sys_get_be64(bufview_read(v, sizeof(uint64_t)));
+    return pouch_get_be64(bufview_read(v, sizeof(uint64_t)));
 }
 
 size_t pouch_bufview_available(const struct pouch_bufview *v)

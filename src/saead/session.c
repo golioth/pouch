@@ -12,7 +12,6 @@
 #include <sys/types.h>
 #include <pouch/port.h>
 #include <psa/crypto.h>
-#include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/base64.h>
 
@@ -192,8 +191,8 @@ static void nonce_generate(const struct session *session,
                            enum pouch_role sender,
                            uint8_t nonce[NONCE_LEN])
 {
-    sys_put_be16(session->pouch.id, &nonce[0]);
-    sys_put_be16(session->pouch.block_index, &nonce[2]);
+    pouch_put_be16(session->pouch.id, &nonce[0]);
+    pouch_put_be16(session->pouch.block_index, &nonce[2]);
     nonce[4] = sender;
     memset(&nonce[5], 0, NONCE_LEN - 5);
 }
