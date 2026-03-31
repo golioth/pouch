@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pouch/port.h>
 #include <zephyr/toolchain.h>
 
 #include <pouch/transport/gatt/common/packetizer.h>
@@ -27,8 +28,8 @@ struct pouch_gatt_packet
     uint8_t data[];
 } __packed;
 
-BUILD_ASSERT(sizeof(struct pouch_gatt_packet) == POUCH_GATT_FIN_SIZE,
-             "POUCH_GATT_FIN_SIZE is wrong");
+POUCH_STATIC_ASSERT(sizeof(struct pouch_gatt_packet) == POUCH_GATT_FIN_SIZE,
+                    "POUCH_GATT_FIN_SIZE is wrong");
 
 struct pouch_gatt_ack
 {
@@ -37,7 +38,8 @@ struct pouch_gatt_ack
     uint8_t window;
 } __packed;
 
-BUILD_ASSERT(sizeof(struct pouch_gatt_ack) == POUCH_GATT_ACK_SIZE, "POUCH_GATT_ACK_SIZE is wrong");
+POUCH_STATIC_ASSERT(sizeof(struct pouch_gatt_ack) == POUCH_GATT_ACK_SIZE,
+                    "POUCH_GATT_ACK_SIZE is wrong");
 
 enum pouch_gatt_packetizer_fill_type
 {
