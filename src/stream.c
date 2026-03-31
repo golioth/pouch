@@ -6,8 +6,8 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <zephyr/sys/byteorder.h>
 
+#include <pouch/port.h>
 #include <pouch/uplink.h>
 #include "buf.h"
 #include "block.h"
@@ -35,7 +35,7 @@ static void write_stream_header(struct pouch_buf *block, uint16_t content_type, 
 {
     size_t path_len = strlen(path);
 
-    sys_put_be16(content_type, buf_claim(block, sizeof(uint16_t)));
+    pouch_put_be16(content_type, buf_claim(block, sizeof(uint16_t)));
     *buf_claim(block, 1) = path_len;
     buf_write(block, path, path_len);
 }

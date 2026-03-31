@@ -11,7 +11,6 @@
 #include <string.h>
 #include <stdio.h>
 
-#include <zephyr/sys/byteorder.h>
 #include <pouch/downlink.h>
 #include <pouch/port.h>
 
@@ -186,8 +185,8 @@ static int write_entry(struct pouch_buf *block, const struct pouch_entry *entry)
         return -ENOMEM;
     }
 
-    sys_put_be16(entry->data_len, buf_claim(block, sizeof(uint16_t)));
-    sys_put_be16(entry->content_type, buf_claim(block, sizeof(uint16_t)));
+    pouch_put_be16(entry->data_len, buf_claim(block, sizeof(uint16_t)));
+    pouch_put_be16(entry->content_type, buf_claim(block, sizeof(uint16_t)));
     *buf_claim(block, 1) = pathlen;
     buf_write(block, entry->path, pathlen);
     buf_write(block, entry->data, entry->data_len);
