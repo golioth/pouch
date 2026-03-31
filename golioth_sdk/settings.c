@@ -15,7 +15,7 @@ LOG_MODULE_REGISTER(glth_settings, CONFIG_GOLIOTH_LOG_LEVEL);
 
 #include <zcbor_decode.h>
 
-#include <golioth/settings_types.h>
+#include <pouch/golioth/settings_types.h>
 
 #include "dispatch.h"
 #include "settings.h"

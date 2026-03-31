@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <pouch/port.h>
-#include "golioth/settings_types.h"
+#include <pouch/golioth/settings_types.h>
 #include "other_test_functions.h"
 #include <errno.h>
 
@@ -10,7 +10,7 @@ POUCH_LOG_REGISTER(main, POUCH_LOG_LEVEL_DBG);
  * Iterable Sections
  *------------------------------------------------*/
 
-#include <golioth/settings_callbacks.h>
+#include <pouch/golioth/settings_callbacks.h>
 #include <string.h>
 #include "../../../../golioth_sdk/settings.h"
 

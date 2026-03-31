@@ -19,7 +19,7 @@ LOG_MODULE_REGISTER(main);
 #include <pouch/transport/gatt/peripheral.h>
 #include <pouch/transport/gatt/common/types.h>
 
-#include <golioth/settings_callbacks.h>
+#include <pouch/golioth/settings_callbacks.h>
 
 #include <app_version.h>
 

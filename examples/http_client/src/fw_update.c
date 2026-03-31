@@ -14,7 +14,7 @@ LOG_MODULE_REGISTER(fw_update);
 #include <zephyr/storage/flash_map.h>
 #include <zephyr/sys/reboot.h>
 
-#include <golioth/ota.h>
+#include <pouch/golioth/ota.h>
 
 #include <app_version.h>
 
