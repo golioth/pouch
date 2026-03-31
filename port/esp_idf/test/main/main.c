@@ -112,6 +112,28 @@ void init_startup_number(void)
 POUCH_APPLICATION_STARTUP_HOOK(init_startup_number);
 
 /*--------------------------------------------------
+ * Big Endian
+ *------------------------------------------------*/
+
+void test_big_endian(void)
+{
+    POUCH_LOG_WRN("Test big endian");
+
+
+    uint16_t test16 = 0xCDAB;
+    uint32_t test32 = 0x01EFCDAB;
+    uint64_t test64 = 0x8967452301EFCDAB;
+
+    POUCH_LOG_INF("get be16: 0x%X", pouch_get_be16((uint8_t *) &test16));
+    POUCH_LOG_INF("get be32: 0x%" PRIX32, pouch_get_be32((uint8_t *) &test32));
+    POUCH_LOG_INF("get be64: 0x%" PRIX64, pouch_get_be64((uint8_t *) &test64));
+
+    uint16_t dst;
+    pouch_put_be16(0x3412, (uint8_t *) &dst);
+    POUCH_LOG_INF("put be16: 0x%X", dst);
+}
+
+/*--------------------------------------------------
  * Logging
  *------------------------------------------------*/
 
@@ -137,6 +159,6 @@ void app_main(void)
 
     test_logging();
     test_other_logging();
-
     test_iterable_sections();
+    test_big_endian();
 }
