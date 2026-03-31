@@ -10,10 +10,10 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <mbedtls/base64.h>
 #include <pouch/port.h>
 #include <psa/crypto.h>
 #include <zephyr/sys/util.h>
-#include <zephyr/sys/base64.h>
 
 POUCH_LOG_REGISTER(saead_session, CONFIG_POUCH_LOG_LEVEL);
 
@@ -78,11 +78,11 @@ static ssize_t session_key_info_build(const struct session_id *id,
     char session_id[BASE64_STRLEN(SESSION_ID_LEN) + 1];
     size_t id_len = 0;
 
-    int err = base64_encode(session_id,
-                            sizeof(session_id),
-                            &id_len,
-                            (const void *) &id->value,
-                            sizeof(id->value));
+    int err = mbedtls_base64_encode(session_id,
+                                    sizeof(session_id),
+                                    &id_len,
+                                    (const void *) &id->value,
+                                    sizeof(id->value));
     if (err)
     {
         return -EIO;
