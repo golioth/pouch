@@ -35,15 +35,16 @@ struct golioth_downlink_service
     struct golioth_downlink_service_data *data;
 };
 
-#define GOLIOTH_DOWNLINK_HANDLER(_name, _path, _start_cb, _data_cb)                              \
-    BUILD_ASSERT((_path != NULL) && (_data_cb != NULL), "_path, and _data_cb must not be NULL"); \
-    static struct golioth_downlink_service_data _name##_data = {                                 \
-        .downlink_id = DOWNLINK_ID_INVALID,                                                      \
-    };                                                                                           \
-    static POUCH_STRUCT_SECTION_ITERABLE(golioth_downlink_service,                               \
-                                         _golioth_downlink_service_##_name) = {                  \
-        .path = _path,                                                                           \
-        .start_cb = _start_cb,                                                                   \
-        .data_cb = _data_cb,                                                                     \
-        .data = &_name##_data,                                                                   \
+#define GOLIOTH_DOWNLINK_HANDLER(_name, _path, _start_cb, _data_cb)             \
+    POUCH_STATIC_ASSERT((_path != NULL) && (_data_cb != NULL),                  \
+                        "_path, and _data_cb must not be NULL");                \
+    static struct golioth_downlink_service_data _name##_data = {                \
+        .downlink_id = DOWNLINK_ID_INVALID,                                     \
+    };                                                                          \
+    static POUCH_STRUCT_SECTION_ITERABLE(golioth_downlink_service,              \
+                                         _golioth_downlink_service_##_name) = { \
+        .path = _path,                                                          \
+        .start_cb = _start_cb,                                                  \
+        .data_cb = _data_cb,                                                    \
+        .data = &_name##_data,                                                  \
     }
