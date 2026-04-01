@@ -27,9 +27,9 @@ struct pouch_stream
 };
 
 /** Next stream ID */
-static atomic_t stream_id = ATOMIC_INIT(1);
+static pouch_atomic_t stream_id = POUCH_ATOMIC_INIT(1);
 /** Number of open streams */
-static atomic_t open_streams;
+static pouch_atomic_t open_streams;
 
 static void write_stream_header(struct pouch_buf *block, uint16_t content_type, const char *path)
 {
@@ -46,7 +46,7 @@ static uint8_t new_stream_id(void)
     // ID 0 is reserved:
     do
     {
-        id = atomic_inc(&stream_id) & BLOCK_ID_MASK;
+        id = pouch_atomic_inc(&stream_id) & BLOCK_ID_MASK;
     } while (id == 0);
 
     return id;
@@ -54,16 +54,16 @@ static uint8_t new_stream_id(void)
 
 struct pouch_stream *pouch_uplink_stream_open(const char *path, uint16_t content_type)
 {
-    if (atomic_inc(&open_streams) >= POUCH_STREAMS_MAX)
+    if (pouch_atomic_inc(&open_streams) >= POUCH_STREAMS_MAX)
     {
-        atomic_dec(&open_streams);
+        pouch_atomic_dec(&open_streams);
         return NULL;
     }
 
     struct pouch_stream *stream = malloc(sizeof(struct pouch_stream));
     if (stream == NULL)
     {
-        atomic_dec(&open_streams);
+        pouch_atomic_dec(&open_streams);
         return NULL;
     }
 
@@ -75,7 +75,7 @@ struct pouch_stream *pouch_uplink_stream_open(const char *path, uint16_t content
     if (stream->buf == NULL)
     {
         free(stream);
-        atomic_dec(&open_streams);
+        pouch_atomic_dec(&open_streams);
         return NULL;
     }
 
@@ -148,7 +148,7 @@ int pouch_stream_close(struct pouch_stream *stream, int32_t timeout_ms)
         block_free(stream->buf);
     }
 
-    atomic_dec(&open_streams);
+    pouch_atomic_dec(&open_streams);
     free(stream);
 
     return 0;
@@ -161,5 +161,5 @@ bool pouch_stream_is_valid(struct pouch_stream *stream)
 
 bool stream_is_open(void)
 {
-    return atomic_get(&open_streams) != 0;
+    return pouch_atomic_get_value(&open_streams) != 0;
 }
