@@ -180,7 +180,7 @@ void pouch_downlink_block_push(struct pouch_buf *pouch_buf)
 static int write_entry(struct pouch_buf *block, const struct pouch_entry *entry)
 {
     size_t pathlen = strlen(entry->path);
-    if (block_space_get(block) < ENTRY_HEADER_OVERHEAD + pathlen + entry->data_len)
+    if (block == NULL || block_space_get(block) < ENTRY_HEADER_OVERHEAD + pathlen + entry->data_len)
     {
         return -ENOMEM;
     }
@@ -205,24 +205,15 @@ int pouch_uplink_entry_write(const char *path,
         return -EINVAL;
     }
 
-    int err = 0;
-    bool block_is_new = false;
+    /* We're using the timeout for successive blocking calls, so we have to
+     * use timepoints to move it along:
+     */
+    pouch_timepoint_t end = pouch_timepoint_get(timeout);
 
-    bool unlocked = pouch_mutex_lock(&mut, timeout);
-    if (false == unlocked)
+    bool ok = pouch_mutex_lock(&mut, pouch_timepoint_timeout(end));
+    if (!ok)
     {
         return -EAGAIN;
-    }
-
-    if (block == NULL)
-    {
-        block_is_new = true;
-        block = block_alloc();
-        if (block == NULL)
-        {
-            err = -ENOMEM;
-            goto end;
-        }
     }
 
     const struct pouch_entry entry = {
@@ -232,15 +223,18 @@ int pouch_uplink_entry_write(const char *path,
         .data = data,
     };
 
-    err = write_entry(block, &entry);
-    if (err && !block_is_new)
+    int err = write_entry(block, &entry);
+    if (err)
     {
-        // block is full
-        block_finish(block);
-        uplink_enqueue(block);
+        if (block != NULL)
+        {
+            // block is full
+            block_finish(block);
+            uplink_enqueue(block);
+        }
 
-        // try again with a new block:
-        block = block_alloc();
+        // allocate a new block:
+        block = block_alloc(pouch_timepoint_timeout(end));
         if (block == NULL)
         {
             err = -ENOMEM;
@@ -263,10 +257,17 @@ int entry_block_close(pouch_timeout_t timeout)
         return -EAGAIN;
     }
 
-    if (block && block_size_get(block) > 0)
+    if (block)
     {
-        block_finish(block);
-        uplink_enqueue(block);
+        if (block_size_get(block) > 0)
+        {
+            block_finish(block);
+            uplink_enqueue(block);
+        }
+        else
+        {
+            block_free(block);
+        }
         block = NULL;
     }
 
