@@ -2,11 +2,12 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-if(CONFIG_POUCH)
-    zephyr_include_directories(../../include)   # Pouch includes
+zephyr_include_directories(include)         # Port includes
+zephyr_library_sources(zephyr_port_layer.c) # Port functions
 
-    zephyr_include_directories(include)         # Port includes
-    zephyr_library_sources(zephyr_port_layer.c) # Port functions
+if(CONFIG_POUCH)
+
+    zephyr_include_directories(../../include) # Pouch includes
 
     zephyr_library_named(pouch)
 
