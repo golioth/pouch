@@ -37,7 +37,7 @@ static struct
 /** Check that this session is a valid follow up to the previous downlink session */
 static bool is_valid_downlink(const struct session_id *id, psa_algorithm_t algorithm)
 {
-    if (!atomic_test_bit(&downlink.flags, SESSION_VALID))
+    if (!pouch_atomic_test_bit(&downlink.flags, SESSION_VALID))
     {
         // No previous session to invalidate the incoming session
         return true;
@@ -118,13 +118,13 @@ int saead_downlink_session_start(const struct session_id *id,
         return -EIO;
     }
 
-    downlink.flags = ATOMIC_INIT(0);
+    downlink.flags = POUCH_ATOMIC_INIT(0);
     downlink.pouch.id = 0;
     downlink.algorithm = algorithm;
     downlink.key = session_key;
     downlink.id = *id;
 
-    atomic_set_bit(&downlink.flags, SESSION_ACTIVE);
+    pouch_atomic_set_bit(&downlink.flags, SESSION_ACTIVE);
 
     return 0;
 }
@@ -136,7 +136,7 @@ void saead_downlink_session_end(void)
 
 int saead_downlink_pouch_start(pouch_id_t id)
 {
-    if (atomic_test_bit(&downlink.flags, SESSION_HAS_POUCH) && id <= server.pouch_id)
+    if (pouch_atomic_test_bit(&downlink.flags, SESSION_HAS_POUCH) && id <= server.pouch_id)
     {
         POUCH_LOG_ERR("Replaying pouch %u (highest: %u)", id, server.pouch_id);
         return -EBADMSG;
@@ -159,8 +159,8 @@ int saead_downlink_block_decrypt(const struct pouch_buf *block, struct pouch_buf
     }
 
     // As we were able to decrypt a block, we know it's a legitimate session.
-    atomic_set_bit(&downlink.flags, SESSION_VALID);
-    atomic_set_bit(&downlink.flags, SESSION_HAS_POUCH);
+    pouch_atomic_set_bit(&downlink.flags, SESSION_VALID);
+    pouch_atomic_set_bit(&downlink.flags, SESSION_HAS_POUCH);
     // We can also update our replay protection:
     server.pouch_id = downlink.pouch.id;
     if (downlink.id.initiator == POUCH_ROLE_SERVER

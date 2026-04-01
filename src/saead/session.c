@@ -31,7 +31,7 @@ POUCH_LOG_REGISTER(saead_session, CONFIG_POUCH_LOG_LEVEL);
 
 void session_end(struct session *session)
 {
-    if (!atomic_test_and_clear_bit(&session->flags, SESSION_ACTIVE))
+    if (!pouch_atomic_test_and_clear_bit(&session->flags, SESSION_ACTIVE))
     {
         return;
     }
@@ -176,7 +176,7 @@ exit:
 
 int session_pouch_start(struct session *session, pouch_id_t pouch_id)
 {
-    if (!atomic_test_bit(&session->flags, SESSION_ACTIVE))
+    if (!pouch_atomic_test_bit(&session->flags, SESSION_ACTIVE))
     {
         return -EBUSY;
     }
@@ -316,7 +316,7 @@ int session_decrypt_block(struct session *session,
     pouch_bufview_memcpy(&ciphertext, &session->pouch.ad, AUTH_TAG_LEN);
     session->pouch.block_index++;
 
-    atomic_set_bit(&session->flags, SESSION_VALID);
+    pouch_atomic_set_bit(&session->flags, SESSION_VALID);
 
     return 0;
 }

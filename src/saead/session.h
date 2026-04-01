@@ -8,7 +8,6 @@
 
 #include "../pouch.h"
 #include <zephyr/kernel.h>
-#include <zephyr/sys/atomic.h>
 #include <psa/crypto.h>
 #include <string.h>
 
@@ -56,7 +55,7 @@ enum session_flags
 struct session
 {
     struct session_id id;
-    atomic_t flags;
+    pouch_atomic_t flags;
     psa_algorithm_t algorithm;
     psa_key_id_t key;
     struct
