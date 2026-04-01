@@ -17,7 +17,10 @@ POUCH_LOG_REGISTER(esp - idf - port - layer, POUCH_LOG_LEVEL_DBG);
  * Atomic
  *------------------------------------------------*/
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 #include "freertos/atomic.h"
+#pragma GCC diagnostic pop
 
 /*
  * The FreeRTOS atomic implementation uses uint32_t for the type. The pouch_atomic_t type matches

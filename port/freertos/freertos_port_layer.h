@@ -13,7 +13,10 @@
  * Atomic
  *------------------------------------------------*/
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 #include "freertos/atomic.h"
+#pragma GCC diagnostic pop
 
 typedef uint32_t pouch_atomic_internal_t;
 
