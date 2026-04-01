@@ -1,0 +1,5 @@
+name: thingy91x-uart0-exp-board
+boards:
+  /thingy91x/nrf9151/ns/:
+    append:
+      EXTRA_DTC_OVERLAY_FILE: thingy91x-uart0-exp-board.overlay
