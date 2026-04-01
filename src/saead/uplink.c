@@ -108,13 +108,13 @@ struct pouch_buf *saead_uplink_encrypt_block(struct pouch_buf *block)
     if (!atomic_test_bit(&uplink.flags, SESSION_ACTIVE))
     {
         POUCH_LOG_WRN("Not in a session");
-        buf_free(block);
+        block_free(block);
         return NULL;
     }
 
     struct pouch_buf *encrypted = session_encrypt_block(&uplink, block);
 
-    buf_free(block);
+    block_free(block);
 
     return encrypted;
 }

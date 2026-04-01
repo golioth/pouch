@@ -180,7 +180,7 @@ void pouch_downlink_block_push(struct pouch_buf *pouch_buf)
 static int write_entry(struct pouch_buf *block, const struct pouch_entry *entry)
 {
     size_t pathlen = strlen(entry->path);
-    if (block_space_get(block) < ENTRY_HEADER_OVERHEAD + pathlen + entry->data_len)
+    if (block == NULL || block_space_get(block) < ENTRY_HEADER_OVERHEAD + pathlen + entry->data_len)
     {
         return -ENOMEM;
     }
@@ -205,22 +205,15 @@ int pouch_uplink_entry_write(const char *path,
         return -EINVAL;
     }
 
-    bool block_is_new = false;
-    int err = k_mutex_lock(&mut, timeout);
+    /* We're using the timeout for successive blocking calls, so we have to
+     * use timepoints to move it along:
+     */
+    k_timepoint_t end = sys_timepoint_calc(timeout);
+
+    int err = k_mutex_lock(&mut, sys_timepoint_timeout(end));
     if (err)
     {
         return err;
-    }
-
-    if (block == NULL)
-    {
-        block_is_new = true;
-        block = block_alloc();
-        if (block == NULL)
-        {
-            err = -ENOMEM;
-            goto end;
-        }
     }
 
     const struct pouch_entry entry = {
@@ -231,14 +224,17 @@ int pouch_uplink_entry_write(const char *path,
     };
 
     err = write_entry(block, &entry);
-    if (err && !block_is_new)
+    if (err)
     {
-        // block is full
-        block_finish(block);
-        uplink_enqueue(block);
+        if (block != NULL)
+        {
+            // block is full
+            block_finish(block);
+            uplink_enqueue(block);
+        }
 
-        // try again with a new block:
-        block = block_alloc();
+        // allocate a new block:
+        block = block_alloc(sys_timepoint_timeout(end));
         if (block == NULL)
         {
             err = -ENOMEM;

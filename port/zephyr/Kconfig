@@ -21,6 +21,13 @@ config POUCH_BLOCK_SIZE
   help
     The maximum block size to use for Pouch transfers.
 
+config POUCH_BLOCK_COUNT
+  int "Block count"
+  default 2
+  range 2 10000
+  help
+    Number of blocks that are allocated for assembling pouch packets.
+
 config POUCH_THREAD_STACK_SIZE
   int "Pouch thread stack size"
   default 2048
