@@ -2,6 +2,7 @@
 #include <pouch/port.h>
 #include <pouch/golioth/settings_types.h>
 #include "other_test_functions.h"
+#include "test_atomic.h"
 #include <errno.h>
 
 POUCH_LOG_REGISTER(main, POUCH_LOG_LEVEL_DBG);
@@ -232,4 +233,6 @@ void app_main(void)
     test_big_endian();
     test_misc();
     test_atomic();
+
+    run_atomic_tests();
 }
