@@ -120,7 +120,6 @@ void test_big_endian(void)
 {
     POUCH_LOG_WRN("Test big endian");
 
-
     uint16_t test16 = 0xCDAB;
     uint32_t test32 = 0x01EFCDAB;
     uint64_t test64 = 0x8967452301EFCDAB;
@@ -149,7 +148,7 @@ void test_logging(void)
 }
 
 /*--------------------------------------------------
- * Micsellaneous
+ * Miscellaneous
  *------------------------------------------------*/
 
 POUCH_STATIC_ASSERT(5 == 5, "Five should equal five!");
