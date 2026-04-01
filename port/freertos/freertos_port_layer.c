@@ -16,7 +16,7 @@
  *------------------------------------------------*/
 
 /**
- * Big Endine implementation based on:
+ * Big Endian implementation based on:
  * https://github.com/zephyrproject-rtos/zephyr/blob/v4.3.0/include/zephyr/sys/byteorder.h
  */
 
