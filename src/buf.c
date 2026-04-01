@@ -9,7 +9,7 @@
 #include <string.h>
 #include <pouch/port.h>
 
-static atomic_t bufs;
+static pouch_atomic_t bufs;
 
 struct pouch_buf
 {
@@ -67,7 +67,7 @@ struct pouch_buf *buf_alloc(size_t size)
     struct pouch_buf *buf = malloc(sizeof(struct pouch_buf) + size);
     if (buf != NULL)
     {
-        atomic_inc(&bufs);
+        pouch_atomic_inc(&bufs);
         buf->bytes = 0;
         pouch_slist_node_init(&buf->node);
     }
@@ -80,13 +80,13 @@ void buf_free(struct pouch_buf *buf)
     free(buf);
     if (buf)
     {
-        atomic_dec(&bufs);
+        pouch_atomic_dec(&bufs);
     }
 }
 
 int buf_active_count(void)
 {
-    return atomic_get(&bufs);
+    return pouch_atomic_get_value(&bufs);
 }
 
 size_t buf_trim_start(struct pouch_buf *buf, size_t bytes)

@@ -20,7 +20,7 @@ int saead_uplink_session_start(psa_algorithm_t algorithm, psa_key_id_t private_k
 {
     struct pubkey pubkey;
 
-    uplink.flags = ATOMIC_INIT(0);
+    uplink.flags = POUCH_ATOMIC_INIT(0);
 
     // Sequential IDs require replay protection, which isn't supported yet:
     uplink.id.type = SESSION_ID_TYPE_RANDOM;
@@ -48,8 +48,8 @@ int saead_uplink_session_start(psa_algorithm_t algorithm, psa_key_id_t private_k
 
     uplink.algorithm = algorithm;
     uplink.pouch.id = 0;
-    atomic_set_bit(&uplink.flags, SESSION_VALID);
-    atomic_set_bit(&uplink.flags, SESSION_ACTIVE);
+    pouch_atomic_set_bit(&uplink.flags, SESSION_VALID);
+    pouch_atomic_set_bit(&uplink.flags, SESSION_ACTIVE);
 
     return 0;
 }
@@ -61,7 +61,7 @@ int saead_uplink_pouch_start(void)
 
 int saead_uplink_header_get(struct saead_info *info)
 {
-    if (!atomic_test_bit(&uplink.flags, SESSION_ACTIVE))
+    if (!pouch_atomic_test_bit(&uplink.flags, SESSION_ACTIVE))
     {
         POUCH_LOG_ERR("Not in a session");
         return -ENOTCONN;
@@ -103,7 +103,7 @@ int saead_uplink_header_get(struct saead_info *info)
 
 struct pouch_buf *saead_uplink_encrypt_block(struct pouch_buf *block)
 {
-    if (!atomic_test_bit(&uplink.flags, SESSION_ACTIVE))
+    if (!pouch_atomic_test_bit(&uplink.flags, SESSION_ACTIVE))
     {
         POUCH_LOG_WRN("Not in a session");
         buf_free(block);
@@ -126,14 +126,15 @@ bool saead_uplink_session_matches(const struct session_id *id,
                                   uint8_t max_block_size_log,
                                   psa_algorithm_t algorithm)
 {
-    return atomic_test_bit(&uplink.flags, SESSION_VALID) && session_id_is_equal(id, &uplink.id)
-        && max_block_size_log == MAX_BLOCK_PAYLOAD_SIZE_LOG && uplink.algorithm == algorithm;
+    return pouch_atomic_test_bit(&uplink.flags, SESSION_VALID)
+        && session_id_is_equal(id, &uplink.id) && max_block_size_log == MAX_BLOCK_PAYLOAD_SIZE_LOG
+        && uplink.algorithm == algorithm;
 }
 
 psa_key_id_t saead_uplink_session_key_copy(psa_key_usage_t usage)
 {
     psa_key_id_t copy = PSA_KEY_ID_NULL;
-    if (!atomic_test_bit(&uplink.flags, SESSION_VALID))
+    if (!pouch_atomic_test_bit(&uplink.flags, SESSION_VALID))
     {
         return PSA_KEY_ID_NULL;
     }
