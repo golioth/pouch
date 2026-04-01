@@ -85,7 +85,7 @@ static void uplink_handler(void)
     if (uplink_handler_enabled)
     {
         k_mutex_lock(&handler_mut, K_FOREVER);
-        write_entry(10, K_FOREVER);
+        write_entry(10, K_MSEC(10));
         k_mutex_unlock(&handler_mut);
         // disabled by default:
         uplink_handler_enabled = false;
@@ -247,6 +247,12 @@ ZTEST(uplink, test_pull_partial)
     }
 
     zassert_equal(offset, 46, "expected to read 46 bytes, got %d", offset);
+    pouch_uplink_close(K_NO_WAIT);
+
+    // let uplink handler and processing run:
+    k_sleep(K_MSEC(1));
+
+    transport_reset(NULL);
 
     free(buf);
 }
@@ -348,7 +354,7 @@ ZTEST(uplink, test_stream_basic)
     transport_session_start();
 
     struct pouch_stream *stream =
-        pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM);
+        pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM, K_FOREVER);
     zassert_not_null(stream, "Failed to open stream");
 
     const uint8_t data[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
@@ -385,7 +391,7 @@ ZTEST(uplink, test_stream_multiblock)
     transport_session_start();
 
     struct pouch_stream *stream =
-        pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM);
+        pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM, K_FOREVER);
     zassert_not_null(stream, "Failed to open stream");
 
     // write more data than a single block can hold:
@@ -464,11 +470,11 @@ ZTEST(uplink, test_stream_multi_stream)
     transport_session_start();
 
     struct pouch_stream *stream1 =
-        pouch_uplink_stream_open("test/path1", POUCH_CONTENT_TYPE_OCTET_STREAM);
+        pouch_uplink_stream_open("test/path1", POUCH_CONTENT_TYPE_OCTET_STREAM, K_FOREVER);
     zassert_not_null(stream1, "Failed to open stream");
 
     struct pouch_stream *stream2 =
-        pouch_uplink_stream_open("test/path2", POUCH_CONTENT_TYPE_OCTET_STREAM);
+        pouch_uplink_stream_open("test/path2", POUCH_CONTENT_TYPE_OCTET_STREAM, K_FOREVER);
     zassert_not_null(stream2, "Failed to open stream");
 
     const uint8_t data1[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
@@ -522,11 +528,11 @@ ZTEST(uplink, test_stream_multi_block_multi_stream)
     transport_session_start();
 
     struct pouch_stream *stream1 =
-        pouch_uplink_stream_open("test/path1", POUCH_CONTENT_TYPE_OCTET_STREAM);
+        pouch_uplink_stream_open("test/path1", POUCH_CONTENT_TYPE_OCTET_STREAM, K_FOREVER);
     zassert_not_null(stream1, "Failed to open stream");
 
     struct pouch_stream *stream2 =
-        pouch_uplink_stream_open("test/path2", POUCH_CONTENT_TYPE_OCTET_STREAM);
+        pouch_uplink_stream_open("test/path2", POUCH_CONTENT_TYPE_OCTET_STREAM, K_FOREVER);
     zassert_not_null(stream2, "Failed to open stream");
 
     // write more data than a single block can hold:
@@ -613,7 +619,6 @@ ZTEST(uplink, test_stream_multi_block_multi_stream)
     }
 }
 
-
 ZTEST(uplink, test_stream_max_count)
 {
     transport_session_start();
@@ -621,12 +626,13 @@ ZTEST(uplink, test_stream_max_count)
     struct pouch_stream *streams[POUCH_STREAMS_MAX];
     for (int i = 0; i < POUCH_STREAMS_MAX; i++)
     {
-        streams[i] = pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM);
-        zassert_not_null(streams[i], "Failed to open stream");
+        streams[i] =
+            pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM, K_NO_WAIT);
+        zassert_not_null(streams[i], "Failed to open stream %d", i);
     }
 
     struct pouch_stream *stream =
-        pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM);
+        pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM, K_NO_WAIT);
     zassert_is_null(stream, "Expected to fail to open stream");
 
     for (int i = 0; i < POUCH_STREAMS_MAX; i++)
@@ -643,7 +649,7 @@ ZTEST(uplink, test_stream_empty)
     transport_session_start();
 
     struct pouch_stream *stream =
-        pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM);
+        pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM, K_FOREVER);
     zassert_not_null(stream, "Failed to open stream");
 
     zassert_ok(pouch_stream_close(stream, POUCH_NO_WAIT));
@@ -659,7 +665,7 @@ ZTEST(uplink, test_stream_empty)
 ZTEST(uplink, test_stream_fail_to_close_stream)
 {
     struct pouch_stream *stream =
-        pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM);
+        pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM, K_FOREVER);
     zassert_not_null(stream, "Failed to open stream");
 
     zassert_true(pouch_stream_is_valid(stream), "Expected stream to be valid");
@@ -695,7 +701,7 @@ ZTEST(uplink, test_stream_length_aligned_to_block_size)
     transport_session_start();
 
     struct pouch_stream *stream =
-        pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM);
+        pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM, K_FOREVER);
     zassert_not_null(stream, "Failed to open stream");
 
     // Write data that is exactly aligned to the size of two blocks. Need to account for the size

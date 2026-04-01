@@ -33,6 +33,7 @@ if(CONFIG_POUCH)
     zephyr_library_sources(
         ${CMAKE_CURRENT_BINARY_DIR}/core/header_decode.c
         ${CMAKE_CURRENT_BINARY_DIR}/core/header_encode.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/blockbuf.c
     )
 
     zephyr_library_include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)

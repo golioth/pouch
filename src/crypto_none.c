@@ -75,5 +75,17 @@ int crypto_decrypt_block(const struct pouch_buf *block, struct pouch_buf *decryp
 
 struct pouch_buf *crypto_encrypt_block(struct pouch_buf *block)
 {
-    return block;
+    // Have to copy this to get a buffer from the heap for transport:
+    struct pouch_buf *encrypted = buf_alloc(MAX_CIPHERTEXT_BLOCK_SIZE);
+    if (encrypted != NULL)
+    {
+        struct pouch_bufview v;
+        pouch_bufview_init(&v, block);
+
+        size_t size = pouch_bufview_available(&v);
+        pouch_bufview_memcpy(&v, buf_claim(encrypted, size), size);
+    }
+    block_free(block);
+
+    return encrypted;
 }

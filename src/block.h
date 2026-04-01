@@ -32,9 +32,9 @@ void block_decode_hdr(struct pouch_bufview *v,
                       bool *is_first,
                       bool *is_last);
 
-struct pouch_buf *block_alloc(void);
+struct pouch_buf *block_alloc(pouch_timeout_t timeout);
 
-struct pouch_buf *block_alloc_stream(uint8_t stream_id, bool first);
+struct pouch_buf *block_alloc_stream(uint8_t stream_id, bool first, pouch_timeout_t timeout);
 
 void block_free(struct pouch_buf *block);
 
