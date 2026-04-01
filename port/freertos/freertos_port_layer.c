@@ -15,7 +15,10 @@ POUCH_LOG_REGISTER(esp - idf - port - layer, POUCH_LOG_LEVEL_DBG);
  * Atomic
  *------------------------------------------------*/
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 #include "freertos/atomic.h"
+#pragma GCC diagnostic pop
 
 /*
  * The Pouch FreeRTOS port currently only supports atomic operations on 32-bit processors
