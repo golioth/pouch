@@ -7,6 +7,15 @@
 #pragma once
 
 #include "freertos/FreeRTOS.h"
+#include <stdint.h>
+
+/*--------------------------------------------------
+ * Atomic
+ *------------------------------------------------*/
+
+#include "freertos/atomic.h"
+
+typedef uint32_t pouch_atomic_internal_t;
 
 /*--------------------------------------------------
  * Linked List
