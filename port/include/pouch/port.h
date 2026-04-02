@@ -218,3 +218,39 @@ void pouch_put_be16(uint16_t val, uint8_t dst[2]);
 
 /** Flush any pending logs */
 #define POUCH_LOG_FLUSH() POUCH_LOG_FLUSH_INTERNAL()
+
+/*--------------------------------------------------
+ * Mutex
+ *------------------------------------------------*/
+
+/** @brief Type to use for mutex operations */
+typedef pouch_mutex_internal_t pouch_mutex_t;
+
+/** @brief Define and statically initialize a mutex at compile-time
+ *
+ * @param name Name used for the mutex handle
+ */
+#define POUCH_MUTEX_DEFINE(name) POUCH_MUTEX_DEFINE_INTERNAL(name)
+
+/** @brief Initialize a mutex
+ *
+ * @param mutex Pointer to a mutex
+ */
+void pouch_mutex_init(pouch_mutex_t *mutex);
+
+/** @brief Lock a mutex
+ *
+ * @param mutex Pointer to a mutex
+ * @param timeout_ms Timeout in milliseconds
+ *
+ * @return true if mutex was locked, false if timeout reached without attaining lock
+ */
+bool pouch_mutex_lock(pouch_mutex_t *mutex, int32_t timeout_ms);
+
+/** @brief Unlock a mutex
+ *
+ * @param mutex Pointer to a mutex
+ *
+ * @return true if mutex was unlocked, false if it was not unlocked
+ */
+bool pouch_mutex_unlock(pouch_mutex_t *mutex);
