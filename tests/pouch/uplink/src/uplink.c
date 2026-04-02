@@ -39,11 +39,8 @@ static void write_to_uplink(struct k_work *work)
     zassert_not_null(data);
     memset(data, 'a', len);
 
-    int err = pouch_uplink_entry_write("test/path",
-                                       POUCH_CONTENT_TYPE_OCTET_STREAM,
-                                       data,
-                                       len,
-                                       K_SECONDS(1));
+    int err =
+        pouch_uplink_entry_write("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM, data, len, 1000);
     if (write_data_expect_fail)
     {
         zassert_not_ok(err, "expected error, got %d", err);
@@ -144,7 +141,7 @@ ZTEST(uplink, test_pouch_block)
                                         POUCH_CONTENT_TYPE_OCTET_STREAM,
                                         data,
                                         sizeof(data),
-                                        K_FOREVER));
+                                        POUCH_TIMEOUT_FOREVER));
 
     // let processing run:
     k_sleep(K_MSEC(1));
@@ -175,7 +172,7 @@ ZTEST(uplink, test_pouch_entry)
                                         POUCH_CONTENT_TYPE_OCTET_STREAM,
                                         data,
                                         sizeof(data),
-                                        K_FOREVER));
+                                        POUCH_TIMEOUT_FOREVER));
 
     // let processing run:
     k_sleep(K_MSEC(1));
@@ -277,7 +274,7 @@ ZTEST(uplink, test_submit_after_close)
                                         POUCH_CONTENT_TYPE_OCTET_STREAM,
                                         data1,
                                         sizeof(data1),
-                                        K_FOREVER));
+                                        POUCH_TIMEOUT_FOREVER));
 
     // let processing run:
     k_sleep(K_MSEC(1));
@@ -287,7 +284,7 @@ ZTEST(uplink, test_submit_after_close)
                                         POUCH_CONTENT_TYPE_OCTET_STREAM,
                                         data2,
                                         sizeof(data2),
-                                        K_FOREVER));
+                                        POUCH_TIMEOUT_FOREVER));
 
     uint8_t *buf;
     size_t len = read_data(&buf, CONFIG_POUCH_BLOCK_SIZE);
@@ -323,7 +320,7 @@ ZTEST(uplink, test_multithread_writer)
                                         POUCH_CONTENT_TYPE_OCTET_STREAM,
                                         data,
                                         sizeof(data),
-                                        K_MSEC(1)));
+                                        1));
 
     // unblock the uplink handler - should push an entry and close the pouch
     k_mutex_unlock(&handler_mut);
@@ -352,10 +349,10 @@ ZTEST(uplink, test_stream_basic)
     zassert_not_null(stream, "Failed to open stream");
 
     const uint8_t data[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
-    size_t written = pouch_stream_write(stream, (void *) data, sizeof(data), K_NO_WAIT);
+    size_t written = pouch_stream_write(stream, (void *) data, sizeof(data), POUCH_TIMEOUT_NO_WAIT);
     zassert_equal(written, sizeof(data), "Unexpected write length %d", written);
 
-    zassert_ok(pouch_stream_close(stream, K_NO_WAIT));
+    zassert_ok(pouch_stream_close(stream, POUCH_TIMEOUT_NO_WAIT));
 
     // let processing run:
     k_sleep(K_MSEC(1));
@@ -395,10 +392,10 @@ ZTEST(uplink, test_stream_multiblock)
         data[i] = i & 0xff;  // dummy data
     }
 
-    size_t written = pouch_stream_write(stream, (void *) data, sizeof(data), K_NO_WAIT);
+    size_t written = pouch_stream_write(stream, (void *) data, sizeof(data), POUCH_TIMEOUT_NO_WAIT);
     zassert_equal(written, sizeof(data), "Unexpected write length %d", written);
 
-    zassert_ok(pouch_stream_close(stream, K_NO_WAIT));
+    zassert_ok(pouch_stream_close(stream, POUCH_TIMEOUT_NO_WAIT));
 
     // let processing run:
     k_sleep(K_MSEC(1));
@@ -472,15 +469,15 @@ ZTEST(uplink, test_stream_multi_stream)
     zassert_not_null(stream2, "Failed to open stream");
 
     const uint8_t data1[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
-    size_t written = pouch_stream_write(stream1, data1, sizeof(data1), K_NO_WAIT);
+    size_t written = pouch_stream_write(stream1, data1, sizeof(data1), POUCH_TIMEOUT_NO_WAIT);
     zassert_equal(written, sizeof(data1), "Unexpected write length %d", written);
 
     const uint8_t data2[] = {0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
-    written = pouch_stream_write(stream2, data2, sizeof(data2), K_NO_WAIT);
+    written = pouch_stream_write(stream2, data2, sizeof(data2), POUCH_TIMEOUT_NO_WAIT);
     zassert_equal(written, sizeof(data2), "Unexpected write length %d", written);
 
-    zassert_ok(pouch_stream_close(stream1, K_NO_WAIT));
-    zassert_ok(pouch_stream_close(stream2, K_NO_WAIT));
+    zassert_ok(pouch_stream_close(stream1, POUCH_TIMEOUT_NO_WAIT));
+    zassert_ok(pouch_stream_close(stream2, POUCH_TIMEOUT_NO_WAIT));
 
     // let processing run:
     k_sleep(K_MSEC(10));
@@ -540,15 +537,15 @@ ZTEST(uplink, test_stream_multi_block_multi_stream)
     size_t chunk_len = 8;
     for (int i = 0; i < sizeof(data); i += chunk_len)
     {
-        size_t written = pouch_stream_write(stream1, &data[i], chunk_len, K_NO_WAIT);
+        size_t written = pouch_stream_write(stream1, &data[i], chunk_len, POUCH_TIMEOUT_NO_WAIT);
         zassert_equal(written, chunk_len, "Unexpected write length %d", written);
 
-        written = pouch_stream_write(stream2, &data[i], chunk_len, K_NO_WAIT);
+        written = pouch_stream_write(stream2, &data[i], chunk_len, POUCH_TIMEOUT_NO_WAIT);
         zassert_equal(written, chunk_len, "Unexpected write length %d", written);
     }
 
-    zassert_ok(pouch_stream_close(stream1, K_NO_WAIT));
-    zassert_ok(pouch_stream_close(stream2, K_NO_WAIT));
+    zassert_ok(pouch_stream_close(stream1, POUCH_TIMEOUT_NO_WAIT));
+    zassert_ok(pouch_stream_close(stream2, POUCH_TIMEOUT_NO_WAIT));
 
     // let processing run:
     k_sleep(K_MSEC(1));
@@ -631,7 +628,7 @@ ZTEST(uplink, test_stream_max_count)
 
     for (int i = 0; i < POUCH_STREAMS_MAX; i++)
     {
-        zassert_ok(pouch_stream_close(streams[i], K_NO_WAIT));
+        zassert_ok(pouch_stream_close(streams[i], POUCH_TIMEOUT_NO_WAIT));
     }
 
     // let processing run:
@@ -646,7 +643,7 @@ ZTEST(uplink, test_stream_empty)
         pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM);
     zassert_not_null(stream, "Failed to open stream");
 
-    zassert_ok(pouch_stream_close(stream, K_NO_WAIT));
+    zassert_ok(pouch_stream_close(stream, POUCH_TIMEOUT_NO_WAIT));
 
     // let processing run:
     k_sleep(K_MSEC(1));
@@ -669,7 +666,7 @@ ZTEST(uplink, test_stream_fail_to_close_stream)
     zassert_true(pouch_stream_is_valid(stream), "Expected stream to be valid");
 
     uint8_t data1[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
-    size_t written = pouch_stream_write(stream, data1, sizeof(data1), K_NO_WAIT);
+    size_t written = pouch_stream_write(stream, data1, sizeof(data1), POUCH_TIMEOUT_NO_WAIT);
     zassert_equal(written, sizeof(data1), "Unexpected write length %d", written);
 
     transport_session_end();
@@ -678,7 +675,7 @@ ZTEST(uplink, test_stream_fail_to_close_stream)
     zassert_false(pouch_stream_is_valid(stream), "Expected stream to be invalid");
 
     // closing the stream should succeed, but data should not be sent:
-    zassert_ok(pouch_stream_close(stream, K_NO_WAIT));
+    zassert_ok(pouch_stream_close(stream, POUCH_TIMEOUT_NO_WAIT));
 
     transport_session_start();
 
@@ -707,10 +704,10 @@ ZTEST(uplink, test_stream_length_aligned_to_block_size)
         data[i] = i & 0xff;  // dummy data
     }
 
-    size_t written = pouch_stream_write(stream, (void *) data, data_len, K_NO_WAIT);
+    size_t written = pouch_stream_write(stream, (void *) data, data_len, POUCH_TIMEOUT_NO_WAIT);
     zassert_equal(written, data_len, "Unexpected write length %d", written);
 
-    zassert_ok(pouch_stream_close(stream, K_NO_WAIT));
+    zassert_ok(pouch_stream_close(stream, POUCH_TIMEOUT_NO_WAIT));
 
     // let processing run:
     k_sleep(K_MSEC(1));

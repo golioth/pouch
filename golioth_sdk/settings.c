@@ -209,7 +209,7 @@ static void settings_uplink(void)
                              POUCH_CONTENT_TYPE_CBOR,
                              buf,
                              zse->payload - buf,
-                             K_FOREVER);
+                             POUCH_TIMEOUT_FOREVER);
 }
 
 GOLIOTH_DOWNLINK_HANDLER(settings, SETTINGS_DOWNLINK_PATH, NULL, settings_downlink);
