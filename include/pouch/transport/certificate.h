@@ -7,7 +7,6 @@
 #pragma once
 
 #include <pouch/types.h>
-#include <zephyr/kernel.h>
 #include <sys/types.h>
 
 /** Set the server certificate. */

@@ -5,14 +5,13 @@
  */
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(example_ble_peripheral, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(example_ble_peripheral);
 
 #include "ble_peripheral.h"
 
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 
-#include <pouch/transport/gatt/peripheral.h>
 #include <pouch/transport/gatt/common/types.h>
 #include <pouch/types.h>
 
@@ -139,14 +138,7 @@ void ble_peripheral_button_handler(void)
 
 int ble_peripheral_init(void)
 {
-    int err = pouch_gatt_peripheral_init();
-    if (err)
-    {
-        LOG_ERR("Failed to initialize Pouch BLE GATT peripheral (err %d)", err);
-        return err;
-    }
-
-    err = bt_enable(NULL);
+    int err = bt_enable(NULL);
     if (err)
     {
         LOG_ERR("Bluetooth init failed (err %d)", err);

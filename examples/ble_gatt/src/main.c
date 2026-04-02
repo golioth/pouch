@@ -16,7 +16,6 @@ LOG_MODULE_REGISTER(main);
 #include <pouch/events.h>
 #include <pouch/uplink.h>
 #include <pouch/downlink.h>
-#include <pouch/transport/gatt/peripheral.h>
 #include <pouch/transport/gatt/common/types.h>
 
 #include <pouch/golioth/settings_callbacks.h>

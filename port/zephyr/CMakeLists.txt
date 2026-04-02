@@ -35,6 +35,7 @@ if(CONFIG_POUCH)
     )
 
     zephyr_library_include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
+    zephyr_library_include_directories(${CMAKE_CURRENT_LIST_DIR}/../../src)
 
     zephyr_library_link_libraries(mbedTLS)
 

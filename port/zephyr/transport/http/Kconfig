@@ -2,9 +2,9 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-if POUCH_TRANSPORT_HTTP_CLIENT
 
 menu "HTTP Transport Options"
+    visible if POUCH_TRANSPORT_HTTP_CLIENT
 
 config POUCH_HTTP_GW_URI
     string "Pouch gateway address"
@@ -51,5 +51,3 @@ module-str = Pouch HTTP Client
 source "subsys/logging/Kconfig.template.log_config"
 
 endmenu # "HTTP Transport Options"
-
-endif # POUCH_TRANSPORT_HTTP_CLIENT
