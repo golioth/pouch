@@ -33,7 +33,11 @@ static struct gpio_callback button_cb_data;
 static void do_uplink(void)
 {
     const char *data = "{\"temp\":22}";
-    pouch_uplink_entry_write(".s/sensor", POUCH_CONTENT_TYPE_JSON, data, strlen(data), K_FOREVER);
+    pouch_uplink_entry_write(".s/sensor",
+                             POUCH_CONTENT_TYPE_JSON,
+                             data,
+                             strlen(data),
+                             POUCH_TIMEOUT_FOREVER);
 }
 
 POUCH_UPLINK_HANDLER(do_uplink);

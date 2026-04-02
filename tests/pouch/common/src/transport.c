@@ -4,6 +4,7 @@
 #include "mocks/transport.h"
 #include <pouch/transport/uplink.h>
 #include <pouch/uplink.h>
+#include <pouch/types.h>
 
 #include <zephyr/ztest.h>
 
@@ -39,7 +40,7 @@ void transport_reset(void *unused)
     if (!uplink)
     {
         uplink = pouch_uplink_start();
-        pouch_uplink_close(K_NO_WAIT);
+        pouch_uplink_close(POUCH_TIMEOUT_NO_WAIT);
         // let processing run:
         k_sleep(K_MSEC(1));
     }

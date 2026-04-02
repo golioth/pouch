@@ -27,7 +27,7 @@ struct pouch_entry
 };
 
 static struct pouch_buf *block;
-static K_MUTEX_DEFINE(mut);
+static POUCH_MUTEX_DEFINE(mut);
 
 /* Entry format:
  *
@@ -198,18 +198,20 @@ int pouch_uplink_entry_write(const char *path,
                              uint16_t content_type,
                              const void *data,
                              size_t len,
-                             k_timeout_t timeout)
+                             int32_t timeout_ms)
 {
     if (path == NULL || data == NULL || len == 0)
     {
         return -EINVAL;
     }
 
+    int err = 0;
     bool block_is_new = false;
-    int err = k_mutex_lock(&mut, timeout);
-    if (err)
+
+    bool unlocked = pouch_mutex_lock(&mut, timeout_ms);
+    if (false == unlocked)
     {
-        return err;
+        return -EAGAIN;
     }
 
     if (block == NULL)
@@ -249,16 +251,16 @@ int pouch_uplink_entry_write(const char *path,
     }
 
 end:
-    k_mutex_unlock(&mut);
+    pouch_mutex_unlock(&mut);
     return err;
 }
 
-int entry_block_close(k_timeout_t timeout)
+int entry_block_close(int32_t timeout_ms)
 {
-    int err = k_mutex_lock(&mut, timeout);
-    if (err)
+    bool unlocked = pouch_mutex_lock(&mut, timeout_ms);
+    if (false == unlocked)
     {
-        return err;
+        return -EAGAIN;
     }
 
     if (block && block_size_get(block) > 0)
@@ -268,6 +270,6 @@ int entry_block_close(k_timeout_t timeout)
         block = NULL;
     }
 
-    k_mutex_unlock(&mut);
+    pouch_mutex_unlock(&mut);
     return 0;
 }
