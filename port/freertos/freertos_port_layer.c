@@ -5,6 +5,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "freertos/FreeRTOS.h"
+#include "freertos_port_layer.h"
+#include <pouch/port.h>
 #include <stdint.h>
 
 /*--------------------------------------------------
@@ -35,4 +38,32 @@ void pouch_put_be16(uint16_t val, uint8_t dst[2])
 {
     dst[0] = val >> 8;
     dst[1] = val;
+}
+
+/*--------------------------------------------------
+ * Mutex
+ *------------------------------------------------*/
+
+/* Note: the underlying pouch_mutex_internal_t is defined in
+ * /port/freertos/freertos_port_layer.h
+ */
+
+#include "freertos/semphr.h"
+
+void pouch_mutex_init(pouch_mutex_t *mutex)
+{
+    *mutex = xSemaphoreCreateMutex();
+}
+
+bool pouch_mutex_lock(pouch_mutex_t *mutex, int32_t timeout_ms)
+{
+    return xSemaphoreTake(*mutex,
+                          (timeout_ms > 0)        ? pdMS_TO_TICKS(timeout_ms)
+                              : (0 == timeout_ms) ? 0
+                                                  : portMAX_DELAY);
+}
+
+bool pouch_mutex_unlock(pouch_mutex_t *mutex)
+{
+    return xSemaphoreGive(*mutex);
 }
