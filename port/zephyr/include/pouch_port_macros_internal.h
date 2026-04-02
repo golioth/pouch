@@ -88,3 +88,11 @@
 #include <zephyr/toolchain/gcc.h>
 
 #define POUCH_STATIC_ASSERT_INTERNAL(EXPR, ...) BUILD_ASSERT(EXPR, __VA_ARGS__)
+
+/*--------------------------------------------------
+ * Mutex
+ *------------------------------------------------*/
+
+typedef struct k_mutex pouch_mutex_internal_t;
+
+#define POUCH_MUTEX_DEFINE_INTERNAL(name) K_MUTEX_DEFINE(name)
