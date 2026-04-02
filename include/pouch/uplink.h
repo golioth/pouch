@@ -75,10 +75,13 @@ int pouch_uplink_close(k_timeout_t timeout);
  *
  * @param path The path to write the entry to.
  * @param content_type The content type of the entry.
+ * @param timeout The timeout for opening the stream.
  *
  * @return A stream handle or NULL on error.
  */
-struct pouch_stream *pouch_uplink_stream_open(const char *path, uint16_t content_type);
+struct pouch_stream *pouch_uplink_stream_open(const char *path,
+                                              uint16_t content_type,
+                                              k_timeout_t timeout);
 
 /**
  * Write data to a stream.

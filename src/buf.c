@@ -20,6 +20,8 @@ struct pouch_buf
     uint8_t buf[];
 };
 
+BUILD_ASSERT(sizeof(struct pouch_buf) == POUCH_BUF_OVERHEAD, "Invalid overhead in pouch buf");
+
 void buf_write(struct pouch_buf *buf, const uint8_t *data, size_t len)
 {
     memcpy(buf_claim(buf, len), data, len);

@@ -13,6 +13,7 @@
 #include "cddl/header_decode.h"
 
 #include "block.h"
+#include "blockbuf.h"
 #include "buf.h"
 #include "crypto.h"
 #include "downlink.h"
@@ -27,7 +28,6 @@ static struct
 {
     pouch_buf_queue_t queue;
     struct k_work work;
-    struct pouch_buf *decrypted;
     struct k_work_q *work_queue;
 } decrypt;
 
@@ -39,26 +39,26 @@ int downlink_init(struct k_work_q *pouch_work_queue)
     k_work_init(&decrypt.work, decrypt_blocks);
     decrypt.work_queue = pouch_work_queue;
 
-    decrypt.decrypted = crypto_block_buf_alloc();
-    if (!decrypt.decrypted)
-    {
-        POUCH_LOG_ERR("Failed to allocate decrypt buf");
-        return -ENOMEM;
-    }
-
     return 0;
 }
 
 static void decrypt_blocks(struct k_work *work)
 {
     struct pouch_buf *encrypted_block;
+    struct pouch_buf *decrypted_block = blockbuf_alloc(K_FOREVER);
+    if (decrypted_block == NULL)
+    {
+        POUCH_LOG_ERR("Failed to allocate decrypt block");
+        return;
+    }
+
     while ((encrypted_block = buf_queue_get(&decrypt.queue)) != NULL)
     {
         // Reset the target buffer
-        buf_restore(decrypt.decrypted, POUCH_BUF_STATE_INITIAL);
+        buf_restore(decrypted_block, POUCH_BUF_STATE_INITIAL);
 
         /* Decrypt this block */
-        int err = crypto_decrypt_block(encrypted_block, decrypt.decrypted);
+        int err = crypto_decrypt_block(encrypted_block, decrypted_block);
 
         /* Encrypted block was consumed; free buffer no matter the outcome */
         /* buffers were allocated then enqueued in pouch_downlink_push() */
@@ -69,13 +69,15 @@ static void decrypt_blocks(struct k_work *work)
         {
             POUCH_LOG_ERR("Failed to decrypt block: %d", err);
             // TODO: Abort the downlink
-            return;
+            break;
         }
 
-        pouch_downlink_block_push(decrypt.decrypted);
+        pouch_downlink_block_push(decrypted_block);
 
         k_yield();  // let other threads run
     }
+
+    blockbuf_free(decrypted_block);
 }
 
 static int block_downlink_push(struct pouch_buf *pouch_buf)

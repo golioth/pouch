@@ -52,7 +52,9 @@ static uint8_t new_stream_id(void)
     return id;
 }
 
-struct pouch_stream *pouch_uplink_stream_open(const char *path, uint16_t content_type)
+struct pouch_stream *pouch_uplink_stream_open(const char *path,
+                                              uint16_t content_type,
+                                              k_timeout_t timeout)
 {
     if (atomic_inc(&open_streams) >= POUCH_STREAMS_MAX)
     {
@@ -71,7 +73,7 @@ struct pouch_stream *pouch_uplink_stream_open(const char *path, uint16_t content
     stream->bytes = 0;
     stream->session_id = uplink_session_id();
 
-    stream->buf = block_alloc_stream(stream->id, true);
+    stream->buf = block_alloc_stream(stream->id, true, timeout);
     if (stream->buf == NULL)
     {
         free(stream);
@@ -108,7 +110,7 @@ size_t pouch_stream_write(struct pouch_stream *stream,
              * stream as a result of this failed write instead of having to allocate an empty block
              * for this.
              */
-            struct pouch_buf *buf = block_alloc_stream(stream->id, false);
+            struct pouch_buf *buf = block_alloc_stream(stream->id, false, timeout);
             if (buf == NULL)
             {
                 break;
