@@ -2,6 +2,7 @@
 #include <pouch/port.h>
 #include <pouch/golioth/settings_types.h>
 #include "other_test_functions.h"
+#include "test_atomic.h"
 #include <errno.h>
 
 POUCH_LOG_REGISTER(main, POUCH_LOG_LEVEL_DBG);
@@ -112,13 +113,68 @@ void init_startup_number(void)
 POUCH_APPLICATION_STARTUP_HOOK(init_startup_number);
 
 /*--------------------------------------------------
+ * Atomic
+ *------------------------------------------------*/
+
+POUCH_ATOMIC_DEFINE(flags, 48);
+#define FLAG_BIT_PICKLES 36
+
+void test_atomic(void)
+{
+    POUCH_LOG_WRN("Test atomic");
+
+    pouch_atomic_t counter = POUCH_ATOMIC_INIT(42);
+    pouch_atomic_t orig_val;
+    bool orig_bit;
+    bool test_bit;
+
+    POUCH_LOG_INF("counter (expect 42): %" PRIdPTR, counter);
+
+    orig_val = pouch_atomic_inc(&counter);
+    POUCH_LOG_INF("pouch_atomic_inc - before: %" PRIdPTR " after %" PRIdPTR, orig_val, counter);
+
+    orig_val = pouch_atomic_dec(&counter);
+    POUCH_LOG_INF("pouch_atomic_decrement - before: %" PRIdPTR " after %" PRIdPTR,
+                  orig_val,
+                  counter);
+
+    orig_val = pouch_atomic_clear(&counter);
+    POUCH_LOG_INF("pouch_atomic_clear - before: %" PRIdPTR " after %" PRIdPTR, orig_val, counter);
+
+    orig_val = pouch_atomic_set(&counter, 1337);
+    POUCH_LOG_INF("pouch_atomic_set - before: %" PRIdPTR " after %" PRIdPTR, orig_val, counter);
+
+    orig_val = pouch_atomic_get(&counter);
+    POUCH_LOG_INF("pouch_atomic_get: %" PRIdPTR, orig_val);
+
+    POUCH_LOG_INF("Pickles bit value: %d", FLAG_BIT_PICKLES);
+    orig_bit = pouch_atomic_test_bit(flags, FLAG_BIT_PICKLES);
+    POUCH_LOG_INF("pickles flag before set: %d", orig_bit);
+
+    pouch_atomic_set_bit(flags, FLAG_BIT_PICKLES);
+    orig_bit = pouch_atomic_test_bit(flags, FLAG_BIT_PICKLES);
+    POUCH_LOG_INF("pickles flag after set: %d", orig_bit);
+
+    pouch_atomic_clear_bit(flags, FLAG_BIT_PICKLES);
+    orig_bit = pouch_atomic_test_bit(flags, FLAG_BIT_PICKLES);
+    POUCH_LOG_INF("pickles flag after clear: %d", orig_bit);
+
+    test_bit = pouch_atomic_test_and_set_bit(flags, FLAG_BIT_PICKLES);
+    orig_bit = pouch_atomic_test_bit(flags, FLAG_BIT_PICKLES);
+    POUCH_LOG_INF("pickles flag test and set - test: %d  set: %d", test_bit, orig_bit);
+
+    test_bit = pouch_atomic_test_and_clear_bit(flags, FLAG_BIT_PICKLES);
+    orig_bit = pouch_atomic_test_bit(flags, FLAG_BIT_PICKLES);
+    POUCH_LOG_INF("pickles flag test and clear - test: %d  set: %d", test_bit, orig_bit);
+}
+
+/*--------------------------------------------------
  * Big Endian
  *------------------------------------------------*/
 
 void test_big_endian(void)
 {
     POUCH_LOG_WRN("Test big endian");
-
 
     uint16_t test16 = 0xCDAB;
     uint32_t test32 = 0x01EFCDAB;
@@ -148,7 +204,7 @@ void test_logging(void)
 }
 
 /*--------------------------------------------------
- * Micsellaneous
+ * Miscellaneous
  *------------------------------------------------*/
 
 POUCH_STATIC_ASSERT(5 == 5, "Five should equal five!");
@@ -176,4 +232,7 @@ void app_main(void)
     test_iterable_sections();
     test_big_endian();
     test_misc();
+    test_atomic();
+
+    run_atomic_tests();
 }

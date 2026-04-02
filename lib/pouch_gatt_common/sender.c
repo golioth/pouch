@@ -6,8 +6,7 @@
 #include <limits.h>
 #include <stdlib.h>
 
-#include <zephyr/sys/atomic.h>
-
+#include <pouch/port.h>
 #include <pouch/transport/gatt/common/packetizer.h>
 #include <pouch/transport/gatt/common/sender.h>
 
@@ -23,10 +22,10 @@ enum
 
 struct pouch_gatt_sender
 {
-    atomic_t last_sent;
-    atomic_t last_acknowledged;
-    atomic_t offered_window;
-    ATOMIC_DEFINE(flags, SENDER_FLAG_COUNT);
+    pouch_atomic_t last_sent;
+    pouch_atomic_t last_acknowledged;
+    pouch_atomic_t offered_window;
+    POUCH_ATOMIC_DEFINE(flags, SENDER_FLAG_COUNT);
     struct pouch_gatt_packetizer *packetizer;
     pouch_gatt_send_fn send;
     void *send_arg;
@@ -37,20 +36,21 @@ struct pouch_gatt_sender
 static int calculate_outstanding_packets(const struct pouch_gatt_sender *sender)
 {
     const uint32_t modulus = 1 << (CHAR_BIT * sizeof(uint8_t));
-    return (modulus + atomic_get(&sender->last_sent) - atomic_get(&sender->last_acknowledged))
+    return (modulus + pouch_atomic_get(&sender->last_sent)
+            - pouch_atomic_get(&sender->last_acknowledged))
         % modulus;
 }
 
 static int calculate_usable_window(const struct pouch_gatt_sender *sender)
 {
-    return atomic_get(&sender->offered_window) - calculate_outstanding_packets(sender);
+    return pouch_atomic_get(&sender->offered_window) - calculate_outstanding_packets(sender);
 }
 
 static int send_data(struct pouch_gatt_sender *sender)
 {
     int err = 0;
 
-    if (atomic_test_and_set_bit(sender->flags, SENDER_FLAG_SENDING))
+    if (pouch_atomic_test_and_set_bit(sender->flags, SENDER_FLAG_SENDING))
     {
         return 0;
     }
@@ -58,7 +58,7 @@ static int send_data(struct pouch_gatt_sender *sender)
     int packets_sent = 0;
 
     while (calculate_usable_window(sender) > 0
-           && !atomic_test_bit(sender->flags, SENDER_FLAG_COMPLETE)
+           && !pouch_atomic_test_bit(sender->flags, SENDER_FLAG_COMPLETE)
            && packets_sent < CONFIG_BT_ATT_TX_COUNT)
     {
         size_t len = sender->buffer_size;
@@ -81,10 +81,10 @@ static int send_data(struct pouch_gatt_sender *sender)
 
         int seq = pouch_gatt_packetizer_get_sequence(sender->buffer, len);
 
-        LOG_DBG("Sending packet %d. Outstanding: %d Offered: %ld Usable: %d",
+        LOG_DBG("Sending packet %d. Outstanding: %d Offered: %" PRIdPTR " Usable: %d",
                 seq,
                 calculate_outstanding_packets(sender),
-                atomic_get(&sender->offered_window),
+                pouch_atomic_get(&sender->offered_window),
                 calculate_usable_window(sender));
 
         err = sender->send(sender->send_arg, sender->buffer, len);
@@ -94,19 +94,19 @@ static int send_data(struct pouch_gatt_sender *sender)
             break;
         }
 
-        atomic_set(&sender->last_sent, seq);
+        pouch_atomic_set(&sender->last_sent, seq);
 
         if (POUCH_GATT_PACKETIZER_NO_MORE_DATA == ret)
         {
             LOG_DBG("No more data");
             /* Set flag only after successful send of last packet */
-            atomic_set_bit(sender->flags, SENDER_FLAG_COMPLETE);
+            pouch_atomic_set_bit(sender->flags, SENDER_FLAG_COMPLETE);
         }
 
         packets_sent++;
     }
 
-    atomic_clear_bit(sender->flags, SENDER_FLAG_SENDING);
+    pouch_atomic_clear_bit(sender->flags, SENDER_FLAG_SENDING);
 
     return err;
 }
@@ -150,10 +150,10 @@ int pouch_gatt_sender_receive_ack(struct pouch_gatt_sender *sender,
 
     LOG_DBG("Received ack for packet %d", last_acknowledged);
 
-    atomic_set(&sender->last_acknowledged, last_acknowledged);
-    atomic_set(&sender->offered_window, offered_window);
+    pouch_atomic_set(&sender->last_acknowledged, last_acknowledged);
+    pouch_atomic_set(&sender->offered_window, offered_window);
 
-    if (!atomic_test_bit(sender->flags, SENDER_FLAG_COMPLETE)
+    if (!pouch_atomic_test_bit(sender->flags, SENDER_FLAG_COMPLETE)
         && calculate_usable_window(sender) > 0)
     {
         err = send_data(sender);
@@ -164,8 +164,8 @@ int pouch_gatt_sender_receive_ack(struct pouch_gatt_sender *sender,
         }
     }
 
-    if (atomic_test_bit(sender->flags, SENDER_FLAG_COMPLETE)
-        && atomic_get(&sender->last_sent) == last_acknowledged)
+    if (pouch_atomic_test_bit(sender->flags, SENDER_FLAG_COMPLETE)
+        && pouch_atomic_get(&sender->last_sent) == last_acknowledged)
     {
         *complete = true;
         err = pouch_gatt_sender_send_fin(sender->send, sender->send_arg, POUCH_GATT_ACK);
@@ -210,10 +210,10 @@ struct pouch_gatt_sender *pouch_gatt_sender_create(struct pouch_gatt_packetizer 
     sender->send = send;
     sender->send_arg = send_arg;
 
-    atomic_set(&sender->last_sent, UINT8_MAX);
-    atomic_set(&sender->last_acknowledged, UINT8_MAX);
-    atomic_set(&sender->offered_window, 0);
-    atomic_clear(sender->flags);
+    pouch_atomic_set(&sender->last_sent, UINT8_MAX);
+    pouch_atomic_set(&sender->last_acknowledged, UINT8_MAX);
+    pouch_atomic_set(&sender->offered_window, 0);
+    pouch_atomic_clear(sender->flags);
 
     return sender;
 }

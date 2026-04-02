@@ -5,14 +5,131 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "freertos/FreeRTOS.h"
+#include <pouch/port.h>
 #include <stdint.h>
+
+POUCH_LOG_REGISTER(esp - idf - port - layer, POUCH_LOG_LEVEL_DBG);
+
+/*--------------------------------------------------
+ * Atomic
+ *------------------------------------------------*/
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#include "freertos/atomic.h"
+#pragma GCC diagnostic pop
+
+/*
+ * The Pouch FreeRTOS port currently only supports atomic operations on 32-bit processors
+ *
+ * This limitation is due to the FreeRTOS atomic_t being defined as uint32_t while the
+ * pouch_atomic_t is intptr_t. If the platform is 64-bits, the underlying FreeRTOS atomic_t
+ * remains 32-bits, while pouch_port_t would be 64-bits. (The same is true for 16-bit MCUs.) The
+ * bit-width of these types must match to accomodate rollover and negative numbers.
+ *
+ * We have chosen intptr_t for pouch_port_t because it supports the Zephyr atomic_t (which is
+ * defined as a long) for all bit-width systems.
+ */
+POUCH_STATIC_ASSERT(sizeof(pouch_atomic_t) <= sizeof(uint32_t),
+                    "FreeRTOS atomic port requires pouch_atomic_t <= 32 bits");
+
+/* Internal helper macros */
+#define FREERTOS_ATOMIC_MASK(bit) BIT((intptr_t) (bit) & (POUCH_ATOMIC_BITS - 1U))
+#define FREERTOS_ATOMIC_ELEM(addr, bit) ((addr) + ((bit) / POUCH_ATOMIC_BITS))
+
+
+pouch_atomic_t pouch_atomic_dec(pouch_atomic_t *target)
+{
+    return (pouch_atomic_t) Atomic_Decrement_u32((uint32_t volatile *) target);
+}
+
+pouch_atomic_t pouch_atomic_inc(pouch_atomic_t *target)
+{
+    return (pouch_atomic_t) Atomic_Increment_u32((uint32_t volatile *) target);
+}
+
+pouch_atomic_t pouch_atomic_get(const pouch_atomic_t *target)
+{
+    /* FreeRTOS lacks an atomic get function. However we can use the OR fuction with 0       so that
+     * no bits are altered and return the original value.
+     */
+    return (pouch_atomic_t) Atomic_OR_u32((uint32_t volatile *) target, 0);
+}
+
+pouch_atomic_t pouch_atomic_clear(pouch_atomic_t *target)
+{
+    /* FreeRTOS lacks an atomic clear function. However, we can use the AND function with 0 to clear
+     * all bits and return the original value.
+     */
+    return (pouch_atomic_t) Atomic_AND_u32((uint32_t volatile *) target, 0);
+}
+
+pouch_atomic_t pouch_atomic_set(pouch_atomic_t *target, pouch_atomic_t value)
+{
+    return (pouch_atomic_t) Atomic_SwapPointers_p32((void *volatile *) target, (void *) value);
+}
+
+void pouch_atomic_clear_bit(pouch_atomic_t *target, int bit)
+{
+    pouch_atomic_t *elem = FREERTOS_ATOMIC_ELEM(target, bit);
+    pouch_atomic_t mask = FREERTOS_ATOMIC_MASK(bit);
+
+    Atomic_AND_u32((uint32_t volatile *) elem, (uint32_t) (~mask));
+}
+
+void pouch_atomic_set_bit(pouch_atomic_t *target, int bit)
+{
+    pouch_atomic_t *elem = FREERTOS_ATOMIC_ELEM(target, bit);
+    pouch_atomic_t mask = FREERTOS_ATOMIC_MASK(bit);
+
+    Atomic_OR_u32((uint32_t volatile *) elem, (uint32_t) mask);
+}
+
+bool pouch_atomic_test_bit(const pouch_atomic_t *target, int bit)
+{
+    const pouch_atomic_t *elem = FREERTOS_ATOMIC_ELEM(target, bit);
+    pouch_atomic_t mask = FREERTOS_ATOMIC_MASK(bit);
+
+    /* FreeRTOS lacks an atomic test bit function. However we can use the OR fuction with 0 so that
+     * no bits are altered, then test the original value againt the desired bit to return bool.
+     */
+    uint32_t original_val = Atomic_OR_u32((uint32_t volatile *) elem, 0);
+    return (0 != (original_val & mask));
+}
+
+bool pouch_atomic_test_and_clear_bit(pouch_atomic_t *target, int bit)
+{
+    const pouch_atomic_t *elem = FREERTOS_ATOMIC_ELEM(target, bit);
+    pouch_atomic_t mask = FREERTOS_ATOMIC_MASK(bit);
+
+    /* FreeRTOS lacks an atomic clear bit function. However, we can use the AND function with a bit
+     * mask to clear the desired bit, then test the original value against the desired bit to return
+     * bool.
+     */
+    uint32_t original_val = Atomic_AND_u32((uint32_t volatile *) elem, ~mask);
+    return (0 != (original_val & mask));
+}
+
+bool pouch_atomic_test_and_set_bit(pouch_atomic_t *target, int bit)
+{
+    const pouch_atomic_t *elem = FREERTOS_ATOMIC_ELEM(target, bit);
+    pouch_atomic_t mask = FREERTOS_ATOMIC_MASK(bit);
+
+    /* FreeRTOS lacks an atomic set bit function. However, we can use the OR function with a bit
+     * mask to set the desired bit, then test the original value against the desired bit to return
+     * bool.
+     */
+    uint32_t original_val = Atomic_OR_u32((uint32_t volatile *) elem, mask);
+    return (0 != (original_val & mask));
+}
 
 /*--------------------------------------------------
  * Big Endian
  *------------------------------------------------*/
 
 /**
- * Big Endine implementation based on:
+ * Big Endian implementation based on:
  * https://github.com/zephyrproject-rtos/zephyr/blob/v4.3.0/include/zephyr/sys/byteorder.h
  */
 
