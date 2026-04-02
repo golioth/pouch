@@ -49,3 +49,7 @@ struct pouch_cert
     /** The length of the certificate */
     size_t size;
 };
+
+/** Pouch timeout values */
+#define POUCH_TIMEOUT_FOREVER -1
+#define POUCH_TIMEOUT_NO_WAIT 0
