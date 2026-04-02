@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "../freertos/freertos_port_layer.h"
+
 /*--------------------------------------------------
  * Application Startup Hook
  *------------------------------------------------*/
@@ -113,3 +115,9 @@
 #include <esp_assert.h>
 
 #define POUCH_STATIC_ASSERT_INTERNAL(EXPR, ...) ESP_STATIC_ASSERT(EXPR, __VA_ARGS__)
+
+/*--------------------------------------------------
+ * Mutex
+ *------------------------------------------------*/
+
+/** This section is implemented in port/freertos/freertos_port_layer.h */
