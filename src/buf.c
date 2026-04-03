@@ -13,7 +13,7 @@ static atomic_t bufs;
 
 struct pouch_buf
 {
-    sys_snode_t node;
+    pouch_slist_node_t node;
     /** Number of bytes in the buffer */
     size_t bytes;
     /** Data */
@@ -69,6 +69,7 @@ struct pouch_buf *buf_alloc(size_t size)
     {
         atomic_inc(&bufs);
         buf->bytes = 0;
+        pouch_slist_node_init(&buf->node);
     }
 
     return buf;
@@ -105,23 +106,23 @@ size_t buf_trim_end(struct pouch_buf *buf, size_t bytes)
 
 void buf_queue_init(pouch_buf_queue_t *queue)
 {
-    sys_slist_init(queue);
+    pouch_slist_init(queue);
 }
 
 void buf_queue_submit(pouch_buf_queue_t *queue, struct pouch_buf *buf)
 {
-    sys_slist_append(queue, &buf->node);
+    pouch_slist_append(queue, &buf->node);
 }
 
 struct pouch_buf *buf_queue_get(pouch_buf_queue_t *queue)
 {
-    sys_snode_t *n = sys_slist_get(queue);
+    pouch_slist_node_t *n = pouch_slist_get(queue);
     return n ? CONTAINER_OF(n, struct pouch_buf, node) : NULL;
 }
 
 struct pouch_buf *buf_queue_peek(pouch_buf_queue_t *queue)
 {
-    sys_snode_t *n = sys_slist_peek_head(queue);
+    pouch_slist_node_t *n = pouch_slist_peek_head(queue);
     return n ? CONTAINER_OF(n, struct pouch_buf, node) : NULL;
 }
 
