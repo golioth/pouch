@@ -65,6 +65,40 @@ pouch_slist_node_t *pouch_slist_peek_head(pouch_slist_t *list)
 }
 
 /*--------------------------------------------------
+ * Message Queue
+ *------------------------------------------------*/
+
+void pouch_msgq_init(pouch_msgq_t *msgq,
+                     uint8_t *msgq_buffer,
+                     size_t msgq_buffer_size,
+                     size_t msg_size)
+{
+    k_msgq_init(msgq, msgq_buffer, msg_size, msgq_buffer_size / msg_size);
+}
+
+int pouch_msgq_send(pouch_msgq_t *msgq, const void *data, int32_t timeout_ms)
+{
+    int result = k_msgq_put(msgq,
+                            data,
+                            (0 < timeout_ms)        ? K_MSEC(timeout_ms)
+                                : (timeout_ms == 0) ? K_NO_WAIT
+                                                    : K_FOREVER);
+
+    return (0 == result) ? 0 : -EAGAIN;
+}
+
+int pouch_msgq_rcv(pouch_msgq_t *msgq, void *buf, int32_t timeout_ms)
+{
+    int result = k_msgq_get(msgq,
+                            buf,
+                            (0 < timeout_ms)        ? K_MSEC(timeout_ms)
+                                : (timeout_ms == 0) ? K_NO_WAIT
+                                                    : K_FOREVER);
+
+    return (0 == result) ? 0 : -ENOMSG;
+}
+
+/*--------------------------------------------------
  * Mutex
  *------------------------------------------------*/
 
