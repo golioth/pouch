@@ -92,6 +92,12 @@ typedef sys_snode_t pouch_slist_node_internal_t;
 #define POUCH_LOG_FLUSH_INTERNAL() LOG_PANIC()
 
 /*--------------------------------------------------
+ * Message Queue
+ *------------------------------------------------*/
+
+typedef struct k_msgq pouch_msgq_internal_t;
+
+/*--------------------------------------------------
  * Miscellaneous
  *------------------------------------------------*/
 
