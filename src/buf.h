@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <pouch/port.h>
 #include <zephyr/kernel.h>
 
 
@@ -26,7 +27,7 @@ struct pouch_bufview
 typedef size_t pouch_buf_state_t;
 
 /** Buffer queue */
-typedef sys_slist_t pouch_buf_queue_t;
+typedef pouch_slist_t pouch_buf_queue_t;
 
 struct pouch_buf *buf_alloc(size_t size);
 
