@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <zephyr/kernel.h>
+
 /*--------------------------------------------------
  * Application Startup Hook
  *------------------------------------------------*/
@@ -51,6 +53,14 @@
  */
 #define POUCH_TYPE_SECTION_ITERABLE_INTERNAL(type, varname, secname, section_postfix) \
     TYPE_SECTION_ITERABLE(type, varname, secname, section_postfix)
+
+/*--------------------------------------------------
+ * Linked List
+ *------------------------------------------------*/
+
+typedef sys_slist_t pouch_slist_internal_t;
+
+typedef sys_snode_t pouch_slist_node_internal_t;
 
 /*--------------------------------------------------
  * Logging

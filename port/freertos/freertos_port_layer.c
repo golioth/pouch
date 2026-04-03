@@ -41,6 +41,62 @@ void pouch_put_be16(uint16_t val, uint8_t dst[2])
 }
 
 /*--------------------------------------------------
+ * Linked List
+ *------------------------------------------------*/
+
+#include "freertos/list.h"
+
+void pouch_slist_init(pouch_slist_t *list)
+{
+    vListInitialise(list);
+}
+
+void pouch_slist_node_init(pouch_slist_node_t *node)
+{
+    vListInitialiseItem(node);
+}
+
+void pouch_slist_append(pouch_slist_t *list, pouch_slist_node_t *node)
+{
+    vListInsertEnd(list, node);
+}
+
+enum _node_op
+{
+    PEEK_NODE,
+    REMOVE_NODE,
+};
+
+static pouch_slist_node_t *get_head_node(pouch_slist_t *list, enum _node_op op)
+{
+    /* vListInitialise() adds an end of list marker. We must check for an empty list before
+     * fetching the head pointer or else we will get a pointer to the end marker. */
+    if (listLIST_IS_EMPTY(list))
+    {
+        return NULL;
+    }
+
+    pouch_slist_node_t *head = listGET_HEAD_ENTRY(list);
+
+    if ((NULL != head) && (op == REMOVE_NODE))
+    {
+        uxListRemove(head);
+    }
+
+    return head;
+}
+
+pouch_slist_node_t *pouch_slist_get(pouch_slist_t *list)
+{
+    return get_head_node(list, REMOVE_NODE);
+}
+
+pouch_slist_node_t *pouch_slist_peek_head(pouch_slist_t *list)
+{
+    return get_head_node(list, PEEK_NODE);
+}
+
+/*--------------------------------------------------
  * Mutex
  *------------------------------------------------*/
 
