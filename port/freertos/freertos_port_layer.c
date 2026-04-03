@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "errno.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos_port_layer.h"
 #include <pouch/port.h>
@@ -88,6 +89,43 @@ pouch_slist_node_t *pouch_slist_get(pouch_slist_t *list)
 pouch_slist_node_t *pouch_slist_peek_head(pouch_slist_t *list)
 {
     return get_head_node(list);
+}
+
+/*--------------------------------------------------
+ * Message Queue
+ *------------------------------------------------*/
+
+#include "freertos/queue.h"
+
+void pouch_msgq_init(pouch_msgq_t *msgq,
+                     uint8_t *msgq_buffer,
+                     size_t msgq_buffer_size,
+                     size_t msg_size)
+{
+    msgq->xQueue =
+        xQueueCreateStatic(msgq_buffer_size / msg_size, msg_size, msgq_buffer, &msgq->xStaticQueue);
+}
+
+int pouch_msgq_put(pouch_msgq_t *msgq, const void *data, int32_t timeout_ms)
+{
+    bool result = xQueueSend(msgq->xQueue,
+                             data,
+                             (timeout_ms > 0)        ? pdMS_TO_TICKS(timeout_ms)
+                                 : (0 == timeout_ms) ? 0
+                                                     : portMAX_DELAY);
+
+    return (pdPASS == result) ? 0 : -EAGAIN;
+}
+
+int pouch_msgq_get(pouch_msgq_t *msgq, void *buf, int32_t timeout_ms)
+{
+    bool result = xQueueReceive(msgq->xQueue,
+                                buf,
+                                (timeout_ms > 0)        ? pdMS_TO_TICKS(timeout_ms)
+                                    : (0 == timeout_ms) ? 0
+                                                        : portMAX_DELAY);
+
+    return (pdPASS == result) ? 0 : -ENOMSG;
 }
 
 /*--------------------------------------------------
