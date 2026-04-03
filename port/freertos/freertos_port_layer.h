@@ -19,6 +19,18 @@ typedef List_t pouch_slist_internal_t;
 typedef ListItem_t pouch_slist_node_internal_t;
 
 /*--------------------------------------------------
+ * Message Queue
+ *------------------------------------------------*/
+
+struct freertos_msgq_ctx
+{
+    QueueHandle_t xQueue;
+    StaticQueue_t xStaticQueue;
+};
+
+typedef struct freertos_msgq_ctx pouch_msgq_internal_t;
+
+/*--------------------------------------------------
  * Mutex
  *------------------------------------------------*/
 
