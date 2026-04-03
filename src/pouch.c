@@ -19,13 +19,14 @@ K_THREAD_STACK_DEFINE(pouch_stack, CONFIG_POUCH_THREAD_STACK_SIZE);
 static struct k_work_q pouch_work_q;
 static struct k_work event_work;
 
-K_MSGQ_DEFINE(pouch_event_q, sizeof(enum pouch_event), CONFIG_POUCH_EVENT_QUEUE_DEPTH, 1);
+uint8_t pouch_event_q_buf[sizeof(enum pouch_event) * CONFIG_POUCH_EVENT_QUEUE_DEPTH];
+pouch_msgq_t pouch_event_q;
 
 static void dispatch_events(struct k_work *work)
 {
     enum pouch_event event;
 
-    while (0 == k_msgq_get(&pouch_event_q, &event, K_NO_WAIT))
+    while (0 == pouch_msgq_get(&pouch_event_q, &event, POUCH_TIMEOUT_NO_WAIT))
     {
         POUCH_STRUCT_SECTION_FOREACH(pouch_event_handler, handler)
         {
@@ -36,7 +37,7 @@ static void dispatch_events(struct k_work *work)
 
 void pouch_event_emit(enum pouch_event event)
 {
-    k_msgq_put(&pouch_event_q, &event, K_NO_WAIT);
+    pouch_msgq_put(&pouch_event_q, &event, POUCH_TIMEOUT_NO_WAIT);
 
     k_work_submit_to_queue(&pouch_work_q, &event_work);
 }
@@ -59,6 +60,11 @@ POUCH_APPLICATION_STARTUP_HOOK(pouch_module_init);
 
 int pouch_init(const struct pouch_config *config)
 {
+    pouch_msgq_init(&pouch_event_q,
+                    pouch_event_q_buf,
+                    sizeof(pouch_event_q_buf),
+                    sizeof(enum pouch_event));
+
     int err = downlink_init(&pouch_work_q);
     if (err)
     {
