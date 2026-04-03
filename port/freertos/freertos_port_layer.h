@@ -9,6 +9,16 @@
 #include "freertos/FreeRTOS.h"
 
 /*--------------------------------------------------
+ * Linked List
+ *------------------------------------------------*/
+
+#include "freertos/list.h"
+
+typedef List_t pouch_slist_internal_t;
+
+typedef ListItem_t pouch_slist_node_internal_t;
+
+/*--------------------------------------------------
  * Mutex
  *------------------------------------------------*/
 
