@@ -35,6 +35,36 @@ void pouch_put_be16(uint16_t val, uint8_t dst[2])
 }
 
 /*--------------------------------------------------
+ * Linked List
+ *------------------------------------------------*/
+
+void pouch_slist_init(pouch_slist_t *list)
+{
+    sys_slist_init(list);
+}
+
+void pouch_slist_node_init(pouch_slist_node_t *node)
+{
+    /* Zephyr slist nodes don't need to be initialized */
+    return;
+}
+
+void pouch_slist_append(pouch_slist_t *list, pouch_slist_node_t *node)
+{
+    sys_slist_append(list, node);
+}
+
+pouch_slist_node_t *pouch_slist_get(pouch_slist_t *list)
+{
+    return sys_slist_get(list);
+}
+
+pouch_slist_node_t *pouch_slist_peek_head(pouch_slist_t *list)
+{
+    return sys_slist_peek_head(list);
+}
+
+/*--------------------------------------------------
  * Mutex
  *------------------------------------------------*/
 

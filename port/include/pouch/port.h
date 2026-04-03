@@ -211,6 +211,70 @@ void pouch_put_be16(uint16_t val, uint8_t dst[2]);
     POUCH_TYPE_SECTION_ITERABLE(struct struct_type, varname, struct_type, varname)
 
 /*--------------------------------------------------
+ * Linked List
+ *------------------------------------------------*/
+
+/**
+ * @brief Type to use for singly linked lists
+ *
+ * @note Lists must be initialized before use.
+ */
+typedef pouch_slist_internal_t pouch_slist_t;
+
+/**
+ * @brief Type to use for singly linked lists nodes
+ *
+ * @note List nodes must be initialized before use.
+ */
+typedef pouch_slist_node_internal_t pouch_slist_node_t;
+
+/**
+ * @brief Initialize a singly linked list
+ *
+ * @param list List to be initialized
+ */
+void pouch_slist_init(pouch_slist_t *list);
+
+/**
+ * @brief Initialize a singly linked list node
+ *
+ * @param node Node to be initialized
+ */
+void pouch_slist_node_init(pouch_slist_node_t *node);
+
+/**
+ * @brief Append a node to the end of a singly linked list
+ *
+ * This function is not thread safe.
+ *
+ * @param list List onto which a node should be appended
+ * @param node Node to append to list
+ */
+void pouch_slist_append(pouch_slist_t *list, pouch_slist_node_t *node);
+
+/**
+ * @brief Remove and return the head node of a singly linked list
+ *
+ * This function is not thread safe.
+ *
+ * @param list List from which to get a node
+ *
+ * @return Pointer to the node or NULL if the list was empty
+ */
+pouch_slist_node_t *pouch_slist_get(pouch_slist_t *list);
+
+/**
+ * @brief Peek the head node of a singly linked list
+ *
+ * The node will remain at the head of the list. This function is not thread safe.
+ *
+ * @param list List from which to peek a node
+ *
+ * @return Pointer to the head node or NULL if the list was empty
+ */
+pouch_slist_node_t *pouch_slist_peek_head(pouch_slist_t *list);
+
+/*--------------------------------------------------
  * Logging
  *------------------------------------------------*/
 
