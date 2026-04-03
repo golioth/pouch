@@ -2,7 +2,7 @@
 #include <pouch/port.h>
 #include <pouch/golioth/settings_types.h>
 #include "other_test_functions.h"
-#include "test_mutex.h"
+#include "unity_tests.h"
 #include <errno.h>
 
 POUCH_LOG_REGISTER(main, POUCH_LOG_LEVEL_DBG);
@@ -177,5 +177,5 @@ void app_main(void)
     test_iterable_sections();
     test_big_endian();
     test_misc();
-    run_unity_mutex_tests();
+    run_unity_tests();
 }
