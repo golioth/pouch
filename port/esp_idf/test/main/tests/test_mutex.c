@@ -27,25 +27,32 @@ static void task_lock_timeout(void *param)
     vTaskDelete(NULL);
 }
 
-void setUp(void)
+void init_and_confirm_mutex(pouch_mutex_t *mutex)
 {
-    pouch_mutex_init(&test_mutex);
-    TEST_ASSERT_NOT_NULL(test_mutex);
-    shared_counter = 0;
+    pouch_mutex_init(mutex);
+    TEST_ASSERT_NOT_NULL(mutex);
 }
-
-void tearDown(void) {}
 
 void test_mutex_init_and_lock_unlock(void)
 {
-    TEST_ASSERT_TRUE(pouch_mutex_lock(&test_mutex, 1000));
-    TEST_ASSERT_TRUE(pouch_mutex_unlock(&test_mutex));
+    pouch_mutex_t local_mutex = NULL;
+    init_and_confirm_mutex(&local_mutex);
+
+    TEST_ASSERT_TRUE(pouch_mutex_lock(&local_mutex, 1000));
+    TEST_ASSERT_TRUE(pouch_mutex_unlock(&local_mutex));
 }
 
 void test_mutex_protection_multithread(void)
 {
     int err;
     int increments = 1000;
+
+    /* Global mutex */
+    pouch_mutex_init(&test_mutex);
+    TEST_ASSERT_NOT_NULL(test_mutex);
+
+    shared_counter = 0;
+
     err = xTaskCreate(task_increment, "T1", 2048, &increments, 5, NULL);
     TEST_ASSERT_EQUAL(pdPASS, err);
     err = xTaskCreate(task_increment, "T2", 2048, &increments, 5, NULL);
@@ -59,6 +66,10 @@ void test_mutex_protection_multithread(void)
 
 void test_mutex_timeout_multithread(void)
 {
+    /* Global mutex */
+    pouch_mutex_init(&test_mutex);
+    TEST_ASSERT_NOT_NULL(test_mutex);
+
     TEST_ASSERT_TRUE_MESSAGE(pouch_mutex_lock(&test_mutex, 1000), "Failed to lock");
     int err = xTaskCreate(task_lock_timeout, "T3", 2048, NULL, 5, NULL);
     TEST_ASSERT_EQUAL(pdPASS, err);
