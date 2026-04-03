@@ -8,6 +8,7 @@
 #pragma once
 
 #include "pouch_port_macros_internal.h"
+#include <stdint.h>
 
 /*--------------------------------------------------
  * Misc
@@ -331,6 +332,52 @@ pouch_slist_node_t *pouch_slist_peek_head(pouch_slist_t *list);
 
 /** Flush any pending logs */
 #define POUCH_LOG_FLUSH() POUCH_LOG_FLUSH_INTERNAL()
+
+/*--------------------------------------------------
+ * Message Queue
+ *------------------------------------------------*/
+
+/** @brief Handle used for a message queue */
+typedef pouch_msgq_internal_t pouch_msgq_t;
+
+/**
+ * @brief Initialize a message queue
+ *
+ * @param msgq Handle to use for this message queue.
+ * @param msgq_buffer Pointer to memory supplied by caller to use as storage buffer.
+ * @param msgq_buffer_size Size of the \p msgq_buffer.
+ * @param msg_size Size of a single message.
+ */
+void pouch_msgq_init(pouch_msgq_t *msgq,
+                     uint8_t *msgq_buffer,
+                     size_t msgq_buffer_size,
+                     size_t msg_size);
+
+/**
+ * @brief Put a message into the message queue
+ *
+ * Copies the messages and adds it to the queue.
+ *
+ * @param msgq Handle of message queue.
+ * @param msgq_buffer[in] Pointer to message to store in the queue.
+ * @param timeout Timeout in milliseconds.
+ *
+ * @return 0 on success, -EAGAIN when timeout reached before queueing the message.
+ */
+int pouch_msgq_put(pouch_msgq_t *msgq, const void *data, int32_t timeout_ms);
+
+/**
+ * @brief Get the next message from the message queue
+ *
+ * Fetch the oldest message and remove it from the queue.
+ *
+ * @param msgq Handle of message queue.
+ * @param msgq_buffer[out] Buffer where the message will be stored
+ * @param timeout Timeout in milliseconds.
+ *
+ * @return 0 on success or -ENOMSG when queue is empty.
+ */
+int pouch_msgq_get(pouch_msgq_t *msgq, void *buf, int32_t timeout_ms);
 
 /*--------------------------------------------------
  * Mutex
