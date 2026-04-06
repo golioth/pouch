@@ -40,6 +40,19 @@ config POUCH_EVENT_QUEUE_DEPTH
     The maximum number of Pouch events that can queued to send to
     the application.
 
+config POUCH_UPLINK_PROCESSING_STACK_SIZE
+  int "Pouch uplink processing stack size"
+  default 2048
+  help
+    The size of the stack for the internal Pouch uplink processing work
+    queue.
+
+config POUCH_UPLINK_PROCESSING_PRIORITY
+  int "Pouch uplink processing thread priority"
+  default 5
+  help
+    The priority of the internal Pouch uplink processing work queue.
+
 choice
   prompt "Pouch uplink encryption scheme"
   help
