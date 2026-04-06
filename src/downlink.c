@@ -74,7 +74,7 @@ static void decrypt_blocks(struct k_work *work)
 
         pouch_downlink_block_push(decrypt.decrypted);
 
-        k_yield();  // let other threads run
+        pouch_yield();  // let other threads run
     }
 }
 
