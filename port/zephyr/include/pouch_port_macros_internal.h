@@ -131,3 +131,13 @@ typedef struct k_mutex pouch_mutex_internal_t;
 
 typedef k_timeout_t pouch_timeout_internal_t;
 typedef k_timepoint_t pouch_timepoint_internal_t;
+
+/*--------------------------------------------------
+ * Work Queue
+ *------------------------------------------------*/
+
+typedef struct k_work_q pouch_work_q_internal_t;
+
+typedef struct k_work pouch_work_internal_t;
+
+#define POUCH_THREAD_STACK_DEFINE_INTERNAL(name, size) K_THREAD_STACK_DEFINE(name, size)
