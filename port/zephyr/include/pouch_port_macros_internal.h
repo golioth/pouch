@@ -120,3 +120,13 @@ typedef struct k_msgq pouch_msgq_internal_t;
 typedef struct k_mutex pouch_mutex_internal_t;
 
 #define POUCH_MUTEX_DEFINE_INTERNAL(name) K_MUTEX_DEFINE(name)
+
+/*--------------------------------------------------
+ * Work Queue
+ *------------------------------------------------*/
+
+typedef struct k_work_q pouch_work_q_internal_t;
+
+typedef struct k_work pouch_work_internal_t;
+
+#define POUCH_THREAD_STACK_DEFINE_INTERNAL(name, size) K_THREAD_STACK_DEFINE(name, size)
