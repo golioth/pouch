@@ -573,3 +573,71 @@ bool pouch_mutex_lock(pouch_mutex_t *mutex, pouch_timeout_t timeout);
  * @return true if mutex was unlocked, false if it was not unlocked
  */
 bool pouch_mutex_unlock(pouch_mutex_t *mutex);
+
+/*--------------------------------------------------
+ * Work Queue
+ *------------------------------------------------*/
+
+/**
+ * @brief Statically allocate memory for a thread stack.
+ *
+ * @param name Name of the handle used for this stack memory
+ * @param size Size of the memory to allocate (in bytes).
+ */
+#define POUCH_THREAD_STACK_DEFINE(name, size) POUCH_THREAD_STACK_DEFINE_INTERNAL(name, size)
+
+/** @brief Type to use for work queues */
+typedef pouch_work_q_internal_t pouch_work_q_t;
+
+/** @brief Type to use for work items */
+typedef pouch_work_internal_t pouch_work_t;
+
+/**
+ * @brief Work handler callback function prototype
+ *
+ * @param work Pointer to the work passed to the callback function
+ */
+typedef void (*pouch_work_handler_t)(pouch_work_t *work);
+
+/**
+ * @brief Initialize a work item
+ *
+ * @param work Pointer to the work item to initialize
+ * @param handler Callback function to run when work is processed
+ */
+void pouch_work_init(pouch_work_t *work, pouch_work_handler_t handler);
+
+/**
+ * @brief Initialize a work queue
+ *
+ * @param queue The work queue to be initialized
+ */
+void pouch_work_queue_init(pouch_work_q_t *queue);
+
+/**
+ * @brief Start a work queue
+ *
+ * Work queues must be initialized by calling \ref pouch_work_queue_init before being started.
+ *
+ * @param queue The work queue to be initialized
+ * @param stack Pointer to the stack to use for this thread
+ * @param stack_size Size of \p stack
+ * @param prio Priority level for this thread
+ * @param name Name to use for the thread
+ */
+void pouch_work_queue_start(pouch_work_q_t *queue,
+                            void *stack,
+                            size_t stack_size,
+                            int prio,
+                            char *name);
+
+/**
+ * @brief Submit a work item to a work queue
+ *
+ * @param queue Work queue to which the \p work item should be added
+ * @param work The work item to submit to the \p queue
+ *
+ * @return 0 When submission is already in queue or was added to queue
+ * @return Negative number on failure
+ */
+int pouch_work_submit_to_queue(pouch_work_q_t *queue, pouch_work_t *work);

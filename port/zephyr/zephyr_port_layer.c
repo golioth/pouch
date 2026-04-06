@@ -204,3 +204,43 @@ bool pouch_mutex_unlock(pouch_mutex_t *mutex)
     int ret = k_mutex_unlock(mutex);
     return (0 == ret) ? true : false;
 }
+
+/*--------------------------------------------------
+ * Work Queue
+ *------------------------------------------------*/
+
+void pouch_work_init(pouch_work_t *work, pouch_work_handler_t handler)
+{
+    k_work_init(work, handler);
+}
+
+void pouch_work_queue_init(pouch_work_q_t *queue)
+{
+    k_work_queue_init(queue);
+}
+
+void pouch_work_queue_start(pouch_work_q_t *queue,
+                            void *stack,
+                            size_t stack_size,
+                            int prio,
+                            char *name)
+{
+    struct k_work_queue_config workq_config = {.name = name};
+    k_work_queue_start(queue, stack, stack_size, prio, &workq_config);
+}
+
+int pouch_work_submit_to_queue(pouch_work_q_t *queue, pouch_work_t *work)
+{
+    int ret = k_work_submit_to_queue(queue, work);
+
+    /*
+     * Success, return 0:
+     * ret == 0, was already in queue
+     * ret == 1, was added to queue
+     * ret == 2, handler is running, work was requeued
+     *
+     * Not added to queue, return negative number:
+     * ret < 0, return ret error code
+     */
+    return (0 <= ret) ? 0 : ret;
+}
