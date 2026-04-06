@@ -24,6 +24,8 @@ enum flags
     POUCH_CLOSED,
 };
 
+K_THREAD_STACK_DEFINE(uplink_processing_stack, CONFIG_POUCH_UPLINK_PROCESSING_STACK_SIZE);
+
 struct pouch_uplink
 {
     struct pouch_buf *header;
@@ -35,6 +37,7 @@ struct pouch_uplink
     {
         /** Blocks that are ready for processing */
         pouch_buf_queue_t queue;
+        struct k_work_q work_queue;
         struct k_work work;
     } processing;
     struct
@@ -99,7 +102,7 @@ static void end_session(void)
 void uplink_enqueue(struct pouch_buf *block)
 {
     buf_queue_submit(&uplink.processing.queue, block);
-    k_work_submit(&uplink.processing.work);
+    k_work_submit_to_queue(&uplink.processing.work_queue, &uplink.processing.work);
 }
 
 int pouch_uplink_close(pouch_timeout_t timeout)
@@ -111,7 +114,7 @@ int pouch_uplink_close(pouch_timeout_t timeout)
 
     int err = entry_block_close(timeout);
 
-    k_work_submit(&uplink.processing.work);
+    k_work_submit_to_queue(&uplink.processing.work_queue, &uplink.processing.work);
 
     return err;
 }
@@ -121,6 +124,16 @@ void uplink_init(void)
     buf_queue_init(&uplink.processing.queue);
     buf_queue_init(&uplink.transport.queue);
     k_work_init(&uplink.processing.work, process_blocks);
+
+    k_work_queue_init(&uplink.processing.work_queue);
+
+
+    struct k_work_queue_config workq_config = {.name = "uplink_workq"};
+    k_work_queue_start(&uplink.processing.work_queue,
+                       uplink_processing_stack,
+                       CONFIG_POUCH_UPLINK_PROCESSING_STACK_SIZE,
+                       CONFIG_POUCH_UPLINK_PROCESSING_PRIORITY,
+                       &workq_config);
 }
 
 uint32_t uplink_session_id(void)
@@ -187,7 +200,7 @@ struct pouch_uplink *pouch_uplink_start(void)
     // Process any pending blocks:
     if (!buf_queue_is_empty(&uplink.processing.queue))
     {
-        k_work_submit(&uplink.processing.work);
+        k_work_submit_to_queue(&uplink.processing.work_queue, &uplink.processing.work);
     }
 
     return &uplink;
