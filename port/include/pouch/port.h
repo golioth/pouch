@@ -11,7 +11,7 @@
 #include <stdint.h>
 
 /*--------------------------------------------------
- * Misc
+ * Miscellaneous
  *------------------------------------------------*/
 
 #define POUCH_STATIC_ASSERT(EXPR, ...) POUCH_STATIC_ASSERT_INTERNAL(EXPR, __VA_ARGS__)
@@ -71,6 +71,11 @@
     })
 
 #endif  // CONTAINER_OF
+
+/**
+ * @brief Allow RTOS scheduler to run other threads
+ */
+void pouch_yield(void);
 
 /*--------------------------------------------------
  * Application Startup Hook
