@@ -26,17 +26,17 @@ static bool pouch_header;
 static struct
 {
     pouch_buf_queue_t queue;
-    struct k_work work;
+    pouch_work_t work;
     struct pouch_buf *decrypted;
-    struct k_work_q *work_queue;
+    pouch_work_q_t *work_queue;
 } decrypt;
 
-static void decrypt_blocks(struct k_work *work);
+static void decrypt_blocks(pouch_work_t *work);
 
-int downlink_init(struct k_work_q *pouch_work_queue)
+int downlink_init(pouch_work_q_t *pouch_work_queue)
 {
     buf_queue_init(&decrypt.queue);
-    k_work_init(&decrypt.work, decrypt_blocks);
+    pouch_work_init(&decrypt.work, decrypt_blocks);
     decrypt.work_queue = pouch_work_queue;
 
     decrypt.decrypted = crypto_block_buf_alloc();
@@ -49,7 +49,7 @@ int downlink_init(struct k_work_q *pouch_work_queue)
     return 0;
 }
 
-static void decrypt_blocks(struct k_work *work)
+static void decrypt_blocks(pouch_work_t *work)
 {
     struct pouch_buf *encrypted_block;
     while ((encrypted_block = buf_queue_get(&decrypt.queue)) != NULL)
@@ -81,7 +81,7 @@ static void decrypt_blocks(struct k_work *work)
 static int block_downlink_push(struct pouch_buf *pouch_buf)
 {
     buf_queue_submit(&decrypt.queue, pouch_buf);
-    return k_work_submit_to_queue(decrypt.work_queue, &decrypt.work);
+    return pouch_work_submit_to_queue(decrypt.work_queue, &decrypt.work);
 }
 
 void pouch_downlink_start(void)
