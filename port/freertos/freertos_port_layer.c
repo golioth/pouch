@@ -7,9 +7,10 @@
 
 #include "errno.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos_port_layer.h"
 #include <pouch/port.h>
+#include "freertos_port_layer.h"
 #include <stdint.h>
+#include <string.h>
 
 POUCH_LOG_REGISTER(esp - idf - port - layer, POUCH_LOG_LEVEL_DBG);
 
@@ -309,4 +310,83 @@ bool pouch_mutex_lock(pouch_mutex_t *mutex, pouch_timeout_t timeout)
 bool pouch_mutex_unlock(pouch_mutex_t *mutex)
 {
     return xSemaphoreGive(*mutex);
+}
+
+/*--------------------------------------------------
+ * Work Queue
+ *------------------------------------------------*/
+
+static void work_q_handler_proxy(void *param)
+{
+    pouch_work_t *work;
+    pouch_work_q_t *q = (pouch_work_q_t *) param;
+
+    while (true)
+    {
+        if (pdTRUE == xQueueReceive(q->items, &work, portMAX_DELAY))
+        {
+            /* Clear flag immediately; then handler can re-queue work if it wants */
+            pouch_atomic_clear_bit(&work->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED);
+
+            if (work && work->handler)
+            {
+                work->handler(work);
+            }
+
+            pouch_yield();
+        }
+    }
+}
+
+void pouch_work_init(pouch_work_t *work, pouch_work_handler_t handler)
+{
+    pouch_atomic_clear(&work->flags);
+    work->handler = handler;
+}
+
+void pouch_work_queue_init(pouch_work_q_t *queue)
+{
+    queue->items = xQueueCreateStatic(sizeof(queue->priv_storage) / sizeof(pouch_work_t *),
+                                      sizeof(pouch_work_t *),
+                                      queue->priv_storage,
+                                      &queue->priv_static_queue);
+
+    configASSERT(NULL != queue->items);
+}
+
+void pouch_work_queue_start(pouch_work_q_t *queue,
+                            void *stack,
+                            size_t stack_size,
+                            int prio,
+                            char *name)
+{
+    queue->handle = xTaskCreateStatic(work_q_handler_proxy,
+                                      name,
+                                      stack_size / sizeof(StackType_t),
+                                      queue,
+                                      prio,
+                                      stack,
+                                      &queue->priv_task_buf);
+
+    configASSERT(queue->handle != NULL);
+}
+
+int pouch_work_submit_to_queue(pouch_work_q_t *queue, pouch_work_t *work)
+{
+    if (true == pouch_atomic_test_and_set_bit(&work->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED))
+    {
+        /* Work already in queue */
+        return 0;
+    }
+
+    if (xQueueSend(queue->items, &work, 0) == pdTRUE)
+    {
+        /* Work  added to queue */
+        return 0;
+    }
+
+    /* Failed to add work to queue */
+    /* Clear pending bit that was set earlier in this function */
+    pouch_atomic_clear_bit(&work->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED);
+    return -ENOMEM;
 }
