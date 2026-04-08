@@ -1,5 +1,13 @@
 # Pouch HTTP Client Example (ESP-IDF)
 
+## Position Golioth Device PKI
+
+To authenticate with Golioth, a place the following files in the
+`http_client/main` directory:
+
+- device.crt.pem
+- device.key.pem
+
 ## Set Target
 
 ```

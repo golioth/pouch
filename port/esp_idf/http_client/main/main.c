@@ -7,6 +7,7 @@
 #include <esp_log.h>
 #define TAG "golioth_http_client_example"
 
+#include "http_client.h"
 #include "wifi.h"
 #include "nvs_flash.h"
 
@@ -25,4 +26,6 @@ void app_main(void)
 
     ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
     wifi_init_sta();
+
+    http_client_fetch_manifest();
 }
