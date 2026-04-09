@@ -1,0 +1,6 @@
+[submodule "port/esp_idf/components/zcbor_component/zcbor"]
+	path = port/esp_idf/components/zcbor_component/zcbor
+	url = https://github.com/nordicsemi/zcbor.git
+[submodule "port/esp_idf/components/zcbor/zcbor"]
+	path = port/esp_idf/components/zcbor/zcbor
+	url = https://github.com/nordicsemi/zcbor.git

@@ -7,7 +7,6 @@
 #pragma once
 
 #include <pouch/port.h>
-#include <zephyr/kernel.h>
 
 /**
  * @file uplink.h

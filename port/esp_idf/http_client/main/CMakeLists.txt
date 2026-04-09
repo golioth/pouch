@@ -9,9 +9,16 @@ idf_component_register(SRCS
                          "main.c"
                          "http_client.c"
                          "wifi.c"
-                       INCLUDE_DIRS "."
+
                        EMBED_TXTFILES
                          isrgrootx1_goliothrootx1.pem
                          device.crt.pem
                          device.key.pem
+
+                       REQUIRES
+                         esp_http_client
+                         esp-tls
+                         esp_wifi
+                         nvs_flash
+                         pouch
                        )

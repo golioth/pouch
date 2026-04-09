@@ -9,6 +9,7 @@
 #include "freertos/FreeRTOS.h"
 #include <pouch/port.h>
 #include <stdint.h>
+#include <errno.h> /* Needd to support for Linux-style error codes used in Pouch */
 
 /*--------------------------------------------------
  * Atomic
@@ -46,6 +47,14 @@ struct freertos_msgq_ctx
 };
 
 typedef struct freertos_msgq_ctx pouch_msgq_internal_t;
+
+/*--------------------------------------------------
+ * Miscellaneous
+ *------------------------------------------------*/
+
+#define __ASSERT_NO_MSG(condition) configASSERT(condition)
+
+#define LOG2(x) (31 - __builtin_clz(x))
 
 /*--------------------------------------------------
  * Mutex

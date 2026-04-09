@@ -13,7 +13,6 @@
 #include <mbedtls/base64.h>
 #include <pouch/port.h>
 #include <psa/crypto.h>
-#include <zephyr/sys/util.h>
 
 POUCH_LOG_REGISTER(saead_session, CONFIG_POUCH_LOG_LEVEL);
 
