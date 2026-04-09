@@ -2,5 +2,4 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-#rsource "*/Kconfig"
-rsource "zcbor_utils/Kconfig"
+rsource "*/Kconfig"

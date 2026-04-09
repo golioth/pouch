@@ -50,7 +50,7 @@ if(CONFIG_POUCH)
         ${CMAKE_CURRENT_BINARY_DIR}/header_decode.c
         ${CMAKE_CURRENT_BINARY_DIR}/header_encode.c)
 
-    add_dependencies(${COMPONENT_LIB} pouch_generate_headers)
+    add_dependencies(pouch pouch_generate_headers)
 
     list(APPEND POUCH_COMMON_SRCS
         ${CMAKE_CURRENT_BINARY_DIR}/header_decode.c
@@ -60,8 +60,6 @@ if(CONFIG_POUCH)
     list(APPEND POUCH_COMMON_INC_DIRS
         ${CMAKE_CURRENT_BINARY_DIR}/../include
     )
-
-    message(WARNING "############################ ${CMAKE_CURRENT_BINARY_DIR}/include}")
 
     if (DEFINED CONFIG_POUCH_ENCRYPTION_SAEAD AND NOT DEFINED CONFIG_POUCH_VALIDATE_SERVER_CERT)
         message(WARNING " \n"
@@ -80,13 +78,13 @@ if(CONFIG_POUCH)
                 " **************************************************")
     endif()
 
-    #add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/golioth_sdk golioth_sdk)
+    set(SDK_NAME_LIST)
+    include("${CMAKE_CURRENT_LIST_DIR}/golioth_sdk/golioth_sdk.cmake")
 
 endif()
 
 # Libraries
 
-#add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib lib)
 set(POUCH_LIB_INC_DIRS)
 set(POUCH_LIB_SRCS)
 include(${CMAKE_CURRENT_LIST_DIR}/lib/libraries.cmake)

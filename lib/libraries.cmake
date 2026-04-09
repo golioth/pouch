@@ -2,10 +2,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-file(GLOB children RELATIVE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/*)
+file(GLOB dir_list RELATIVE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/*)
 
-foreach(child ${children})
-if(IS_DIRECTORY ${curdir}/${child})
-    include("${CMAKE_CURRENT_LIST_DIR}/${child}/${chile}.cmake")
-endif()
+foreach(dname ${dir_list})
+    if(IS_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/${dname})
+        include("${CMAKE_CURRENT_LIST_DIR}/${dname}/${dname}.cmake")
+    endif()
 endforeach()

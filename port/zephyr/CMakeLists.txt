@@ -2,15 +2,31 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+zephyr_library_named(pouch)
+
+include("../../pouch_common.cmake")
+
 zephyr_include_directories(../include)      # pouch/port.h
 zephyr_include_directories(include)         # Zephyr port includes
 zephyr_library_sources(zephyr_port_layer.c) # Port functions
 
 if(CONFIG_POUCH)
 
-    zephyr_include_directories(../../include) # Pouch includes
+    if(POUCH_COMMON_INC_DIRS)
+        zephyr_include_directories(${POUCH_COMMON_INC_DIRS}) # Pouch includes
+    endif()
 
-    zephyr_library_named(pouch)
+    if(POUCH_LIB_INC_DIRS)
+        zephyr_include_directories(${POUCH_LIB_INC_DIRS})    # Pouch library includes
+    endif()
+
+    if(POUCH_COMMON_SRCS)
+        zephyr_library_sources(${POUCH_COMMON_SRCS}) # Pouch sources
+    endif()
+
+    if(POUCH_LIB_SRCS)
+        zephyr_library_sources(${POUCH_LIB_SRCS})    # Pouch library sources
+    endif()
 
     zephyr_linker_sources(SECTIONS downlink_handlers.ld)
     zephyr_linker_sources(SECTIONS uplink_handlers.ld)
@@ -28,14 +44,10 @@ if(CONFIG_POUCH)
             ${ZEPHYR_BINARY_DIR}/include/generated/golioth_ca_cert.inc)
     endif()
 
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../.. core)
-
     zephyr_library_sources(
-        ${CMAKE_CURRENT_BINARY_DIR}/core/header_decode.c
-        ${CMAKE_CURRENT_BINARY_DIR}/core/header_encode.c
+        ${CMAKE_CURRENT_BINARY_DIR}/header_decode.c
+        ${CMAKE_CURRENT_BINARY_DIR}/header_encode.c
     )
-
-    zephyr_library_include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
 
     zephyr_library_link_libraries(mbedTLS)
 
@@ -48,6 +60,32 @@ if(CONFIG_POUCH)
         add_subdirectory(transport/http example_http)
     endif()
 endif()
+
+# SDKs
+
+# WARNING: This block of code switches the Zephyr library context away from `pouch`
+if (SDK_NAME_LIST)
+    foreach(SDK_NAME ${SDK_NAME_LIST})
+
+        zephyr_library_named("${SDK_NAME}")
+
+        if (${SDK_NAME}_SRCS)
+            zephyr_library_sources(${${SDK_NAME}_SRCS})
+        endif (${SDK_NAME}_SRCS)
+
+        if (${SDK_NAME}_INC_DIRS)
+            zephyr_library_include_directories(${${SDK_NAME}_INC_DIRS})
+        endif (${SDK_NAME}_INC_DIRS)
+
+        if (${SDK_NAME}_LINKER_SECTION_ZEPHYR)
+            foreach(LINKER_FILE ${${SDK_NAME}_LINKER_SECTION_ZEPHYR})
+                message(WARNING "################# ${LINKER_FILE}")
+                zephyr_linker_sources(SECTIONS ${LINKER_FILE})
+            endforeach(LINKER_FILE)
+        endif (${SDK_NAME}_LINKER_SECTION_ZEPHYR)
+
+    endforeach(SDK_NAME)
+endif (SDK_NAME_LIST)
 
 if(CONFIG_POUCH_GATEWAY)
     zephyr_include_directories(../../include)

@@ -4,11 +4,11 @@
 
 if(CONFIG_ZCBOR_UTILS)
 
-    set(POUCH_LIB_INC_DIRS
+    list(APPEND POUCH_LIB_INC_DIRS
         ${CMAKE_CURRENT_LIST_DIR}/include
     )
 
-    set(POUCH_LIB_SRCS
+    list(APPEND POUCH_LIB_SRCS
         ${CMAKE_CURRENT_LIST_DIR}/zcbor_utils.c
     )
 
