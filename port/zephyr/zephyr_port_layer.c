@@ -102,6 +102,20 @@ void pouch_put_be16(uint16_t val, uint8_t dst[2])
 }
 
 /*--------------------------------------------------
+ * Time
+ *------------------------------------------------*/
+
+pouch_timepoint_t pouch_timepoint_get(pouch_timeout_t timeout)
+{
+    return sys_timepoint_calc(timeout);
+}
+
+pouch_timeout_t pouch_timepoint_timeout(pouch_timepoint_t tp)
+{
+    return sys_timepoint_timeout(tp);
+}
+
+/*--------------------------------------------------
  * Linked List
  *------------------------------------------------*/
 
@@ -143,24 +157,16 @@ void pouch_msgq_init(pouch_msgq_t *msgq,
     k_msgq_init(msgq, msgq_buffer, msg_size, msgq_buffer_size / msg_size);
 }
 
-int pouch_msgq_put(pouch_msgq_t *msgq, const void *data, int32_t timeout_ms)
+int pouch_msgq_put(pouch_msgq_t *msgq, const void *data, pouch_timeout_t timeout)
 {
-    int result = k_msgq_put(msgq,
-                            data,
-                            (0 < timeout_ms)        ? K_MSEC(timeout_ms)
-                                : (timeout_ms == 0) ? K_NO_WAIT
-                                                    : K_FOREVER);
+    int result = k_msgq_put(msgq, data, timeout);
 
     return (0 == result) ? 0 : -EAGAIN;
 }
 
-int pouch_msgq_get(pouch_msgq_t *msgq, void *buf, int32_t timeout_ms)
+int pouch_msgq_get(pouch_msgq_t *msgq, void *buf, pouch_timeout_t timeout)
 {
-    int result = k_msgq_get(msgq,
-                            buf,
-                            (0 < timeout_ms)        ? K_MSEC(timeout_ms)
-                                : (timeout_ms == 0) ? K_NO_WAIT
-                                                    : K_FOREVER);
+    int result = k_msgq_get(msgq, buf, timeout);
 
     return (0 == result) ? 0 : -ENOMSG;
 }
@@ -178,12 +184,9 @@ void pouch_mutex_init(pouch_mutex_t *mutex)
     k_mutex_init(mutex);
 }
 
-bool pouch_mutex_lock(pouch_mutex_t *mutex, int32_t timeout_ms)
+bool pouch_mutex_lock(pouch_mutex_t *mutex, pouch_timeout_t timeout)
 {
-    int ret = k_mutex_lock(mutex,
-                           (timeout_ms > 0)        ? K_MSEC(timeout_ms)
-                               : (0 == timeout_ms) ? K_NO_WAIT
-                                                   : K_FOREVER);
+    int ret = k_mutex_lock(mutex, timeout);
     return (0 == ret) ? true : false;
 }
 

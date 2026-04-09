@@ -87,7 +87,7 @@ struct pouch_stream *pouch_uplink_stream_open(const char *path, uint16_t content
 size_t pouch_stream_write(struct pouch_stream *stream,
                           const void *data,
                           size_t len,
-                          int32_t timeout_ms)
+                          pouch_timeout_t timeout)
 {
     const uint8_t *bytes = data;
     size_t written = 0;
@@ -131,7 +131,7 @@ size_t pouch_stream_write(struct pouch_stream *stream,
     return written;
 }
 
-int pouch_stream_close(struct pouch_stream *stream, int32_t timeout_ms)
+int pouch_stream_close(struct pouch_stream *stream, pouch_timeout_t timeout)
 {
     if (stream == NULL)
     {

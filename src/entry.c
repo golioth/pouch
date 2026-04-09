@@ -198,7 +198,7 @@ int pouch_uplink_entry_write(const char *path,
                              uint16_t content_type,
                              const void *data,
                              size_t len,
-                             int32_t timeout_ms)
+                             pouch_timeout_t timeout)
 {
     if (path == NULL || data == NULL || len == 0)
     {
@@ -208,7 +208,7 @@ int pouch_uplink_entry_write(const char *path,
     int err = 0;
     bool block_is_new = false;
 
-    bool unlocked = pouch_mutex_lock(&mut, timeout_ms);
+    bool unlocked = pouch_mutex_lock(&mut, timeout);
     if (false == unlocked)
     {
         return -EAGAIN;
@@ -255,9 +255,9 @@ end:
     return err;
 }
 
-int entry_block_close(int32_t timeout_ms)
+int entry_block_close(pouch_timeout_t timeout)
 {
-    bool unlocked = pouch_mutex_lock(&mut, timeout_ms);
+    bool unlocked = pouch_mutex_lock(&mut, timeout);
     if (false == unlocked)
     {
         return -EAGAIN;

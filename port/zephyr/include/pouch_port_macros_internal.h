@@ -120,3 +120,14 @@ typedef struct k_msgq pouch_msgq_internal_t;
 typedef struct k_mutex pouch_mutex_internal_t;
 
 #define POUCH_MUTEX_DEFINE_INTERNAL(name) K_MUTEX_DEFINE(name)
+
+/*--------------------------------------------------
+ * Time
+ *------------------------------------------------*/
+
+#define POUCH_FOREVER_INTERNAL K_FOREVER
+#define POUCH_NO_WAIT_INTERNAL K_NO_WAIT
+#define POUCH_MSEC_INTERNAL(ms) K_MSEC(ms)
+
+typedef k_timeout_t pouch_timeout_internal_t;
+typedef k_timepoint_t pouch_timepoint_internal_t;

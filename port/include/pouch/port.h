@@ -464,6 +464,29 @@ pouch_slist_node_t *pouch_slist_peek_head(pouch_slist_t *list);
 /** Flush any pending logs */
 #define POUCH_LOG_FLUSH() POUCH_LOG_FLUSH_INTERNAL()
 
+/*------------------------------------------------
+ * Time
+ *------------------------------------------------*/
+
+/** Infinite timeout delay */
+#define POUCH_FOREVER POUCH_FOREVER_INTERNAL
+/** Timeout that expires immediately */
+#define POUCH_NO_WAIT POUCH_NO_WAIT_INTERNAL
+/** Timeout value in milliseconds */
+#define POUCH_MSEC(ms) POUCH_MSEC_INTERNAL(ms)
+/** Timeout value in seconds */
+#define POUCH_SECONDS(s) (POUCH_MSEC_INTERNAL((1000 * (s))))
+
+/** Timeout type */
+typedef pouch_timeout_internal_t pouch_timeout_t;
+/** Timepoint representing an absolute timestamp */
+typedef pouch_timepoint_internal_t pouch_timepoint_t;
+
+/** Get the corresponding timepoint for the given timeout */
+pouch_timepoint_t pouch_timepoint_get(pouch_timeout_t timeout);
+/** Get a timeout value from a timepoint */
+pouch_timeout_t pouch_timepoint_timeout(pouch_timepoint_t tp);
+
 /*--------------------------------------------------
  * Message Queue
  *------------------------------------------------*/
@@ -495,7 +518,7 @@ void pouch_msgq_init(pouch_msgq_t *msgq,
  *
  * @return 0 on success, -EAGAIN when timeout reached before queueing the message.
  */
-int pouch_msgq_put(pouch_msgq_t *msgq, const void *data, int32_t timeout_ms);
+int pouch_msgq_put(pouch_msgq_t *msgq, const void *data, pouch_timeout_t timeout);
 
 /**
  * @brief Get the next message from the message queue
@@ -508,7 +531,7 @@ int pouch_msgq_put(pouch_msgq_t *msgq, const void *data, int32_t timeout_ms);
  *
  * @return 0 on success or -ENOMSG when queue is empty.
  */
-int pouch_msgq_get(pouch_msgq_t *msgq, void *buf, int32_t timeout_ms);
+int pouch_msgq_get(pouch_msgq_t *msgq, void *buf, pouch_timeout_t timeout);
 
 /*--------------------------------------------------
  * Mutex
@@ -532,11 +555,11 @@ void pouch_mutex_init(pouch_mutex_t *mutex);
 /** @brief Lock a mutex
  *
  * @param mutex Pointer to a mutex
- * @param timeout_ms Timeout in milliseconds
+ * @param timeout Timeout in milliseconds
  *
  * @return true if mutex was locked, false if timeout reached without attaining lock
  */
-bool pouch_mutex_lock(pouch_mutex_t *mutex, int32_t timeout_ms);
+bool pouch_mutex_lock(pouch_mutex_t *mutex, pouch_timeout_t timeout);
 
 /** @brief Unlock a mutex
  *

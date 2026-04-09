@@ -102,7 +102,7 @@ void uplink_enqueue(struct pouch_buf *block)
     k_work_submit(&uplink.processing.work);
 }
 
-int pouch_uplink_close(int32_t timeout)
+int pouch_uplink_close(pouch_timeout_t timeout)
 {
     if (pouch_atomic_test_and_set_bit(uplink.flags, POUCH_CLOSING))
     {
@@ -144,7 +144,7 @@ static void event_handler(enum pouch_event evt, void *ctx)
         }
     }
 
-    pouch_uplink_close(POUCH_TIMEOUT_FOREVER);
+    pouch_uplink_close(POUCH_FOREVER);
 }
 
 POUCH_EVENT_HANDLER(event_handler, NULL);
