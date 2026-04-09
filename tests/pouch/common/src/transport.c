@@ -40,7 +40,7 @@ void transport_reset(void *unused)
     if (!uplink)
     {
         uplink = pouch_uplink_start();
-        pouch_uplink_close(POUCH_TIMEOUT_NO_WAIT);
+        pouch_uplink_close(POUCH_NO_WAIT);
         // let processing run:
         k_sleep(K_MSEC(1));
     }

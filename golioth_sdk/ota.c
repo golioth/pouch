@@ -306,7 +306,7 @@ static void ota_uplink(void)
                                            POUCH_CONTENT_TYPE_CBOR,
                                            encode_buf,
                                            zse->payload - encode_buf,
-                                           POUCH_TIMEOUT_FOREVER);
+                                           POUCH_FOREVER);
         if (err)
         {
             LOG_ERR("Could not report OTA state for %s (%d)", name, err);

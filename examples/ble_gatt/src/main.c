@@ -37,7 +37,7 @@ static void do_uplink(void)
                              POUCH_CONTENT_TYPE_JSON,
                              data,
                              strlen(data),
-                             POUCH_TIMEOUT_FOREVER);
+                             POUCH_FOREVER);
 }
 
 POUCH_UPLINK_HANDLER(do_uplink);

@@ -47,7 +47,7 @@ typedef void (*pouch_uplink_handler_t)(void);
  * @param content_type The content type of the entry.
  * @param data The data to write.
  * @param len The length of the data.
- * @param timeout_ms The timeout for the operation in milliseconds.
+ * @param timeout The timeout for the operation in milliseconds.
  *
  * @return 0 on success or a negative error code on failure.
  */
@@ -55,16 +55,16 @@ int pouch_uplink_entry_write(const char *path,
                              uint16_t content_type,
                              const void *data,
                              size_t len,
-                             int32_t timeout_ms);
+                             pouch_timeout_t timeout);
 
 /**
  * Close the current uplink session by finalizing the open pouch.
  *
- * @param timeout_ms Timeout in milliseconds
+ * @param timeout Timeout in milliseconds
  *
  * @return 0 on success or a negative error code on failure.
  */
-int pouch_uplink_close(int32_t timeout_ms);
+int pouch_uplink_close(pouch_timeout_t timeout);
 
 /**
  * Open a new stream to the uplink.
@@ -99,7 +99,7 @@ struct pouch_stream *pouch_uplink_stream_open(const char *path, uint16_t content
  * @param stream The stream to write to.
  * @param data The data to write.
  * @param len The length of the data.
- * @param timeout_ms The timeout for the write operation in milliseconds. If the timeout is reached
+ * @param timeout The timeout for the write operation in milliseconds. If the timeout is reached
  * before the write operation completes, the function will return the number of bytes written before
  * the timeout.
  *
@@ -108,17 +108,17 @@ struct pouch_stream *pouch_uplink_stream_open(const char *path, uint16_t content
 size_t pouch_stream_write(struct pouch_stream *stream,
                           const void *data,
                           size_t len,
-                          int32_t timeout_ms);
+                          pouch_timeout_t timeout);
 
 /**
  * Close a stream.
  *
  * @param stream The stream to close.
- * @param timeout_ms The timeout for the close operation in milliseconds.
+ * @param timeout The timeout for the close operation in milliseconds.
  *
  * @return 0 on success or a negative error code on failure.
  */
-int pouch_stream_close(struct pouch_stream *stream, int32_t timeout_ms);
+int pouch_stream_close(struct pouch_stream *stream, pouch_timeout_t timeout);
 
 /**
  * Check if a stream is valid.

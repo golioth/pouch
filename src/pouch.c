@@ -26,7 +26,7 @@ static void dispatch_events(struct k_work *work)
 {
     enum pouch_event event;
 
-    while (0 == pouch_msgq_get(&pouch_event_q, &event, POUCH_TIMEOUT_NO_WAIT))
+    while (0 == pouch_msgq_get(&pouch_event_q, &event, POUCH_NO_WAIT))
     {
         POUCH_STRUCT_SECTION_FOREACH(pouch_event_handler, handler)
         {
@@ -37,7 +37,7 @@ static void dispatch_events(struct k_work *work)
 
 void pouch_event_emit(enum pouch_event event)
 {
-    pouch_msgq_put(&pouch_event_q, &event, POUCH_TIMEOUT_NO_WAIT);
+    pouch_msgq_put(&pouch_event_q, &event, POUCH_NO_WAIT);
 
     k_work_submit_to_queue(&pouch_work_q, &event_work);
 }

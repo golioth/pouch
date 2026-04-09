@@ -153,6 +153,51 @@ void pouch_put_be16(uint16_t val, uint8_t dst[2])
     dst[1] = val;
 }
 
+/*------------------------------------------------
+ * Time
+ *------------------------------------------------*/
+
+static int32_t get_ticks(pouch_timeout_t timeout)
+{
+    if (timeout > 0)
+    {
+        return pdMS_TO_TICKS(timeout);
+    }
+
+    if (0 == timeout)
+    {
+        return 0;
+    }
+
+    return portMAX_DELAY;
+}
+
+pouch_timepoint_t pouch_timepoint_get(pouch_timeout_t timeout)
+{
+    if (timeout > 0)
+    {
+        uint32_t now = xTaskGetTickCount();
+        return now + pdMS_TO_TICKS(timeout);
+    }
+
+    return timeout;
+}
+
+pouch_timeout_t pouch_timepoint_timeout(pouch_timepoint_t tp)
+{
+    if (tp > 0)
+    {
+        uint32_t now = xTaskGetTickCount();
+        if (now <= tp)
+        {
+            return 0;
+        }
+
+        return tp - now;
+    }
+    return tp;
+}
+
 /*--------------------------------------------------
  * Linked List
  *------------------------------------------------*/
@@ -218,24 +263,16 @@ void pouch_msgq_init(pouch_msgq_t *msgq,
         xQueueCreateStatic(msgq_buffer_size / msg_size, msg_size, msgq_buffer, &msgq->xStaticQueue);
 }
 
-int pouch_msgq_put(pouch_msgq_t *msgq, const void *data, int32_t timeout_ms)
+int pouch_msgq_put(pouch_msgq_t *msgq, const void *data, pouch_timeout_t timeout)
 {
-    bool result = xQueueSend(msgq->xQueue,
-                             data,
-                             (timeout_ms > 0)        ? pdMS_TO_TICKS(timeout_ms)
-                                 : (0 == timeout_ms) ? 0
-                                                     : portMAX_DELAY);
+    bool result = xQueueSend(msgq->xQueue, data, get_ticks(timeout));
 
     return (pdPASS == result) ? 0 : -EAGAIN;
 }
 
-int pouch_msgq_get(pouch_msgq_t *msgq, void *buf, int32_t timeout_ms)
+int pouch_msgq_get(pouch_msgq_t *msgq, void *buf, pouch_timeout_t timeout)
 {
-    bool result = xQueueReceive(msgq->xQueue,
-                                buf,
-                                (timeout_ms > 0)        ? pdMS_TO_TICKS(timeout_ms)
-                                    : (0 == timeout_ms) ? 0
-                                                        : portMAX_DELAY);
+    bool result = xQueueReceive(msgq->xQueue, buf, get_ticks(timeout));
 
     return (pdPASS == result) ? 0 : -ENOMSG;
 }
@@ -255,12 +292,9 @@ void pouch_mutex_init(pouch_mutex_t *mutex)
     *mutex = xSemaphoreCreateMutex();
 }
 
-bool pouch_mutex_lock(pouch_mutex_t *mutex, int32_t timeout_ms)
+bool pouch_mutex_lock(pouch_mutex_t *mutex, pouch_timeout_t timeout)
 {
-    return xSemaphoreTake(*mutex,
-                          (timeout_ms > 0)        ? pdMS_TO_TICKS(timeout_ms)
-                              : (0 == timeout_ms) ? 0
-                                                  : portMAX_DELAY);
+    return xSemaphoreTake(*mutex, get_ticks(timeout));
 }
 
 bool pouch_mutex_unlock(pouch_mutex_t *mutex)

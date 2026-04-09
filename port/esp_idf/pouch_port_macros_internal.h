@@ -121,3 +121,14 @@
  *------------------------------------------------*/
 
 /** This section is implemented in port/freertos/freertos_port_layer.h */
+
+/*--------------------------------------------------
+ * Time
+ *------------------------------------------------*/
+
+#define POUCH_FOREVER_INTERNAL (-1)
+#define POUCH_NO_WAIT_INTERNAL (0)
+#define POUCH_MSEC_INTERNAL(ms) (ms)
+
+typedef int32_t pouch_timeout_internal_t;
+typedef int32_t pouch_timepoint_internal_t;
