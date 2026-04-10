@@ -4,6 +4,8 @@
 
 set(requires "")
 
+include(../../../../pouch_common.cmake)
+
 set(POUCH_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../..")
 set(POUCH_PORT "${POUCH_ROOT}/port")
 
