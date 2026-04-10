@@ -9,6 +9,7 @@
 #include "freertos/FreeRTOS.h"
 #include <pouch/port.h>
 #include <stdint.h>
+#include <errno.h> /* Needed to support for Linux-style error codes used in Pouch */
 
 /*--------------------------------------------------
  * Atomic
