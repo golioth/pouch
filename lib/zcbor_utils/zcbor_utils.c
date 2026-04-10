@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <pouch/port.h>
-POUCH_LOG_REGISTER(zcbor_util, CONFIG_POUCH_LOG_LEVEL);
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(zcbor_util, CONFIG_POUCH_LOG_LEVEL);
+
+#include <errno.h>
 
 #include <zcbor_utils.h>
 
