@@ -2,27 +2,32 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-if(NOT CONFIG_GOLIOTH)
-    return()
-endif()
+if(CONFIG_GOLIOTH)
 
-zephyr_library()
+cmake_minimum_required(VERSION 3.5)
 
-zephyr_library_sources(
-    dispatch.c
-)
-
-zephyr_linker_sources(SECTIONS dispatch.ld)
+project(golioth_sdk)
+add_library(golioth_sdk STATIC dispatch.c)
+target_link_options(golioth_sdk PRIVATE "-T${CMAKE_CURRENT_SOURCE_DIR}/dispatch.ld")
+target_link_libraries(golioth_sdk PRIVATE zcbor_utils)
+target_link_libraries(golioth_sdk PRIVATE pouch)
 
 # Settings
 
-zephyr_library_sources_ifdef(CONFIG_GOLIOTH_SETTINGS settings.c)
-zephyr_library_sources_ifdef(CONFIG_GOLIOTH_SETTINGS_FRONTEND_CALLBACKS settings_callbacks.c)
-zephyr_linker_sources_ifdef(CONFIG_GOLIOTH_SETTINGS_FRONTEND_CALLBACKS
-                            SECTIONS
-                            settings_callbacks.ld)
+if(CONFIG_GOLIOTH_SETTINGS)
+    target_sources(golioth_sdk PRIVATE settings.c)
+endif(CONFIG_GOLIOTH_SETTINGS)
+
+if(CONFIG_GOLIOTH_SETTINGS_FRONTEND_CALLBACKS)
+    target_sources(golioth_sdk PRIVATE settings_callbacks.c)
+    target_link_options(golioth_sdk PRIVATE "-T${CMAKE_CURRENT_SOURCE_DIR}/settings_callbacks.ld")
+endif(CONFIG_GOLIOTH_SETTINGS_FRONTEND_CALLBACKS)
 
 # OTA
 
-zephyr_library_sources_ifdef(CONFIG_GOLIOTH_OTA ota.c ota_upper.c)
-zephyr_linker_sources_ifdef(CONFIG_GOLIOTH_OTA SECTIONS ota.ld)
+if(CONFIG_GOLIOTH_OTA)
+    target_sources(golioth_sdk PRIVATE ota.c ota_upper.c)
+    target_link_options(golioth_sdk PRIVATE "-T${CMAKE_CURRENT_SOURCE_DIR}/ota.ld")
+endif(CONFIG_GOLIOTH_OTA)
+
+endif(CONFIG_GOLIOTH)
