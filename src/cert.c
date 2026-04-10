@@ -6,7 +6,6 @@
 
 #include "cert.h"
 #include <psa/crypto.h>
-#include <zephyr/kernel.h>
 #include <pouch/port.h>
 #include <pouch/transport/certificate.h>
 

@@ -7,8 +7,6 @@
 #pragma once
 
 #include <pouch/port.h>
-#include <zephyr/kernel.h>
-
 
 /** Initial state of the buffer */
 #define POUCH_BUF_STATE_INITIAL ((pouch_buf_state_t) 0)
