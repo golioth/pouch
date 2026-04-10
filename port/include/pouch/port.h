@@ -16,12 +16,24 @@
 
 #define POUCH_STATIC_ASSERT(EXPR, ...) POUCH_STATIC_ASSERT_INTERNAL(EXPR, __VA_ARGS__)
 
-#ifndef STRINGIFY
-#define STRINGIFY(s) #s
+#ifndef __ASSERT_NO_MSG
+#define __ASSERT_NO_MSG(condition) configASSERT(condition)
 #endif
 
 #ifndef DIV_ROUND_UP
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
+#endif
+
+#ifndef LOG2
+#define LOG2(x) (31 - __builtin_clz(x))
+#endif
+
+#ifndef MIN
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#endif
+
+#ifndef STRINGIFY
+#define STRINGIFY(s) #s
 #endif
 
 #ifndef CONTAINER_OF
