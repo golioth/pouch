@@ -2,19 +2,18 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+zephyr_library_named(pouch)
 zephyr_include_directories(../include)      # pouch/port.h
 zephyr_include_directories(include)         # Zephyr port includes
 zephyr_library_sources(zephyr_port_layer.c) # Port functions
 
 if(CONFIG_POUCH)
 
-    zephyr_include_directories(../../include) # Pouch includes
-
-    zephyr_library_named(pouch)
-
     zephyr_linker_sources(SECTIONS downlink_handlers.ld)
     zephyr_linker_sources(SECTIONS uplink_handlers.ld)
     zephyr_linker_sources(SECTIONS event_handlers.ld)
+
+    zephyr_library_link_libraries(mbedTLS)
 
     if (DEFINED CONFIG_POUCH_CA_CERT_FILENAME)
         find_file(ca_cert ../../${CONFIG_POUCH_CA_CERT_FILENAME}
@@ -28,17 +27,6 @@ if(CONFIG_POUCH)
             ${ZEPHYR_BINARY_DIR}/include/generated/golioth_ca_cert.inc)
     endif()
 
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../.. core)
-
-    zephyr_library_sources(
-        ${CMAKE_CURRENT_BINARY_DIR}/core/header_decode.c
-        ${CMAKE_CURRENT_BINARY_DIR}/core/header_encode.c
-    )
-
-    zephyr_library_include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
-
-    zephyr_library_link_libraries(mbedTLS)
-
     # Transports
 
     if (CONFIG_POUCH_TRANSPORT_BLE_GATT)
@@ -51,6 +39,8 @@ endif()
 
 if(CONFIG_POUCH_GATEWAY)
     zephyr_include_directories(../../include)
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../.. core)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../.. pouch_core)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../src/gateway gateway)
 endif()
+
+target_link_libraries(app PRIVATE pouch)

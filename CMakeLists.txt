@@ -3,27 +3,25 @@
 # SPDX-License-Identifier: Apache-2.0
 
 if(CONFIG_POUCH)
-    target_include_directories(pouch PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
-
-    set(pouch_source_files)
-
-    list(APPEND pouch_source_files
-      src/pouch.c
-      src/uplink.c
-      src/header.c
-      src/buf.c
-      src/block.c
-      src/entry.c
-      src/stream.c
-      src/downlink.c
+    target_sources(pouch PRIVATE
+        ${CMAKE_CURRENT_BINARY_DIR}/header_decode.c
+        ${CMAKE_CURRENT_BINARY_DIR}/header_encode.c
+        src/pouch.c
+        src/uplink.c
+        src/header.c
+        src/buf.c
+        src/block.c
+        src/entry.c
+        src/stream.c
+        src/downlink.c
     )
 
     if (CONFIG_POUCH_ENCRYPTION_NONE)
-        list(APPEND pouch_source_files src/crypto_none.c)
+        target_sources(pouch PRIVATE src/crypto_none.c)
     endif (CONFIG_POUCH_ENCRYPTION_NONE)
 
     if (CONFIG_POUCH_ENCRYPTION_SAEAD)
-        list(APPEND pouch_source_files
+        target_sources(pouch PRIVATE
             src/crypto_saead.c
             src/cert.c
             src/saead/session.c
@@ -32,7 +30,10 @@ if(CONFIG_POUCH)
         )
     endif (CONFIG_POUCH_ENCRYPTION_SAEAD)
 
-    target_sources(pouch PRIVATE ${pouch_source_files})
+    target_include_directories(pouch PUBLIC
+        ${CMAKE_CURRENT_LIST_DIR}/include
+        ${CMAKE_CURRENT_BINARY_DIR}/../include
+    )
 
     add_custom_command(
         OUTPUT
