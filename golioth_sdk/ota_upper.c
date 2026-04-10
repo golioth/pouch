@@ -7,8 +7,6 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(ota_upper, CONFIG_GOLIOTH_LOG_LEVEL);
 
-#include <zephyr/kernel.h>
-
 #include <pouch/golioth/ota.h>
 #include <pouch/port.h>
 

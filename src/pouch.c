@@ -12,9 +12,7 @@
 #include <pouch/port.h>
 #include <pouch/uplink.h>
 
-#include <zephyr/kernel.h>
-
-K_THREAD_STACK_DEFINE(pouch_stack, CONFIG_POUCH_THREAD_STACK_SIZE);
+POUCH_THREAD_STACK_DEFINE(pouch_stack, CONFIG_POUCH_THREAD_STACK_SIZE);
 
 static pouch_work_q_t pouch_work_q;
 static pouch_work_t event_work;
