@@ -2,5 +2,85 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+menuconfig POUCH
+  bool "Golioth Pouch protocol"
+  select ZCBOR
+  select ZCBOR_CANONICAL
+  select ESP_TLS_USING_MBEDTLS
+  help
+    Pouch is a protocol for communicating with Golioth from devices not
+    directly connected to the internet.
+
 # Port-specific log-level constants
 rsource "Kconfig.port_log_levels"
+
+if POUCH
+
+# Pouch
+rsource "../../src/Kconfig"
+
+choice
+  prompt "Pouch uplink encryption scheme"
+  help
+    Select the encryption method to use for uplink Pouch transfers.
+
+config POUCH_ENCRYPTION_SAEAD
+  bool "Streaming AEAD"
+  select MBEDTLS_ECDSA_C
+  select MBEDTLS_ECP_C
+  select MBEDTLS_HKDF_C
+  help
+    Use a streaming AEAD encryption scheme for uplink Pouch transfers.
+
+config POUCH_ENCRYPTION_NONE
+  bool "Plaintext"
+  help
+    No encryption.
+
+endchoice
+
+menu "Streaming AEAD encryption"
+  depends on POUCH_ENCRYPTION_SAEAD
+
+choice
+  prompt "Encryption algorithm"
+  help
+    Select the encryption algorithm to use for Pouch.
+    This will be used for both uplink and downlink transfers.
+
+config POUCH_ENCRYPTION_CHACHA20_POLY1305
+  bool "ChaCha20-Poly1305"
+  select MBEDTLS_CHACHA20_C
+  select MBEDTLS_CHACHAPOLY_C
+  select MBEDTLS_POLY1305_C
+  help
+    Support ChaCha20-Poly1305 for encryption and decryption.
+
+config POUCH_ENCRYPTION_AES_GCM
+  bool "AES-GCM"
+  select MBEDTLS_GCM_C
+  select MBEDTLS_AES_C
+  help
+    Support AES-GCM for encryption and decryption.
+
+endchoice
+
+config MBEDTLS_USER_CONFIG_ENABLE
+  default y
+
+config MBEDTLS_USER_CONFIG_FILE
+  default "$(ZEPHYR_POUCH_MODULE_DIR)/src/saead/mbedtls_config.h"
+
+# Pouch sources
+rsource "../../src/saead/Kconfig"
+
+endmenu
+
+# Transport choices
+# TODO: implement port-specific transports
+#rsource "transport/Kconfig"
+
+endif
+
+# Libraries and SDK
+rsource "../../Kconfig"
