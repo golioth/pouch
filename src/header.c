@@ -16,7 +16,6 @@
 
 #include <zcbor_encode.h>
 #include <zcbor_encode.h>
-#include <zephyr/kernel.h>
 
 #define POUCH_HEADER_VERSION 1
 

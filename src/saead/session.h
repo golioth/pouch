@@ -7,7 +7,6 @@
 #pragma once
 
 #include "../pouch.h"
-#include <zephyr/kernel.h>
 #include <psa/crypto.h>
 #include <string.h>
 
