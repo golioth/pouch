@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <pouch/port.h>
-POUCH_LOG_REGISTER(settings, CONFIG_GOLIOTH_LOG_LEVEL);
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(glth_settings, CONFIG_GOLIOTH_LOG_LEVEL);
+
+#include <zephyr/drivers/gpio.h>
 
 #include <pouch/types.h>
 #include <pouch/uplink.h>

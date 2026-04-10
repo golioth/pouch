@@ -6,8 +6,8 @@
 
 #include <string.h>
 
-#include <pouch/port.h>
-POUCH_LOG_REGISTER(ota, CONFIG_GOLIOTH_LOG_LEVEL);
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(ota, CONFIG_GOLIOTH_LOG_LEVEL);
 
 #include <pouch/types.h>
 #include <pouch/uplink.h>

@@ -52,9 +52,8 @@ config GOLIOTH_OTA_MAX_VERSION_LEN
 
 endif
 
-module = GOLIOTH
-module-str = Golioth
-source "subsys/logging/Kconfig.template.log_config"
-
+config GOLIOTH_LOG_LEVEL
+  int "Maximum log level"
+  default 4
 
 endif

@@ -4,10 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <pouch/port.h>
-POUCH_LOG_REGISTER(settings_callbacks, CONFIG_GOLIOTH_LOG_LEVEL);
+#include <zephyr/logging/log.h>
+LOG_MODULE_DECLARE(glth_settings);
 
+#include <errno.h>
 #include <stddef.h>
+#include <pouch/port.h>
+
 #include "settings.h"
 
 int golioth_settings_receive_one(const struct setting_value *value)
