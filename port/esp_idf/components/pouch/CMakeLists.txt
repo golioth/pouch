@@ -7,6 +7,8 @@ set(requires "")
 set(POUCH_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../..")
 set(POUCH_PORT "${POUCH_ROOT}/port")
 
+set(CDDL_PROJ ${COMPONENT_LIB}) # Project used to set CDDL header generation dependency
+
 include("${POUCH_ROOT}/pouch_common.cmake")
 
 idf_component_register(SRCS

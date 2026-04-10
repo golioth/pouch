@@ -50,7 +50,7 @@ if(CONFIG_POUCH)
         ${CMAKE_CURRENT_BINARY_DIR}/header_decode.c
         ${CMAKE_CURRENT_BINARY_DIR}/header_encode.c)
 
-    add_dependencies(pouch pouch_generate_headers)
+    add_dependencies(${COMPONENT_LIB} pouch_generate_headers)
 
     list(APPEND POUCH_COMMON_SRCS
         ${CMAKE_CURRENT_BINARY_DIR}/header_decode.c

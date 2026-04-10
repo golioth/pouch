@@ -1,7 +1,5 @@
 set(zcbor_dir ${CMAKE_CURRENT_LIST_DIR}/zcbor)
 
-message(WARNING "ZCBOR: ${zcbor_dir}/include")
-
 idf_component_register(
     INCLUDE_DIRS
         "${zcbor_dir}/include"

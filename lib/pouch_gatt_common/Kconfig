@@ -14,8 +14,7 @@ config POUCH_GATT_ACK_TIMEOUT_MS
     The timeout, in milliseconds, that a receiver will wait
     for new packets before retransmitting an acknowledgement
 
-module = POUCH_GATT_COMMON
-module-str = Pouch GATT Common
-source "subsys/logging/Kconfig.template.log_config"
-
+config POUCH_GATT_COMMON_LOG_LEVEL
+    int "Pouch GATT Common Log Level"
+    default 3
 endif # POUCH_TRANSPORT_GATT_COMMON

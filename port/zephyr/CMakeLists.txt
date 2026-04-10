@@ -10,6 +10,12 @@ zephyr_include_directories(../include)      # pouch/port.h
 zephyr_include_directories(include)         # Zephyr port includes
 zephyr_library_sources(zephyr_port_layer.c) # Port functions
 
+set(CDDL_PROJ "pouch") # Project used to set CDDL header generation dependency
+
+if(CONFIG_POUCH_GATEWAY)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../src/gateway gateway)
+endif()
+
 if(CONFIG_POUCH)
 
     if(POUCH_COMMON_INC_DIRS)
@@ -59,36 +65,30 @@ if(CONFIG_POUCH)
     if (CONFIG_POUCH_TRANSPORT_HTTP_CLIENT)
         add_subdirectory(transport/http example_http)
     endif()
-endif()
 
-# SDKs
+    # SDKs
+    # WARNING: This block of code switches the Zephyr library context away from `pouch`
 
-# WARNING: This block of code switches the Zephyr library context away from `pouch`
-if (SDK_NAME_LIST)
-    foreach(SDK_NAME ${SDK_NAME_LIST})
+    if (SDK_NAME_LIST)
+        foreach(SDK_NAME ${SDK_NAME_LIST})
 
-        zephyr_library_named("${SDK_NAME}")
+            zephyr_library_named("${SDK_NAME}")
 
-        if (${SDK_NAME}_SRCS)
-            zephyr_library_sources(${${SDK_NAME}_SRCS})
-        endif (${SDK_NAME}_SRCS)
+            if (${SDK_NAME}_SRCS)
+                zephyr_library_sources(${${SDK_NAME}_SRCS})
+            endif (${SDK_NAME}_SRCS)
 
-        if (${SDK_NAME}_INC_DIRS)
-            zephyr_library_include_directories(${${SDK_NAME}_INC_DIRS})
-        endif (${SDK_NAME}_INC_DIRS)
+            if (${SDK_NAME}_INC_DIRS)
+                zephyr_library_include_directories(${${SDK_NAME}_INC_DIRS})
+            endif (${SDK_NAME}_INC_DIRS)
 
-        if (${SDK_NAME}_LINKER_SECTION_ZEPHYR)
-            foreach(LINKER_FILE ${${SDK_NAME}_LINKER_SECTION_ZEPHYR})
-                message(WARNING "################# ${LINKER_FILE}")
-                zephyr_linker_sources(SECTIONS ${LINKER_FILE})
-            endforeach(LINKER_FILE)
-        endif (${SDK_NAME}_LINKER_SECTION_ZEPHYR)
+            if (${SDK_NAME}_LINKER_SECTION)
+                foreach(LINKER_FILE ${${SDK_NAME}_LINKER_SECTION})
+                    message(WARNING "################# ${LINKER_FILE}.ld")
+                    zephyr_linker_sources(SECTIONS ${LINKER_FILE}.ld)
+                endforeach(LINKER_FILE)
+            endif (${SDK_NAME}_LINKER_SECTION)
 
-    endforeach(SDK_NAME)
-endif (SDK_NAME_LIST)
-
-if(CONFIG_POUCH_GATEWAY)
-    zephyr_include_directories(../../include)
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../.. core)
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../src/gateway gateway)
+        endforeach(SDK_NAME)
+    endif (SDK_NAME_LIST)
 endif()
