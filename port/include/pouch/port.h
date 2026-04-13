@@ -36,6 +36,14 @@
 #define STRINGIFY(s) #s
 #endif
 
+#ifndef IS_ENABLED
+#define IS_ENABLED(config_macro) PORT_IS_ENABLED1(config_macro)
+#define _PORTXXXX1 _expand_to_comma,
+#define PORT_IS_ENABLED1(x) PORT_IS_ENABLED2(_PORTXXXX##x)
+#define PORT_IS_ENABLED2(one_or_two_args) PORT_IS_ENABLED3(one_or_two_args 1, 0)
+#define PORT_IS_ENABLED3(ignore, val, ...) val
+#endif
+
 #ifndef CONTAINER_OF
 
 /*
