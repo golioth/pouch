@@ -111,7 +111,7 @@ static void pouch_downlink_entries_push(struct pouch_bufview *v)
         memcpy(path_null_term, path, path_len);
         path_null_term[path_len] = '\0';
 
-        downlink_start(0, path_null_term, content_type);
+        downlink_start(0, (char *) path_null_term, content_type);
         downlink_data(0, data, data_len, true);
     }
 }
@@ -145,7 +145,7 @@ static void pouch_downlink_stream_push(struct pouch_bufview *v,
         memcpy(path_null_term, path, path_len);
         path_null_term[path_len] = '\0';
 
-        downlink_start(stream_id, path_null_term, content_type);
+        downlink_start(stream_id, (char *) path_null_term, content_type);
     }
 
     data_len = pouch_bufview_available(v);
@@ -189,7 +189,7 @@ static int write_entry(struct pouch_buf *block, const struct pouch_entry *entry)
     pouch_put_be16(entry->data_len, buf_claim(block, sizeof(uint16_t)));
     pouch_put_be16(entry->content_type, buf_claim(block, sizeof(uint16_t)));
     *buf_claim(block, 1) = pathlen;
-    buf_write(block, entry->path, pathlen);
+    buf_write(block, (uint8_t *) entry->path, pathlen);
     buf_write(block, entry->data, entry->data_len);
 
     return 0;
