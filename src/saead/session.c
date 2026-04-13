@@ -51,7 +51,7 @@ int session_id_generate(struct session_id *id)
         status = psa_generate_random(id->value.random, sizeof(id->value.random));
         if (status != PSA_SUCCESS)
         {
-            POUCH_LOG_ERR("Failed to generate session ID: %d", status);
+            POUCH_LOG_ERR("Failed to generate session ID: %d", (int) status);
             return -EIO;
         }
 
@@ -61,7 +61,7 @@ int session_id_generate(struct session_id *id)
     status = psa_generate_random(id->value.sequential.tag, sizeof(id->value.sequential.tag));
     if (status != PSA_SUCCESS)
     {
-        POUCH_LOG_ERR("Failed to generate session ID tag: %d", status);
+        POUCH_LOG_ERR("Failed to generate session ID tag: %d", (int) status);
         return -EIO;
     }
 
@@ -123,7 +123,7 @@ psa_key_id_t session_key_generate(const struct session_id *id,
         PSA_ALG_KEY_AGREEMENT(PSA_ALG_ECDH, PSA_ALG_HKDF(PSA_ALG_SHA_256)));
     if (status != PSA_SUCCESS)
     {
-        POUCH_LOG_ERR("Couldn't set up key derivation: %d", status);
+        POUCH_LOG_ERR("Couldn't set up key derivation: %d", (int) status);
         goto exit;
     }
 
@@ -135,7 +135,7 @@ psa_key_id_t session_key_generate(const struct session_id *id,
                                               pubkey->len);
     if (status != PSA_SUCCESS)
     {
-        POUCH_LOG_ERR("Failed key agreement: %d", status);
+        POUCH_LOG_ERR("Failed key agreement: %d", (int) status);
         goto exit;
     }
 
@@ -151,7 +151,7 @@ psa_key_id_t session_key_generate(const struct session_id *id,
         psa_key_derivation_input_bytes(&operation, PSA_KEY_DERIVATION_INPUT_INFO, info, info_len);
     if (status != PSA_SUCCESS)
     {
-        POUCH_LOG_ERR("Failed info input: %d", status);
+        POUCH_LOG_ERR("Failed info input: %d", (int) status);
         goto exit;
     }
 
@@ -164,7 +164,7 @@ psa_key_id_t session_key_generate(const struct session_id *id,
     status = psa_key_derivation_output_key(&key_attributes, &operation, &key);
     if (status != PSA_SUCCESS)
     {
-        POUCH_LOG_ERR("Failed key derivation: %d", status);
+        POUCH_LOG_ERR("Failed key derivation: %d", (int) status);
         goto exit;
     }
 
@@ -209,7 +209,7 @@ struct pouch_buf *session_encrypt_block(struct session *session, struct pouch_bu
     uint8_t nonce[NONCE_LEN];
     nonce_generate(session, POUCH_ROLE_DEVICE, nonce);
 
-    POUCH_LOG_DBG("Session key: %d", session->key);
+    POUCH_LOG_DBG("Session key: %d", (int) session->key);
 
     struct pouch_bufview plaintext;
     pouch_bufview_init(&plaintext, block);
@@ -241,7 +241,7 @@ struct pouch_buf *session_encrypt_block(struct session *session, struct pouch_bu
                          &ciphertext_len);
     if (status != PSA_SUCCESS)
     {
-        POUCH_LOG_ERR("Couldn't encrypt: %d", status);
+        POUCH_LOG_ERR("Couldn't encrypt: %d", (int) status);
         buf_free(encrypted);
         return NULL;
     }
@@ -302,7 +302,7 @@ int session_decrypt_block(struct session *session,
                          &plaintext_len);
     if (status != PSA_SUCCESS)
     {
-        POUCH_LOG_ERR("Failed decryption: %d", status);
+        POUCH_LOG_ERR("Failed decryption: %d", (int) status);
         return status;
     }
 
