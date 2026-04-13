@@ -9,6 +9,7 @@
 #include <psa/crypto.h>
 #include <pouch/port.h>
 #include <pouch/transport/certificate.h>
+#include <string.h>
 
 POUCH_LOG_REGISTER(cert, CONFIG_POUCH_LOG_LEVEL);
 
