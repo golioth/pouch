@@ -10,4 +10,4 @@ idf_component_register(SRCS "main.c"
                        INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/../../../include"  # Pouch includes
                        INCLUDE_DIRS "tests/include"                         # Unity tests
 
-                       LDFRAGMENTS ../../linker.lf)
+                       LDFRAGMENTS linker.lf)

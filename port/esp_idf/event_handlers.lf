@@ -1,0 +1,13 @@
+[sections:pouch_event_handler_sections]
+entries:
+    ._pouch_event_handler.static+
+
+[scheme:pouch_event_handler_iterable]
+entries:
+    pouch_event_handler_sections -> flash_rodata
+
+[mapping:pouch_event_handler]
+archive: *
+entries:
+    * (pouch_event_handler_iterable);
+        pouch_event_handler_sections -> flash_rodata KEEP() SORT(name) SURROUND(pouch_event_handler)
