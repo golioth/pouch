@@ -1,0 +1,13 @@
+[sections:pouch_downlink_handler_sections]
+entries:
+    ._pouch_downlink_handler.static+
+
+[scheme:pouch_downlink_handler_iterable]
+entries:
+    pouch_downlink_handler_sections -> flash_rodata
+
+[mapping:pouch_downlink_handler]
+archive: *
+entries:
+    * (pouch_downlink_handler_iterable);
+        pouch_downlink_handler_sections -> flash_rodata KEEP() SORT(name) SURROUND(pouch_downlink_handler)
