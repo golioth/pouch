@@ -25,7 +25,9 @@ if(CONFIG_POUCH)
 
         generate_inc_file_for_target(pouch
             ${ca_cert}
-            ${ZEPHYR_BINARY_DIR}/include/generated/golioth_ca_cert.inc)
+            ${ZEPHYR_BINARY_DIR}/include/generated/pouch_ca_cert.inc)
+
+        zephyr_library_sources(pouch_ca_cert.c)
     endif()
 
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../.. core)

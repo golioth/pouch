@@ -13,11 +13,12 @@
 
 POUCH_LOG_REGISTER(cert, CONFIG_POUCH_LOG_LEVEL);
 
-static const uint8_t raw_ca_cert[] = {
 #if IS_ENABLED(CONFIG_POUCH_VALIDATE_SERVER_CERT)
-#include "golioth_ca_cert.inc"
+#include <pouch/pouch_ca_cert.h>
+#else
+static const struct pouch_cert empty_cert = {.buffer = NULL, .size = 0};
+static const struct pouch_cert *pouch_ca_cert = &empty_cert;
 #endif
-};
 
 static struct
 {
@@ -69,12 +70,7 @@ static mbedtls_x509_crt *load_ca_cert(void)
         return &ca_cert;
     }
 
-    const struct pouch_cert ca_cert_data = {
-        .buffer = raw_ca_cert,
-        .size = sizeof(raw_ca_cert),
-    };
-
-    int err = parse_x509_cert(&ca_cert_data, &ca_cert);
+    int err = parse_x509_cert(pouch_ca_cert, &ca_cert);
     if (err)
     {
         return NULL;
