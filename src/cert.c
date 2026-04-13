@@ -121,7 +121,9 @@ static int authenticate_server_cert(mbedtls_x509_crt *cert)
                                       NULL);
     if (ret != 0)
     {
-        POUCH_LOG_ERR("Failed verifying server cert: 0x%x, %x", -ret, flags);
+        POUCH_LOG_ERR("Failed verifying server cert: 0x%" PRIx32 ", %" PRIx32,
+                      (uint32_t) -ret,
+                      flags);
         return -EPERM;
     }
 
