@@ -46,7 +46,7 @@ static void pouch_module_init(void)
 
     pouch_work_queue_start(&pouch_work_q,
                            pouch_stack,
-                           K_THREAD_STACK_SIZEOF(pouch_stack),
+                           CONFIG_POUCH_THREAD_STACK_SIZE,
                            CONFIG_POUCH_THREAD_PRIORITY,
                            "pouch_work");
 
