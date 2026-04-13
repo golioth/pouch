@@ -38,7 +38,7 @@ static void write_stream_header(struct pouch_buf *block, uint16_t content_type, 
 
     pouch_put_be16(content_type, buf_claim(block, sizeof(uint16_t)));
     *buf_claim(block, 1) = path_len;
-    buf_write(block, path, path_len);
+    buf_write(block, (uint8_t *) path, path_len);
 }
 
 static uint8_t new_stream_id(void)
