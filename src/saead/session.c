@@ -78,7 +78,7 @@ static ssize_t session_key_info_build(const struct session_id *id,
     char session_id[BASE64_STRLEN(SESSION_ID_LEN) + 1];
     size_t id_len = 0;
 
-    int err = mbedtls_base64_encode(session_id,
+    int err = mbedtls_base64_encode((unsigned char *) session_id,
                                     sizeof(session_id),
                                     &id_len,
                                     (const void *) &id->value,
@@ -140,7 +140,7 @@ psa_key_id_t session_key_generate(const struct session_id *id,
     }
 
     uint8_t info[INFO_MAX_LEN];
-    ssize_t info_len = session_key_info_build(id, algorithm, max_block_size_log, info);
+    ssize_t info_len = session_key_info_build(id, algorithm, max_block_size_log, (char *) info);
     if (info_len < 0)
     {
         POUCH_LOG_ERR("Failed session key build: %d", info_len);
