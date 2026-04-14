@@ -32,7 +32,7 @@ LOG_MODULE_REGISTER(pouch_http);
 #define HTTP_PATH_DEVICE_CERT "/.g/device-cert"
 
 #define POUCH_FILL_COUNT_LIMIT 100
-#define CHUNK_DATA_LEN_FMT "%04x"
+#define CHUNK_DATA_LEN_FMT "%04zx"
 #define CHUNK_HEADER_LEN 6  // ascii hex len(4) + CRLF(2)
 #define CHUNK_FOOTER_LEN 2  // CRLF(2)
 
