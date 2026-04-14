@@ -46,7 +46,7 @@ int downlink_init(pouch_work_q_t *pouch_work_queue)
 static void decrypt_blocks(pouch_work_t *work)
 {
     struct pouch_buf *encrypted_block;
-    struct pouch_buf *decrypted_block = blockbuf_alloc(K_FOREVER);
+    struct pouch_buf *decrypted_block = blockbuf_alloc(POUCH_FOREVER);
     if (decrypted_block == NULL)
     {
         POUCH_LOG_ERR("Failed to allocate decrypt block");
