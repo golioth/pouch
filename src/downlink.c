@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 
+#include <errno.h>
 #include <pouch/downlink.h>
 #include <pouch/port.h>
 #include <pouch/types.h>

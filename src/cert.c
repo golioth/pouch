@@ -5,6 +5,7 @@
  */
 
 #include "cert.h"
+#include <errno.h>
 #include <psa/crypto.h>
 #include <pouch/port.h>
 #include <pouch/transport/certificate.h>

@@ -8,6 +8,7 @@
 #include "uplink.h"
 #include "session.h"
 #include "../cert.h"
+#include <errno.h>
 #include <stdint.h>
 #include <pouch/port.h>
 #include <psa/crypto.h>

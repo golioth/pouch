@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <errno.h>
 #include <pouch/port.h>
 #include <pouch/uplink.h>
 #include "buf.h"

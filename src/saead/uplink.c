@@ -8,6 +8,7 @@
 #include "session.h"
 #include "../cert.h"
 #include "../block.h"
+#include <errno.h>
 #include <stdint.h>
 #include <psa/crypto.h>
 #include <pouch/port.h>
