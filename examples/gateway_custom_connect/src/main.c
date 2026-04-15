@@ -15,8 +15,6 @@
 #include <golioth/gateway.h>
 #include <samples/common/sample_credentials.h>
 
-#include <pouch/transport/gatt/common/types.h>
-
 #include <pouch/gateway/bt/bond.h>
 #include <pouch/gateway/bt/connect.h>
 #include <pouch/gateway/cert.h>
@@ -207,8 +205,6 @@ static void bt_disconnected(struct bt_conn *conn, uint8_t reason)
     bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
     LOG_INF("Disconnected: %s, reason 0x%02x %s", addr, reason, bt_hci_err_to_str(reason));
 
-    pouch_gateway_bt_stop(conn);
-
     bt_conn_unref(conn);
 
     custom_scan_start();
@@ -313,12 +309,7 @@ static struct bt_conn_auth_info_cb auth_info_cb = {
     .pairing_failed = pairing_failed,
 };
 
-static void sync_start_handler(struct k_work *work)
-{
-    pouch_gateway_bt_start(sync_data.conn);
-}
-
-void pouch_gateway_bt_finished(struct bt_conn *conn)
+static void gateway_bt_finished(struct bt_conn *conn)
 {
     sync_data.counter++;
 
@@ -332,6 +323,11 @@ void pouch_gateway_bt_finished(struct bt_conn *conn)
         LOG_INF("Start sync once again in 5s");
         k_work_schedule(&sync_data.work, K_SECONDS(5));
     }
+}
+
+static void sync_start_handler(struct k_work *work)
+{
+    pouch_gateway_bt_start(sync_data.conn, gateway_bt_finished);
 }
 
 int main(void)

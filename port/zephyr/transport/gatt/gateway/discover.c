@@ -4,25 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "discover.h"
+#include "types.h"
+#include "gateway.h"
+#include "../common.h"
+
 #include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/sys/util.h>
 
-#include <pouch/transport/gatt/common/uuids.h>
-
-#include <pouch/gateway/types.h>
-#include <pouch/gateway/bt/connect.h>
-#include <pouch/gateway/bt/scan.h>
-
-#include "downlink.h"
-#include "info.h"
-#include "uplink.h"
-
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(connect, CONFIG_POUCH_GATEWAY_GATT_LOG_LEVEL);
+LOG_MODULE_REGISTER(gatt_discover, CONFIG_POUCH_GATEWAY_GATT_LOG_LEVEL);
 
 static const struct bt_uuid_128 golioth_svc_uuid_128 =
     BT_UUID_INIT_128(POUCH_GATT_UUID_SVC_VAL_128);
@@ -39,27 +32,30 @@ static const struct bt_uuid_16 gatt_ccc_uuid = BT_UUID_INIT_16(BT_UUID_GATT_CCC_
 BUILD_ASSERT(ARRAY_SIZE(char_uuids) == POUCH_GATEWAY_GATT_ATTRS,
              "Missing characteristic UUID definitions");
 
-static struct pouch_gateway_node_info connected_nodes[CONFIG_BT_MAX_CONN];
+
+static void complete(struct gatt_device *device, bool success)
+{
+    device->discover.callback(device, success);
+}
 
 static uint8_t discover_descriptors(struct bt_conn *conn,
                                     const struct bt_gatt_attr *attr,
                                     struct bt_gatt_discover_params *params)
 {
-    struct pouch_gateway_node_info *node = pouch_gateway_get_node_info(conn);
-
+    struct gatt_device *device = gateway_gatt_device(conn);
     if (attr)
     {
         int attr_idx = POUCH_GATEWAY_GATT_ATTRS;
         /* Find the value handle closest to but lower than this handle */
         for (int i = 0; i < POUCH_GATEWAY_GATT_ATTRS; i++)
         {
-            if (node->attr_handles[i].value < attr->handle)
+            if (device->chars[i].handle.value < attr->handle)
             {
                 if (attr_idx == POUCH_GATEWAY_GATT_ATTRS)
                 {
                     attr_idx = i;
                 }
-                else if (node->attr_handles[i].value > node->attr_handles[attr_idx].value)
+                else if (device->chars[i].handle.value > device->chars[attr_idx].handle.value)
                 {
                     attr_idx = i;
                 }
@@ -68,26 +64,16 @@ static uint8_t discover_descriptors(struct bt_conn *conn,
 
         if (attr_idx != POUCH_GATEWAY_GATT_ATTRS)
         {
-            node->attr_handles[attr_idx].ccc = attr->handle;
+            device->chars[attr_idx].handle.ccc = attr->handle;
             LOG_DBG("Found CCC descriptor handle %d for value handle %d",
-                    node->attr_handles[attr_idx].ccc,
-                    node->attr_handles[attr_idx].value);
+                    device->chars[attr_idx].handle.ccc,
+                    device->chars[attr_idx].handle.value);
         }
 
         return BT_GATT_ITER_CONTINUE;
     }
 
-    if (node->attr_handles[POUCH_GATEWAY_GATT_ATTR_SERVER_CERT].value
-        && node->attr_handles[POUCH_GATEWAY_GATT_ATTR_DEVICE_CERT].value)
-    {
-        pouch_gateway_info_read_start(conn);
-    }
-    else
-    {
-        LOG_WRN("Could not discover %s characteristics", "certificate");
-        LOG_INF("Starting uplink without cert exchange");
-        pouch_gateway_uplink_start(conn);
-    }
+    complete(device, true);
 
     return BT_GATT_ITER_STOP;
 }
@@ -96,8 +82,7 @@ static uint8_t discover_characteristics(struct bt_conn *conn,
                                         const struct bt_gatt_attr *attr,
                                         struct bt_gatt_discover_params *params)
 {
-    struct pouch_gateway_node_info *node = pouch_gateway_get_node_info(conn);
-
+    struct gatt_device *device = gateway_gatt_device(conn);
     if (attr)
     {
         struct bt_gatt_chrc *chrc = attr->user_data;
@@ -105,7 +90,7 @@ static uint8_t discover_characteristics(struct bt_conn *conn,
         {
             if (0 == bt_uuid_cmp(chrc->uuid, &char_uuids[i].uuid))
             {
-                node->attr_handles[i].value = chrc->value_handle;
+                device->chars[i].handle.value = chrc->value_handle;
                 return BT_GATT_ITER_CONTINUE;
             }
         }
@@ -114,20 +99,20 @@ static uint8_t discover_characteristics(struct bt_conn *conn,
         return BT_GATT_ITER_CONTINUE;
     }
 
-    if (!node->attr_handles[POUCH_GATEWAY_GATT_ATTR_UPLINK].value
-        || !node->attr_handles[POUCH_GATEWAY_GATT_ATTR_DOWNLINK].value)
+    if (!device->chars[POUCH_GATEWAY_GATT_ATTR_UPLINK].handle.value
+        || !device->chars[POUCH_GATEWAY_GATT_ATTR_DOWNLINK].handle.value)
     {
         LOG_ERR("Could not discover %s characteristics", "pouch");
-        pouch_gateway_bt_finished(conn);
+        complete(device, false);
         return BT_GATT_ITER_STOP;
     }
 
     params->start_handle = params->end_handle;
     for (int i = 0; i < POUCH_GATEWAY_GATT_ATTRS; i++)
     {
-        if (node->attr_handles[i].value < params->start_handle)
+        if (device->chars[i].handle.value < params->start_handle)
         {
-            params->start_handle = node->attr_handles[i].value;
+            params->start_handle = device->chars[i].handle.value;
         }
     }
 
@@ -141,7 +126,7 @@ static uint8_t discover_characteristics(struct bt_conn *conn,
     if (err)
     {
         LOG_ERR("Error discovering descriptors: %d", err);
-        pouch_gateway_bt_finished(conn);
+        complete(device, false);
     }
 
     return BT_GATT_ITER_STOP;
@@ -151,6 +136,7 @@ static uint8_t discover_services(struct bt_conn *conn,
                                  const struct bt_gatt_attr *attr,
                                  struct bt_gatt_discover_params *params)
 {
+    struct gatt_device *device = gateway_gatt_device(conn);
     if (!attr)
     {
         if (params->uuid == &golioth_svc_uuid_16.uuid)
@@ -162,13 +148,13 @@ static uint8_t discover_services(struct bt_conn *conn,
             if (err)
             {
                 LOG_ERR("Failed to start discovery: %d", err);
-                pouch_gateway_bt_finished(conn);
+                complete(device, false);
             }
         }
         else
         {
             LOG_ERR("Missing pouch service");
-            pouch_gateway_bt_finished(conn);
+            complete(device, false);
         }
         return BT_GATT_ITER_STOP;
     }
@@ -188,7 +174,7 @@ static uint8_t discover_services(struct bt_conn *conn,
         if (err)
         {
             LOG_ERR("Error discovering characteristics: %d", err);
-            pouch_gateway_bt_finished(conn);
+            complete(device, false);
         }
 
         return BT_GATT_ITER_STOP;
@@ -197,36 +183,17 @@ static uint8_t discover_services(struct bt_conn *conn,
     return BT_GATT_ITER_CONTINUE;
 }
 
-void pouch_gateway_bt_start(struct bt_conn *conn)
+int gateway_bt_discover(struct gatt_device *device, gateway_gatt_discover_callback_t on_complete)
 {
-    int err;
+    struct bt_gatt_discover_params params = {
+        .func = discover_services,
+        .type = BT_GATT_DISCOVER_PRIMARY,
+        .start_handle = BT_ATT_FIRST_ATTRIBUTE_HANDLE,
+        .end_handle = BT_ATT_LAST_ATTRIBUTE_HANDLE,
+        .uuid = &golioth_svc_uuid_16.uuid,
+    };
+    device->discover.params = params;
+    device->discover.callback = on_complete;
 
-    uint8_t conn_idx = bt_conn_index(conn);
-    memset(&connected_nodes[conn_idx], 0, sizeof(connected_nodes[conn_idx]));
-
-    struct bt_gatt_discover_params *discover_params = &connected_nodes[conn_idx].discover_params;
-
-    discover_params->func = discover_services;
-    discover_params->type = BT_GATT_DISCOVER_PRIMARY;
-    discover_params->start_handle = BT_ATT_FIRST_ATTRIBUTE_HANDLE;
-    discover_params->end_handle = BT_ATT_LAST_ATTRIBUTE_HANDLE;
-    discover_params->uuid = &golioth_svc_uuid_16.uuid;
-
-    err = bt_gatt_discover(conn, discover_params);
-    if (err)
-    {
-        LOG_ERR("Failed to start discovery: %d", err);
-        pouch_gateway_bt_finished(conn);
-    }
-}
-
-void pouch_gateway_bt_stop(struct bt_conn *conn)
-{
-    pouch_gateway_uplink_cleanup(conn);
-    pouch_gateway_downlink_cleanup(conn);
-}
-
-struct pouch_gateway_node_info *pouch_gateway_get_node_info(const struct bt_conn *conn)
-{
-    return &connected_nodes[bt_conn_index(conn)];
+    return bt_gatt_discover(device->conn, &device->discover.params);
 }

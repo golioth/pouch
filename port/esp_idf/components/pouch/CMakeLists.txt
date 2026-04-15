@@ -117,7 +117,7 @@ endif()
 
 # TODO: Add port-specific transports and include them in the build here
 
-if("${CONFIG_POUCH_TRANSPORT_GATT_COMMON}" STREQUAL "y")
+if("${CONFIG_POUCH_TRANSPORT_BLE_GATT}" STREQUAL "y")
 
     list(APPEND POUCH_TRANSPORT_SRCS
         ${POUCH_TRANSPORT_COMMON}/endpoints/info.c
@@ -164,15 +164,6 @@ endif()
 if("${CONFIG_ZCBOR_UTILS}" STREQUAL "y")
     list(APPEND POUCH_LIB_INC_DIRS ${POUCH_LIB}/zcbor_utils/include)
     list(APPEND POUCH_LIB_SRCS ${POUCH_LIB}/zcbor_utils/zcbor_utils.c)
-endif()
-
-if("${CONFIG_POUCH_TRANSPORT_GATT_COMMON}" STREQUAL "y")
-    list(APPEND POUCH_LIB_INC_DIRS ${POUCH_LIB}/pouch_gatt_common)
-    list(APPEND POUCH_LIB_SRCS
-        ${POUCH_LIB}/pouch_gatt_common/packetizer.c
-        ${POUCH_LIB}/pouch_gatt_common/receiver.c
-        ${POUCH_LIB}/pouch_gatt_common/sender.c
-    )
 endif()
 
 #########################

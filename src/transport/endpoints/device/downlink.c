@@ -7,18 +7,18 @@
 #include <pouch/transport/downlink.h>
 #include "endpoints.h"
 
-static int start(void)
+static int start(struct pouch_bearer *bearer)
 {
     pouch_downlink_start();
     return 0;
 }
 
-static int recv(const void *buf, size_t len)
+static int recv(struct pouch_bearer *bearer, const void *buf, size_t len)
 {
     return pouch_downlink_push(buf, len);
 }
 
-static void end(bool success)
+static void end(struct pouch_bearer *bearer, bool success)
 {
     pouch_downlink_finish();
 }

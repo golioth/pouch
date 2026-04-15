@@ -47,32 +47,21 @@ config POUCH_GATEWAY_SERVER_CERT_BUILTIN
     bool
     default y if !POUCH_GATEWAY_CLOUD
 
-config POUCH_GATT_INFO_WINDOW_SIZE
-    int "Info GATT Window Size"
-    range 1 127
-    default 4
+config POUCH_TRANSPORT_ACK_TIMEOUT_MS
+    int "Pouch Transport ACK timeout (ms)"
+    default 1000
     help
-        The number of unacknowledged packets that can be received by
-        the device on the info characteristic. Larger numbers can
-        increase throughput but will use more RAM.
+        The timeout, in milliseconds, that a receiver will wait
+        for new packets before retransmitting an acknowledgement
 
-config POUCH_GATT_DEVICE_CERT_WINDOW_SIZE
-    int "Device Cert GATT Window Size"
+config POUCH_GATT_WINDOW_SIZE
+    int "GATT Window Size"
     range 1 127
     default 4
     help
         The number of unacknowledged packets that can be received by
-        the device on the device certificate characteristic. Larger
-        numbers can increase throughput but will use more RAM.
-
-config POUCH_GATT_UPLINK_WINDOW_SIZE
-    int "Uplink GATT Window Size"
-    range 1 127
-    default 4
-    help
-        The number of unacknowledged packets that can be received by
-        the device on the uplink characteristic. Larger numbers can
-        increase throughput but will use more RAM.
+        the device. Larger numbers can increase throughput but will
+        use more RAM.
 
 module = POUCH_GATEWAY
 module-str = Pouch Gateway Library
@@ -88,6 +77,10 @@ config POUCH_GATEWAY_GATT_SCAN_FILTER_BONDED
 
 module = POUCH_GATEWAY_GATT
 module-str = Pouch Gateway GATT Library
+source "subsys/logging/Kconfig.template.log_config"
+
+module = POUCH_TRANSPORT
+module-str = Pouch Transport
 source "subsys/logging/Kconfig.template.log_config"
 
 endif # POUCH_GATEWAY

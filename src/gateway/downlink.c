@@ -180,7 +180,8 @@ int pouch_gateway_downlink_get_data(struct pouch_gateway_downlink_context *downl
                        notify them the next time we receive a block */
                     atomic_set_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING);
                 }
-                return -EAGAIN;
+
+                return 0;
             }
         }
 

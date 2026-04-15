@@ -7,7 +7,7 @@
 #pragma once
 #include "../bearer.h"
 #include <pouch/transport/types.h>
-#include "../endpoints/endpoints.h"
+#include "../endpoints/endpoint.h"
 
 struct pouch_sender
 {
@@ -22,5 +22,6 @@ struct pouch_sender
 };
 
 int pouch_sender_open(struct pouch_sender *sender, struct pouch_bearer *bearer);
+void pouch_sender_ready(struct pouch_sender *sender);
 int pouch_sender_recv(struct pouch_sender *sender, const uint8_t *buf, size_t len);
 void pouch_sender_close(struct pouch_sender *sender);
