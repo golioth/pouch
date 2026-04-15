@@ -8,8 +8,7 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/uuid.h>
 
-#include <pouch/transport/gatt/common/types.h>
-#include <pouch/transport/gatt/common/uuids.h>
+#include "../common.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(scan, CONFIG_POUCH_GATEWAY_GATT_LOG_LEVEL);
@@ -122,7 +121,7 @@ static void device_found(const bt_addr_le_t *addr,
 
     bt_data_parse(ad, data_cb, &tf);
 
-    if (!tf.is_tf)
+    if (!tf.is_tf || !tf.adv_data.flags)
     {
         return;
     }

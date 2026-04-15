@@ -1,11 +1,12 @@
 /*
  * Copyright (c) 2025 Golioth
  */
+#pragma once
 
 #include <zephyr/toolchain.h>
+#include <pouch/types.h>
 #include <stdint.h>
 #include <stddef.h>
-#include "uuids.h"
 
 #define POUCH_GATT_VERSION 1
 
@@ -16,6 +17,8 @@
 
 #define POUCH_GATT_ADV_FLAG_SYNC_REQUEST (1 << 0)
 
+/** Pouch Bluetooth GATT Service ID */
+#define POUCH_GATT_UUID_SVC_VAL_16 0xFC49
 
 /**
  * Advertisement data payload.

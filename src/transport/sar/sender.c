@@ -5,12 +5,12 @@
  */
 #include <stdlib.h>
 #include <errno.h>
+#include <pouch/port.h>
 
 #include "sender.h"
 #include "packet.h"
 
-#include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(pouch_sender, CONFIG_POUCH_TRANSPORT_LOG_LEVEL);
+POUCH_LOG_REGISTER(pouch_sender, CONFIG_POUCH_TRANSPORT_LOG_LEVEL);
 
 enum state
 {
@@ -24,8 +24,10 @@ static void end(struct pouch_sender *sender, bool success)
 {
     if (sender->endpoint->end)
     {
-        sender->endpoint->end(success);
+        sender->endpoint->end(sender->bearer, success);
     }
+
+    pouch_bearer_close(sender->bearer, success);
 }
 
 static void send_fin(struct pouch_sender *p)
@@ -43,7 +45,7 @@ static void send_fin(struct pouch_sender *p)
     int err = pouch_sar_tx_pkt_encode(&pkt, p->buf, &len);
     if (err)
     {
-        LOG_ERR("Encode failed (%d)", err);
+        POUCH_LOG_ERR("Encode failed (%d)", err);
         return;
     }
 
@@ -51,7 +53,7 @@ static void send_fin(struct pouch_sender *p)
     err = pouch_bearer_send(p->bearer, p->buf, len);
     if (err)
     {
-        LOG_ERR("TX failed (%d)", err);
+        POUCH_LOG_ERR("TX failed (%d)", err);
         return;
     }
 
@@ -72,11 +74,11 @@ static void push_fragments(struct pouch_sender *sender)
             pkt.flags |= POUCH_SAR_TX_PKT_FLAG_FIRST;
         }
 
-        enum pouch_result res = sender->endpoint->send((void *) pkt.data, &pkt.len);
+        enum pouch_result res = sender->endpoint->send(sender->bearer, (void *) pkt.data, &pkt.len);
         if (res == POUCH_ERROR)
         {
-            LOG_ERR("Error from endpoint, aborting");
-            pouch_bearer_abort(sender->bearer);
+            POUCH_LOG_ERR("Error from endpoint, aborting");
+            pouch_bearer_close(sender->bearer, false);
             return;
         }
         if (res == POUCH_MORE_DATA && pkt.len == 0)
@@ -88,25 +90,25 @@ static void push_fragments(struct pouch_sender *sender)
         if (res == POUCH_NO_MORE_DATA)
         {
             pkt.flags |= POUCH_SAR_TX_PKT_FLAG_LAST;
-            LOG_DBG("Last entry");
+            POUCH_LOG_DBG("Last entry");
         }
 
         size_t len = sender->bearer->maxlen;
         int err = pouch_sar_tx_pkt_encode(&pkt, sender->buf, &len);
         if (err)
         {
-            LOG_ERR("Encode failed (%d)", err);
+            POUCH_LOG_ERR("Encode failed (%d)", err);
             return;
         }
 
         err = pouch_bearer_send(sender->bearer, sender->buf, len);
         if (err)
         {
-            LOG_ERR("TX failed (%d)", err);
+            POUCH_LOG_ERR("TX failed (%d)", err);
             return;
         }
 
-        LOG_DBG("Data sent. flags: %x, len: %u, seq: %x", pkt.flags, pkt.len, pkt.seq);
+        POUCH_LOG_DBG("Data sent. flags: %x, len: %u, seq: %x", pkt.flags, pkt.len, pkt.seq);
 
         sender->seq++;
         sender->state = STATE_ACTIVE;
@@ -119,11 +121,8 @@ static void push_fragments(struct pouch_sender *sender)
     }
 }
 
-
 int pouch_sender_open(struct pouch_sender *sender, struct pouch_bearer *bearer)
 {
-    LOG_DBG("Starting transfer %p", sender);
-
     sender->bearer = bearer;
     sender->seq = 0;
     sender->window = 0;
@@ -137,7 +136,7 @@ int pouch_sender_open(struct pouch_sender *sender, struct pouch_bearer *bearer)
 
     if (sender->endpoint->start != NULL)
     {
-        int err = sender->endpoint->start();
+        int err = sender->endpoint->start(sender->bearer);
         if (err)
         {
             free(sender->buf);
@@ -156,20 +155,20 @@ int pouch_sender_recv(struct pouch_sender *sender, const uint8_t *buf, size_t le
     struct pouch_sar_rx_pkt ack;
     if (sender->bearer == NULL)
     {
-        LOG_DBG("Received before opening");
+        POUCH_LOG_DBG("Received before opening");
         return -EBUSY;
     }
 
     int err = pouch_sar_rx_pkt_decode(buf, len, &ack);
     if (err)
     {
-        LOG_ERR("Invalid ack (%d)", err);
+        POUCH_LOG_ERR("Invalid ack (%d)", err);
         return err;
     }
 
     if (ack.code != POUCH_RECEIVER_CODE_ACK)
     {
-        LOG_ERR("Received NACK");
+        POUCH_LOG_ERR("Received NACK");
         sender->state = STATE_IDLE;
         end(sender, false);
         return -EIO;
@@ -177,7 +176,7 @@ int pouch_sender_recv(struct pouch_sender *sender, const uint8_t *buf, size_t le
 
     if (ack.window > POUCH_SAR_WINDOW_MAX)
     {
-        LOG_ERR("Invalid window");
+        POUCH_LOG_ERR("Invalid window");
         sender->state = STATE_IDLE;
         end(sender, false);
         return -EINVAL;
@@ -185,10 +184,10 @@ int pouch_sender_recv(struct pouch_sender *sender, const uint8_t *buf, size_t le
 
     sender->window = ack.seq + ack.window + 1;
 
-    LOG_DBG("Received ack (%x window: %u. New target seq: %x)",
-            ack.seq,
-            ack.window,
-            sender->window);
+    POUCH_LOG_DBG("Received ack (%x window: %u. New target seq: %x)",
+                  ack.seq,
+                  ack.window,
+                  sender->window);
 
     if (sender->state == STATE_ACTIVE || sender->state == STATE_READY)
     {
@@ -196,15 +195,31 @@ int pouch_sender_recv(struct pouch_sender *sender, const uint8_t *buf, size_t le
     }
     else if (((ack.seq + 1) & POUCH_SAR_SEQ_MASK) == sender->seq)
     {
+        bool already_ended = (sender->state == STATE_IDLE);
         send_fin(sender);
-        end(sender, true);
+        if (!already_ended)
+        {
+            end(sender, true);
+        }
     }
 
     return 0;
 }
 
+void pouch_sender_ready(struct pouch_sender *sender)
+{
+    push_fragments(sender);
+}
+
 void pouch_sender_close(struct pouch_sender *sender)
 {
+    if (sender->state == STATE_ACTIVE || sender->state == STATE_READY)
+    {
+        // aborted without reaching the end of the transfer
+        POUCH_LOG_WRN("Closed before receiving FIN");
+        end(sender, false);
+    }
+
     sender->state = STATE_IDLE;
     free(sender->buf);
     sender->buf = NULL;

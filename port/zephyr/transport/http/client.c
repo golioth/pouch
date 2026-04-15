@@ -557,7 +557,7 @@ int pouch_http_client_sync(k_timeout_t wait_for_conn)
 
     if (true == atomic_test_and_set_bit(&sync->flags, IN_USE_FLAG))
     {
-        LOG_WRN("Sync already in progress, aborting.");
+        POUCH_LOG_WRN("Sync already in progress, aborting.");
         return -EACCES;
     }
 

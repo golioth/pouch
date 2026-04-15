@@ -15,7 +15,7 @@
 #include <golioth/gateway.h>
 #include <samples/common/sample_credentials.h>
 
-#include <pouch/transport/gatt/common/types.h>
+#include <pouch/transport/bluetooth/gatt.h>
 
 #include <pouch/gateway/bt/bond.h>
 #include <pouch/gateway/bt/connect.h>
@@ -199,11 +199,14 @@ static void bt_disconnected(struct bt_conn *conn, uint8_t reason)
     bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
     LOG_INF("Disconnected: %s, reason 0x%02x %s", addr, reason, bt_hci_err_to_str(reason));
 
-    pouch_gateway_bt_stop(conn);
-
     bt_conn_unref(conn);
 
     pouch_gateway_scan_start();
+}
+
+static void on_gateway_end(struct bt_conn *conn)
+{
+    bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
 }
 
 static void security_changed(struct bt_conn *conn, bt_security_t level, enum bt_security_err err)
@@ -225,7 +228,7 @@ static void security_changed(struct bt_conn *conn, bt_security_t level, enum bt_
     {
         LOG_INF("BT security changed to level %u", level);
 
-        pouch_gateway_bt_start(conn);
+        pouch_gateway_bt_start(conn, on_gateway_end);
     }
 }
 
@@ -301,11 +304,6 @@ static struct bt_conn_auth_info_cb auth_info_cb = {
     .pairing_complete = pairing_complete,
     .pairing_failed = pairing_failed,
 };
-
-void pouch_gateway_bt_finished(struct bt_conn *conn)
-{
-    bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
-}
 
 int main(void)
 {

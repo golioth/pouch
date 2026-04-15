@@ -13,9 +13,9 @@
 
 #include <pouch/gateway/downlink.h>
 #include <pouch/gateway/uplink.h>
+#include <pouch/port.h>
 
-#include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(uplink, CONFIG_POUCH_GATEWAY_LOG_LEVEL);
+POUCH_LOG_REGISTER(uplink, CONFIG_POUCH_GATEWAY_LOG_LEVEL);
 
 enum pouch_flags
 {
@@ -75,7 +75,7 @@ static void block_upload_callback(struct golioth_client *client,
 
     if (!atomic_test_and_clear_bit(uplink->flags, POUCH_UPLINK_SENDING))
     {
-        LOG_ERR("Not sending");
+        POUCH_LOG_ERR("Not sending");
         return;
     }
 
@@ -84,7 +84,7 @@ static void block_upload_callback(struct golioth_client *client,
 
     if (status != GOLIOTH_OK)
     {
-        LOG_ERR("Failed to deliver block: %d", status);
+        POUCH_LOG_ERR("Failed to deliver block: %d", status);
         uplink->end_cb(uplink->end_cb_arg, POUCH_GATEWAY_UPLINK_ERROR_CLOUD);
         cleanup_uplink(uplink);
         return;
@@ -98,7 +98,7 @@ static void process_uplink(struct pouch_gateway_uplink *uplink)
     enum golioth_status status;
     if (atomic_test_and_set_bit(uplink->flags, POUCH_UPLINK_SENDING))
     {
-        LOG_DBG("Already processing queue");
+        POUCH_LOG_DBG("Already processing queue");
         return;
     }
 
@@ -107,7 +107,7 @@ static void process_uplink(struct pouch_gateway_uplink *uplink)
     sys_snode_t *n = sys_slist_get(&uplink->queue);
     if (n == NULL)
     {
-        LOG_DBG("No blocks to process");
+        POUCH_LOG_DBG("No blocks to process");
         if (closed)
         {
             uplink->end_cb(uplink->end_cb_arg, POUCH_GATEWAY_UPLINK_SUCCESS);
@@ -121,7 +121,7 @@ static void process_uplink(struct pouch_gateway_uplink *uplink)
 
     uplink->rblock = CONTAINER_OF(n, struct pouch_block, node);
 
-    LOG_DBG("Processing block %zu of size %zu", uplink->block_idx, uplink->rblock->len);
+    POUCH_LOG_DBG("Processing block %zu of size %zu", uplink->block_idx, uplink->rblock->len);
 
     if (!IS_ENABLED(CONFIG_POUCH_GATEWAY_CLOUD))
     {
@@ -134,7 +134,7 @@ static void process_uplink(struct pouch_gateway_uplink *uplink)
 
     if (uplink->rblock->len == 0)
     {
-        LOG_WRN("Skipping zero length block");
+        POUCH_LOG_WRN("Skipping zero length block");
 
         free(uplink->rblock);
         uplink->rblock = NULL;
@@ -152,7 +152,7 @@ static void process_uplink(struct pouch_gateway_uplink *uplink)
                                           uplink);
     if (status != GOLIOTH_OK)
     {
-        LOG_ERR("Failed to deliver block: %d", status);
+        POUCH_LOG_ERR("Failed to deliver block: %d", status);
         uplink->end_cb(uplink->end_cb_arg, POUCH_GATEWAY_UPLINK_ERROR_LOCAL);
         cleanup_uplink(uplink);
     }
@@ -163,7 +163,7 @@ static struct pouch_block *block_alloc(struct pouch_gateway_uplink *uplink)
     struct pouch_block *block = malloc(sizeof(struct pouch_block));
     if (block == NULL)
     {
-        LOG_ERR("Failed to alloc block");
+        POUCH_LOG_ERR("Failed to alloc block");
         return NULL;
     }
 
@@ -174,7 +174,7 @@ static struct pouch_block *block_alloc(struct pouch_gateway_uplink *uplink)
 
 static void submit_block(struct pouch_gateway_uplink *uplink)
 {
-    LOG_DBG("Submitting block of size %zu", uplink->wblock->len);
+    POUCH_LOG_DBG("Submitting block of size %zu", uplink->wblock->len);
     sys_slist_append(&uplink->queue, &uplink->wblock->node);
     uplink->wblock = NULL;
 }
@@ -196,7 +196,7 @@ int pouch_gateway_uplink_write(struct pouch_gateway_uplink *uplink,
             uplink->wblock = block_alloc(uplink);
             if (uplink->wblock == NULL)
             {
-                LOG_ERR("Failed to alloc new block");
+                POUCH_LOG_ERR("Failed to alloc new block");
                 return -ENOMEM;
             }
         }
@@ -246,7 +246,7 @@ struct pouch_gateway_uplink *pouch_gateway_uplink_open(
                                                        downlink);
         if (uplink->session == NULL)
         {
-            LOG_ERR("Failed to start blockwise upload");
+            POUCH_LOG_ERR("Failed to start blockwise upload");
             free(uplink->wblock);
             free(uplink);
             return NULL;
