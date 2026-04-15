@@ -1,0 +1,58 @@
+# Copyright (c) 2026 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+config POUCH_BLOCK_SIZE
+  int "Block size"
+  default 512
+  help
+    The maximum block size to use for Pouch transfers.
+
+config POUCH_BLOCK_COUNT
+  int "Block count"
+  default 2
+  range 2 10000
+  help
+    Number of blocks that are allocated for assembling pouch packets.
+
+config POUCH_THREAD_STACK_SIZE
+  int "Pouch thread stack size"
+  default 2048
+  help
+    The size of the stack for the internal Pouch thread.
+
+config POUCH_THREAD_PRIORITY
+  int "Pouch thread priority"
+  default 5
+  help
+    The priority of the internal Pouch thread.
+
+config POUCH_EVENT_QUEUE_DEPTH
+  int "Maximum pending pouch events"
+  default 4
+  help
+    The maximum number of Pouch events that can queued to send to
+    the application.
+
+config POUCH_UPLINK_PROCESSING_STACK_SIZE
+  int "Pouch uplink processing stack size"
+  default 2048
+  help
+    The size of the stack for the internal Pouch uplink processing work
+    queue.
+
+config POUCH_UPLINK_PROCESSING_PRIORITY
+  int "Pouch uplink processing thread priority"
+  default 5
+  help
+    The priority of the internal Pouch uplink processing work queue.
+
+config POUCH_AUTH_TAG_LEN
+  int
+  default 16 if POUCH_ENCRYPTION_SAEAD
+  default 0
+
+# Use POUCH_COMMON over POUCH to avoid collision with port log levels
+module = POUCH_COMMON
+module-str = Pouch
+rsource "Kconfig.template.pouch_log_config"
