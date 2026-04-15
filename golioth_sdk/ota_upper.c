@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(ota_upper, CONFIG_GOLIOTH_LOG_LEVEL);
-
+#include <errno.h>
 #include <pouch/golioth/ota.h>
 #include <pouch/port.h>
+#include <string.h>
 
 #include "ota.h"
+
+POUCH_LOG_REGISTER(ota_upper, CONFIG_GOLIOTH_LOG_LEVEL);
 
 /* Public interface to application */
 
@@ -50,10 +51,10 @@ int golioth_ota_mark_updating(const char *name)
 
 int golioth_ota_manifest_receive_one(const struct golioth_ota_component *component)
 {
-    LOG_DBG("Received one component:");
-    LOG_DBG("  package: %s", component->package);
-    LOG_DBG("  version: %s", component->version);
-    LOG_DBG("  size: %d", component->size);
+    POUCH_LOG_DBG("Received one component:");
+    POUCH_LOG_DBG("  package: %s", component->package);
+    POUCH_LOG_DBG("  version: %s", component->version);
+    POUCH_LOG_DBG("  size: %d", component->size);
 
     POUCH_STRUCT_SECTION_FOREACH(golioth_ota_registered_component, registered)
     {
@@ -101,7 +102,7 @@ int golioth_ota_receive_component(const char *name,
                                   size_t len,
                                   bool is_last)
 {
-    LOG_DBG("Received %d bytes at offset %d for %s@%s", len, offset, name, version);
+    POUCH_LOG_DBG("Received %zu bytes at offset %zu for %s@%s", len, offset, name, version);
 
     POUCH_STRUCT_SECTION_FOREACH(golioth_ota_registered_component, registered)
     {
@@ -113,7 +114,7 @@ int golioth_ota_receive_component(const char *name,
             }
             else
             {
-                LOG_WRN("Dropping OTA data for %s, download not requested", name);
+                POUCH_LOG_WRN("Dropping OTA data for %s, download not requested", name);
                 return -EINVAL;
             }
         }
