@@ -1,19 +1,28 @@
 zephyr_library()
 
-zephyr_library_sources(bt/bond.c)
-zephyr_library_sources(bt/connect.c)
-zephyr_library_sources(bt/device_cert.c)
-zephyr_library_sources(bt/downlink.c)
-zephyr_library_sources(bt/info.c)
-zephyr_library_sources(bt/scan.c)
-zephyr_library_sources(bt/server_cert.c)
-zephyr_library_sources(bt/uplink.c)
-zephyr_library_sources(block.c)
-zephyr_library_sources(cert.c)
-zephyr_library_sources(downlink.c)
-zephyr_library_sources(info.c)
-zephyr_library_sources(info_decode.c)
-zephyr_library_sources(uplink.c)
+zephyr_library_sources(
+    block.c
+    cert.c
+    downlink.c
+    info.c
+    info_decode.c
+    uplink.c
+)
+zephyr_library_sources(
+    ${ZEPHYR_POUCH_MODULE_DIR}/src/transport/endpoints/broker/info.c
+    ${ZEPHYR_POUCH_MODULE_DIR}/src/transport/endpoints/broker/uplink.c
+    ${ZEPHYR_POUCH_MODULE_DIR}/src/transport/endpoints/broker/downlink.c
+    ${ZEPHYR_POUCH_MODULE_DIR}/src/transport/endpoints/broker/device_cert.c
+    ${ZEPHYR_POUCH_MODULE_DIR}/src/transport/endpoints/broker/server_cert.c
+    ${ZEPHYR_POUCH_MODULE_DIR}/src/transport/sar/packet.c
+    ${ZEPHYR_POUCH_MODULE_DIR}/src/transport/sar/receiver.c
+    ${ZEPHYR_POUCH_MODULE_DIR}/src/transport/sar/sender.c
+    ${ZEPHYR_POUCH_MODULE_DIR}/port/zephyr/transport/gatt/broker/bond.c
+    ${ZEPHYR_POUCH_MODULE_DIR}/port/zephyr/transport/gatt/broker/discover.c
+    ${ZEPHYR_POUCH_MODULE_DIR}/port/zephyr/transport/gatt/broker/broker.c
+    ${ZEPHYR_POUCH_MODULE_DIR}/port/zephyr/transport/gatt/broker/scan.c
+)
+zephyr_library_include_directories(${ZEPHYR_POUCH_MODULE_DIR}/src)
 
 zephyr_library_link_libraries(mbedTLS)
 

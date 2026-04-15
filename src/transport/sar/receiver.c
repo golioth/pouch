@@ -7,10 +7,10 @@
 #include <errno.h>
 #include "receiver.h"
 #include "packet.h"
+#include <pouch/port.h>
 #include <zephyr/kernel.h>
 
-#include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(pouch_receiver, CONFIG_POUCH_TRANSPORT_LOG_LEVEL);
+POUCH_LOG_REGISTER(pouch_receiver, CONFIG_POUCH_TRANSPORT_LOG_LEVEL);
 
 enum state
 {
@@ -21,12 +21,14 @@ enum state
 
 static void end(struct pouch_receiver *p, bool success)
 {
-    LOG_DBG("Ending transfer %p: %s", p, success ? "success" : "fail");
+    POUCH_LOG_DBG("Ending transfer %p: %s", p, success ? "success" : "fail");
     if (p->endpoint->end)
     {
-        p->endpoint->end(success);
+        p->endpoint->end(p->bearer, success);
     }
     p->state = success ? STATE_IDLE : STATE_FAILED;
+
+    pouch_bearer_close(p->bearer, success);
 }
 
 static void schedule_ack(struct pouch_receiver *p)
@@ -43,17 +45,17 @@ static void send_ack(struct k_work *work)
         .code =
             p->state == STATE_FAILED ? POUCH_RECEIVER_CODE_NACK_UNKNOWN : POUCH_RECEIVER_CODE_ACK,
         .seq = p->seq,
-        .window = p->bearer->window,
+        .window = p->window,
     };
     pouch_sar_rx_pkt_encode(&ack, buf);
 
-    LOG_DBG("Sending ack (0x%x window: %u)", ack.seq, ack.window);
+    POUCH_LOG_DBG("Sending ack (0x%x window: %u)", ack.seq, ack.window);
 
     int err = pouch_bearer_send(p->bearer, buf, sizeof(buf));
     if (err)
     {
         // try again later:
-        LOG_ERR("TX failed (%d)", err);
+        POUCH_LOG_ERR("TX failed (%d)", err);
         schedule_ack(p);
         return;
     }
@@ -62,18 +64,19 @@ static void send_ack(struct k_work *work)
     p->ack = ack.seq;
 }
 
-int pouch_receiver_open(struct pouch_receiver *recv, struct pouch_bearer *bearer)
+int pouch_receiver_open(struct pouch_receiver *recv, struct pouch_bearer *bearer, uint8_t window)
 {
-    LOG_DBG("Starting transfer %p", recv);
+    POUCH_LOG_DBG("Starting transfer %p", recv);
 
     recv->bearer = bearer;
+    recv->window = window;
     recv->seq = POUCH_SAR_SEQ_MAX;
     recv->state = STATE_ACTIVE;
     k_work_init_delayable(&recv->work, send_ack);
 
     if (recv->endpoint->start != NULL)
     {
-        int err = recv->endpoint->start();
+        int err = recv->endpoint->start(recv->bearer);
         if (err)
         {
             // not calling end() here, as transfer never started:
@@ -93,36 +96,36 @@ int pouch_receiver_recv(struct pouch_receiver *recv, const uint8_t *buf, size_t 
     int err = pouch_sar_tx_pkt_decode(buf, len, &pkt);
     if (err)
     {
-        LOG_ERR("Decode failed (%d)", err);
+        POUCH_LOG_ERR("Decode failed (%d)", err);
         end(recv, false);
         return err;
     }
 
     if (pkt.flags & POUCH_SAR_TX_PKT_FLAG_FIN)
     {
-        LOG_DBG("recv FIN");
+        POUCH_LOG_DBG("recv FIN");
         end(recv, true);
         return 0;
     }
 
     if (recv->state != STATE_ACTIVE)
     {
-        LOG_ERR("Invalid state (%u)", recv->state);
+        POUCH_LOG_ERR("Invalid state (%u)", recv->state);
         return -EBUSY;
     }
 
     if (pkt.seq != ((recv->seq + 1) & POUCH_SAR_SEQ_MASK))
     {
-        LOG_ERR("OoO RX: %x (last: %x)", pkt.seq, recv->seq);
+        POUCH_LOG_ERR("OoO RX: %x (last: %x)", pkt.seq, recv->seq);
         end(recv, false);
         k_work_reschedule(&recv->work, K_NO_WAIT);  // NACK
         return -EINVAL;
     }
 
-    err = recv->endpoint->recv(pkt.data, pkt.len);
+    err = recv->endpoint->recv(recv->bearer, pkt.data, pkt.len);
     if (err)
     {
-        LOG_ERR("RX callback failed: %d", err);
+        POUCH_LOG_ERR("RX callback failed: %d", err);
         end(recv, false);
         k_work_reschedule(&recv->work, K_NO_WAIT);  // NACK
         return err;
@@ -136,9 +139,14 @@ int pouch_receiver_recv(struct pouch_receiver *recv, const uint8_t *buf, size_t 
     return 0;
 }
 
+void pouch_receiver_ready(struct pouch_receiver *recv)
+{
+    k_work_reschedule(&recv->work, K_NO_WAIT);
+}
+
 void pouch_receiver_close(struct pouch_receiver *recv)
 {
-    LOG_DBG("Finished transfer %p", recv);
+    POUCH_LOG_DBG("Finished transfer %p", recv);
 
     k_work_cancel_delayable(&recv->work);
 

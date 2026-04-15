@@ -13,9 +13,9 @@
 
 #include "block.h"
 #include <pouch/gateway/downlink.h>
+#include <pouch/port.h>
 
-#include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(downlink, CONFIG_POUCH_GATEWAY_LOG_LEVEL);
+POUCH_LOG_REGISTER(downlink, CONFIG_POUCH_GATEWAY_LOG_LEVEL);
 
 enum
 {
@@ -64,7 +64,7 @@ enum golioth_status pouch_gateway_downlink_block_cb(const uint8_t *data,
     struct block *block = block_alloc(NULL, K_SECONDS(CONFIG_POUCH_GATEWAY_DOWNLINK_BLOCK_TIMEOUT));
     if (NULL == block)
     {
-        LOG_ERR("Failed to allocate block");
+        POUCH_LOG_ERR("Failed to allocate block");
         return GOLIOTH_ERR_MEM_ALLOC;
     }
 
@@ -93,10 +93,12 @@ void pouch_gateway_downlink_end_cb(enum golioth_status status,
 
     if (GOLIOTH_OK != status)
     {
-        LOG_ERR("Downlink ending due to error %d", status);
+        POUCH_LOG_ERR("Downlink ending due to error %d", status);
         if (GOLIOTH_ERR_COAP_RESPONSE == status)
         {
-            LOG_ERR("CoAP error: %d.%02d", coap_rsp_code->code_class, coap_rsp_code->code_detail);
+            POUCH_LOG_ERR("CoAP error: %d.%02d",
+                          coap_rsp_code->code_class,
+                          coap_rsp_code->code_detail);
         }
 
         /* If transport already aborted, close downlink */
@@ -124,7 +126,7 @@ struct pouch_gateway_downlink_context *pouch_gateway_downlink_open(
     pouch_gateway_downlink_data_available_cb data_available_cb,
     void *cb_arg)
 {
-    LOG_INF("Starting downlink");
+    POUCH_LOG_INF("Starting downlink");
 
     struct pouch_gateway_downlink_context *downlink =
         malloc(sizeof(struct pouch_gateway_downlink_context));
@@ -180,7 +182,8 @@ int pouch_gateway_downlink_get_data(struct pouch_gateway_downlink_context *downl
                        notify them the next time we receive a block */
                     atomic_set_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING);
                 }
-                return -EAGAIN;
+
+                return 0;
             }
         }
 
@@ -232,7 +235,7 @@ void pouch_gateway_downlink_close(struct pouch_gateway_downlink_context *downlin
 
 void pouch_gateway_downlink_abort(struct pouch_gateway_downlink_context *downlink)
 {
-    LOG_INF("Aborting downlink");
+    POUCH_LOG_INF("Aborting downlink");
 
     /* Downlink will be aborted after the current in flight CoAP
        block request is completed. */

@@ -11,14 +11,14 @@
 #include <psa/crypto.h>
 
 #include <pouch/gateway/cert.h>
+#include <pouch/port.h>
 
 #include <golioth/gateway.h>
 #include <golioth/golioth_status.h>
 
 #include <zephyr/sys/atomic_types.h>
 
-#include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(cert, CONFIG_POUCH_GATEWAY_LOG_LEVEL);
+POUCH_LOG_REGISTER(cert, CONFIG_POUCH_GATEWAY_LOG_LEVEL);
 
 static struct golioth_client *_client;
 
@@ -110,7 +110,7 @@ int pouch_gateway_device_cert_finish(struct pouch_gateway_device_cert_context *c
                                                  5);
         if (status != GOLIOTH_OK)
         {
-            LOG_ERR("Failed to finish device cert: %d", status);
+            POUCH_LOG_ERR("Failed to finish device cert: %d", status);
             return -EIO;
         }
 
@@ -118,7 +118,7 @@ int pouch_gateway_device_cert_finish(struct pouch_gateway_device_cert_context *c
 
         if (ctx.status != GOLIOTH_OK)
         {
-            LOG_ERR("Failed to set cert: %d", ctx.status);
+            POUCH_LOG_ERR("Failed to set cert: %d", ctx.status);
             return -EIO;
         }
     }
@@ -158,13 +158,13 @@ static int server_crt_update(size_t len)
     int ret = mbedtls_x509_crt_parse(&cert_chain, server_crt_buf, len);
     if (ret < 0)
     {
-        LOG_ERR("Failed to parse certificate: 0x%x", -ret);
+        POUCH_LOG_ERR("Failed to parse certificate: 0x%x", -ret);
         mbedtls_x509_crt_free(&cert_chain);
 
         return -EIO;
     }
 
-    LOG_HEXDUMP_DBG(cert_chain.serial.p, cert_chain.serial.len, "cert_chain.serial");
+    POUCH_LOG_HEXDUMP(cert_chain.serial.p, cert_chain.serial.len, "cert_chain.serial");
 
     memcpy(server_crt_serial, cert_chain.serial.p, cert_chain.serial.len);
     atomic_set(&server_crt_serial_len, cert_chain.serial.len);
@@ -241,7 +241,7 @@ void pouch_gateway_cert_module_on_connected(struct golioth_client *client)
         status = golioth_gateway_server_cert_get(client, server_crt_buf, &len);
         if (status != GOLIOTH_OK)
         {
-            LOG_ERR("Failed to download server certificate: %d", status);
+            POUCH_LOG_ERR("Failed to download server certificate: %d", status);
             return;
         }
 
@@ -256,8 +256,8 @@ void pouch_gateway_cert_module_on_connected(struct golioth_client *client)
         memcpy(server_crt_buf, server_crt_offline, sizeof(server_crt_offline));
         server_crt_update(sizeof(server_crt_offline));
 
-        LOG_INF("Loaded builtin server cert");
+        POUCH_LOG_INF("Loaded builtin server cert");
     }
 
-    LOG_HEXDUMP_DBG(server_crt_buf, atomic_get(&server_crt_len), "Server certificate");
+    POUCH_LOG_HEXDUMP(server_crt_buf, atomic_get(&server_crt_len), "Server certificate");
 }
