@@ -10,6 +10,7 @@
 #include "stream.h"
 #include "crypto.h"
 
+#include <errno.h>
 #include <pouch/uplink.h>
 #include <pouch/events.h>
 #include <pouch/port.h>

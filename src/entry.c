@@ -8,6 +8,7 @@
 #include "block.h"
 #include "uplink.h"
 
+#include <errno.h>
 #include <string.h>
 #include <stdio.h>
 

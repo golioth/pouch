@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <errno.h>
 #include <mbedtls/base64.h>
 #include <pouch/port.h>
 #include <psa/crypto.h>

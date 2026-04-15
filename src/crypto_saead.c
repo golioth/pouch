@@ -5,6 +5,7 @@
  */
 
 #include "crypto.h"
+#include <errno.h>
 #include "saead/uplink.h"
 #include "saead/downlink.h"
 #include "cert.h"
