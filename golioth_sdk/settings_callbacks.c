@@ -7,6 +7,7 @@
 #include <pouch/port.h>
 POUCH_LOG_REGISTER(settings_callbacks, CONFIG_GOLIOTH_LOG_LEVEL);
 
+#include <errno.h>
 #include <stddef.h>
 #include "settings.h"
 
@@ -36,7 +37,7 @@ int golioth_settings_receive_one(const struct setting_value *value)
                     return setting->string_cb(value->str_val.data, value->str_val.len);
 
                 default:
-                    LOG_ERR("Unknown settings type");
+                    POUCH_LOG_ERR("Unknown settings type");
                     break;
             }
         }
