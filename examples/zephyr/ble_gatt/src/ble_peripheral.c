@@ -12,8 +12,7 @@ LOG_MODULE_REGISTER(example_ble_peripheral);
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 
-#include <pouch/transport/gatt/common/types.h>
-#include <pouch/types.h>
+#include <pouch/transport/bluetooth/gatt.h>
 
 static struct bt_conn *default_conn;
 

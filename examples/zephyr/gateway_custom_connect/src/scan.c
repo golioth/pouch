@@ -8,8 +8,7 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/uuid.h>
 
-#include <pouch/transport/gatt/common/types.h>
-#include <pouch/transport/gatt/common/uuids.h>
+#include <pouch/transport/bluetooth/gatt.h>
 
 #include <pouch/gateway/bt/bond.h>
 #include "scan.h"

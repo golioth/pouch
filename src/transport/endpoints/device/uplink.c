@@ -11,7 +11,7 @@
 
 static struct pouch_uplink *uplink;
 
-static int start(void)
+static int start(struct pouch_bearer *bearer)
 {
     uplink = pouch_uplink_start();
     if (uplink == NULL)
@@ -22,7 +22,7 @@ static int start(void)
     return 0;
 }
 
-static enum pouch_result send(void *dst, size_t *dst_len)
+static enum pouch_result send(struct pouch_bearer *bearer, void *dst, size_t *dst_len)
 {
     if (uplink == NULL)
     {
@@ -32,7 +32,7 @@ static enum pouch_result send(void *dst, size_t *dst_len)
     return pouch_uplink_fill(uplink, dst, dst_len);
 }
 
-static void end(bool success)
+static void end(struct pouch_bearer *bearer, bool success)
 {
     pouch_uplink_finish(uplink);
     uplink = NULL;
