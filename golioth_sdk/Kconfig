@@ -52,8 +52,8 @@ config GOLIOTH_OTA_MAX_VERSION_LEN
 
 endif
 
-config GOLIOTH_LOG_LEVEL
-  int "Maximum log level"
-  default 4
+module = GOLIOTH
+module-str = Golioth
+rsource "../src/Kconfig.template.pouch_log_config"
 
 endif
