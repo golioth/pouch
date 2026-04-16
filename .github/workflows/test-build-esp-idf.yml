@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-port-test:
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -19,3 +19,25 @@ jobs:
           esp_idf_version: v5.4.1
           target: esp32s3
           path: port/esp_idf/test/port_features
+
+  build-example:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build esp32s3
+        uses: espressif/esp-idf-ci-action@e6f5c74232b1ccd4c97ed641f1e48553853f1fd5 # v1.2.0
+        with:
+          esp_idf_version: v5.4.1
+          target: esp32s3
+          command: |
+            EXAMPLE_APP_PATH=port/esp_idf/test/http_client
+
+            pip install -r requirements.txt
+
+            idf.py -C $EXAMPLE_APP_PATH build
