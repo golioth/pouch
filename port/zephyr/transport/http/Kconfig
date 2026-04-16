@@ -8,6 +8,7 @@ menu "HTTP Transport Options"
 
 config POUCH_HTTP_GW_URI
     string "Pouch gateway address"
+    default "$(CONFIG_POUCH_HTTP_GW_URI)" if "$(CONFIG_POUCH_HTTP_GW_URI)" != ""
     default "gw.golioth.io"
     help
         URI address of the HTTP gateway
