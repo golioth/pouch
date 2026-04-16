@@ -10,6 +10,8 @@
 #include <pouch/pouch.h>
 
 #include "credentials.h"
+#include "http_client.h"
+#include "mtls_type.h"
 #include "nvs_flash.h"
 #include "wifi.h"
 
@@ -33,6 +35,10 @@ void app_main(void)
     ESP_LOGI(TAG, "Initializing WiFi");
     wifi_init_sta();
 
+    struct mtls_credentials mtls_creds;
+    fill_mtls_credentials(&mtls_creds);
+    http_client_transport_init(&mtls_creds);
+
     struct pouch_config config = {0};
     int err = fill_pouch_config(&config);
     if (0 != err)
@@ -48,4 +54,6 @@ void app_main(void)
         return;
     }
     ESP_LOGI(TAG, "Pouch successfully initialized");
+
+    http_client_transport_sync();
 }
