@@ -5,6 +5,7 @@
 list(APPEND EXAMPLE_SRCS
         "credentials.c"
         "main.c"
+        "wifi.c"
 )
 
 list(APPEND EXAMPLE_EMBEDS
@@ -19,5 +20,7 @@ idf_component_register(SRCS
                          ${EXAMPLE_EMBEDS}
 
                        REQUIRES
+                         esp_wifi
+                         nvs_flash
                          pouch
                        )
