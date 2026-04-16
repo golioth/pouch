@@ -15,7 +15,7 @@
 #include <pouch/downlink.h>
 #include <pouch/port.h>
 
-POUCH_LOG_REGISTER(entry, CONFIG_POUCH_LOG_LEVEL);
+POUCH_LOG_REGISTER(entry, CONFIG_POUCH_COMMON_LOG_LEVEL);
 
 #define ENTRY_HEADER_OVERHEAD 5
 

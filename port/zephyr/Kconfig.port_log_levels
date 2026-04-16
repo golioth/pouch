@@ -26,7 +26,7 @@ config POUCH_LOG_LEVEL_VERBOSE
     int
     default 4   # LOG_LEVEL_DBG
 
-config POUCH_LOG_LEVEL_DEFAULT
+config POUCH_LOG_DEFAULT_LEVEL
     int
     default POUCH_LOG_LEVEL_NONE if !LOG
     default LOG_DEFAULT_LEVEL

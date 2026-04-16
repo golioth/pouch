@@ -171,11 +171,10 @@ endmenu
 # Transport choices
 rsource "transport/Kconfig"
 
-config POUCH_LOG_LEVEL
-  int "Default log level"
-  default POUCH_LOG_LEVEL_INF
-  help
-    The maximum log level used by pouch module
+# Use POUCH_COMMON over POUCH to avoid collision with port log levels
+module = POUCH_COMMON
+module-str = Pouch
+rsource "../../src/Kconfig.template.pouch_log_config"
 
 endif
 

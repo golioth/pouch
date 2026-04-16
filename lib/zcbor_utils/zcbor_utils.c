@@ -5,7 +5,7 @@
  */
 
 #include <pouch/port.h>
-POUCH_LOG_REGISTER(zcbor_util, CONFIG_POUCH_LOG_LEVEL);
+POUCH_LOG_REGISTER(zcbor_util, CONFIG_POUCH_COMMON_LOG_LEVEL);
 
 #include <zcbor_utils.h>
 
