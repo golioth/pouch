@@ -13,7 +13,7 @@
 #include <psa/crypto.h>
 #include <pouch/port.h>
 
-POUCH_LOG_REGISTER(saead_uplink, CONFIG_POUCH_LOG_LEVEL);
+POUCH_LOG_REGISTER(saead_uplink, CONFIG_POUCH_COMMON_LOG_LEVEL);
 
 static struct session uplink;
 

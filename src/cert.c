@@ -11,7 +11,7 @@
 #include <pouch/transport/certificate.h>
 #include <string.h>
 
-POUCH_LOG_REGISTER(cert, CONFIG_POUCH_LOG_LEVEL);
+POUCH_LOG_REGISTER(cert, CONFIG_POUCH_COMMON_LOG_LEVEL);
 
 #if IS_ENABLED(CONFIG_POUCH_VALIDATE_SERVER_CERT)
 #include <pouch/pouch_ca_cert.h>

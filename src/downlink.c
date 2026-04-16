@@ -20,7 +20,7 @@
 #include "downlink.h"
 #include "entry.h"
 
-POUCH_LOG_REGISTER(downlink, CONFIG_POUCH_LOG_LEVEL);
+POUCH_LOG_REGISTER(downlink, CONFIG_POUCH_COMMON_LOG_LEVEL);
 
 static struct pouch_buf *encrypted;
 static bool pouch_header;

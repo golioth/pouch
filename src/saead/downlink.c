@@ -13,7 +13,7 @@
 #include <pouch/port.h>
 #include <psa/crypto.h>
 
-POUCH_LOG_REGISTER(saead_downlink, CONFIG_POUCH_LOG_LEVEL);
+POUCH_LOG_REGISTER(saead_downlink, CONFIG_POUCH_COMMON_LOG_LEVEL);
 
 #define DOWNLINK_KEY_USAGE (PSA_KEY_USAGE_DECRYPT | PSA_KEY_USAGE_VERIFY_MESSAGE)
 
