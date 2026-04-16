@@ -1,4 +1,4 @@
-name: "BabbleSim integration tests"
+name: "Native Simulator and BabbleSim integration tests"
 
 on:
   workflow_dispatch:
@@ -41,7 +41,7 @@ on:
         type: string
 
 jobs:
-  bsim:
+  nsim:
     container: golioth/golioth-zephyr-base:0.17.0-SDK-v0
     env:
       ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-0.17.0
@@ -86,13 +86,20 @@ jobs:
       - name: Build and run
         shell: bash
         run: |
+          COAP_HOST="${{ inputs.coap_gateway_url }}"
+          COAP_HOST="${COAP_HOST#coaps://}"
+          COAP_HOST="${COAP_HOST#coap://}"
+
           export CONFIG_GOLIOTH_COAP_HOST_URI="${{ inputs.coap_gateway_url }}"
+          export CONFIG_POUCH_HTTP_GW_URI="gw.${COAP_HOST#coap.}"
+          export CONFIG_POUCH_SERVER_CERT_CN="pouch.${COAP_HOST#coap.}"
 
           zephyr/scripts/twister                                                  \
             -c -v -W                                                              \
+            -p native_sim                                                         \
+            -p native_sim/native/64                                               \
             -p nrf52_bsim/native                                                  \
-            -T pouch/examples/gateway/                                            \
-            -T pouch/examples/gateway_custom_connect                              \
+            -T pouch/examples/                                                    \
             --pytest-args="--api-url=${{ inputs.api_url }}"                       \
             --pytest-args="--api-key=${{ secrets[inputs.api_key_id] }}"
 
