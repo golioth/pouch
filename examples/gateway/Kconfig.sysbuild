@@ -15,6 +15,7 @@ config POUCH_GATEWAY_CLOUD
 
 config GOLIOTH_COAP_HOST_URI
 	string "CoAP server URI"
+	default "$(CONFIG_GOLIOTH_COAP_HOST_URI)" if "$(CONFIG_GOLIOTH_COAP_HOST_URI)" != ""
 	default "coaps://coap.golioth.io"
 	help
 	  The URI of the CoAP server.
