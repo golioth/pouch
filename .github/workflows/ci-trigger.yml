@@ -28,9 +28,9 @@ jobs:
     name: Run Twister
     uses: ./.github/workflows/test-twister.yml
     secrets: inherit
-  trigger-bsim:
-    name: Run BabbleSim Tests
-    uses: ./.github/workflows/test-bsim.yml
+  trigger-nsim:
+    name: Run Native Simulator and BabbleSim Tests
+    uses: ./.github/workflows/test-nsim.yml
     with:
       api_url: "https://api.golioth.io"
       api_key_id: "PROD_CI_PROJECT_API_KEY"
@@ -41,7 +41,7 @@ jobs:
     if: success() || failure()
     needs:
       - trigger-twister
-      - trigger-bsim
+      - trigger-nsim
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
