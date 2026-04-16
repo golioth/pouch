@@ -13,6 +13,9 @@ menuconfig POUCH
     Pouch is a protocol for communicating with Golioth from devices not
     directly connected to the internet.
 
+# Port-specific log-level constants
+rsource "Kconfig.port_log_levels"
+
 if POUCH
 
 config POUCH_BLOCK_SIZE
@@ -168,9 +171,11 @@ endmenu
 # Transport choices
 rsource "transport/Kconfig"
 
-module = POUCH
-module-str = Pouch
-source "subsys/logging/Kconfig.template.log_config"
+config POUCH_LOG_LEVEL
+  int "Default log level"
+  default POUCH_LOG_LEVEL_INF
+  help
+    The maximum log level used by pouch module
 
 endif
 

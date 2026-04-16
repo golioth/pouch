@@ -1,0 +1,31 @@
+# Copyright (c) 2026 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+config POUCH_LOG_LEVEL_NONE
+    int
+    default 0   # ESP_LOG_NONE
+
+config POUCH_LOG_LEVEL_ERR
+    int
+    default 1   # ESP_LOG_ERROR
+
+config POUCH_LOG_LEVEL_WRN
+    int
+    default 2   # ESP_LOG_WARN
+
+config POUCH_LOG_LEVEL_INF
+    int
+    default 3   # ESP_LOG_INFO
+
+config POUCH_LOG_LEVEL_DBG
+    int
+    default 4   # ESP_LOG_DEBUG
+
+config POUCH_LOG_LEVEL_VERBOSE
+    int
+    default 5   # ESP_LOG_VERBOSE
+
+config POUCH_LOG_DEFAULT_LEVEL
+    int
+    default LOG_DEFAULT_LEVEL

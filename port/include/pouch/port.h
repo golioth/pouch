@@ -436,12 +436,14 @@ pouch_slist_node_t *pouch_slist_peek_head(pouch_slist_t *list);
  *------------------------------------------------*/
 
 /** Log Level Defines */
-#define POUCH_LOG_LEVEL_NONE POUCH_LOG_LEVEL_NONE_INTERNAL
-#define POUCH_LOG_LEVEL_ERR POUCH_LOG_LEVEL_ERR_INTERNAL
-#define POUCH_LOG_LEVEL_WRN POUCH_LOG_LEVEL_WRN_INTERNAL
-#define POUCH_LOG_LEVEL_INF POUCH_LOG_LEVEL_INF_INTERNAL
-#define POUCH_LOG_LEVEL_DBG POUCH_LOG_LEVEL_DBG_INTERNAL
-#define POUCH_LOG_LEVEL_VERBOSE POUCH_LOG_LEVEL_VERBOSE_INTERNAL
+
+/* NOTE: platform log levels need to be set in a Kconfig file sourced by your build system */
+#define POUCH_LOG_LEVEL_NONE CONFIG_POUCH_LOG_LEVEL_NONE
+#define POUCH_LOG_LEVEL_ERR CONFIG_POUCH_LOG_LEVEL_ERR
+#define POUCH_LOG_LEVEL_WRN CONFIG_POUCH_LOG_LEVEL_WRN
+#define POUCH_LOG_LEVEL_INF CONFIG_POUCH_LOG_LEVEL_INF
+#define POUCH_LOG_LEVEL_DBG CONFIG_POUCH_LOG_LEVEL_DBG
+#define POUCH_LOG_LEVEL_VERBOSE CONFIG_POUCH_LOG_LEVEL_VERBOSE
 
 /** Register the file with the logging system
  *
