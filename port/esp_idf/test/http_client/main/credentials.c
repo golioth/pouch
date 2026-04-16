@@ -17,7 +17,7 @@ extern const char device_crt_der_end[] asm("_binary_placeholder_device_crt_der_e
 extern const char device_key_der_start[] asm("_binary_placeholder_device_key_der_start");
 extern const char device_key_der_end[] asm("_binary_placeholder_device_key_der_end");
 
-static mbedtls_svc_key_id_t _device_key_id;
+static mbedtls_svc_key_id_t _device_key_id = PSA_KEY_ID_NULL;
 
 int get_device_cert(struct pouch_cert *cert)
 {
@@ -27,8 +27,13 @@ int get_device_cert(struct pouch_cert *cert)
     return 0;
 }
 
-int load_device_pk(void)
+static int load_device_pk(mbedtls_svc_key_id_t *key_id)
 {
+    if (PSA_KEY_ID_NULL != *key_id)
+    {
+        return 0;
+    }
+
     psa_crypto_init();
     mbedtls_pk_context pk;
     mbedtls_pk_init(&pk);
@@ -52,7 +57,7 @@ int load_device_pk(void)
     psa_set_key_type(&attrs, PSA_KEY_TYPE_ECC_KEY_PAIR(PSA_ECC_FAMILY_SECP_R1));
     psa_set_key_usage_flags(&attrs, PSA_KEY_USAGE_DERIVE);
 
-    err = mbedtls_pk_import_into_psa(&pk, &attrs, &_device_key_id);
+    err = mbedtls_pk_import_into_psa(&pk, &attrs, key_id);
     if (err)
     {
         ESP_LOGE(TAG, "Failed to import private key: -0x%" PRIx32, (uint32_t) -err);
@@ -76,7 +81,7 @@ int fill_pouch_config(struct pouch_config *config)
         return err;
     }
 
-    err = load_device_pk();
+    err = load_device_pk(&_device_key_id);
     if (0 != err)
     {
         ESP_LOGE(TAG, "Failed to load device key");
