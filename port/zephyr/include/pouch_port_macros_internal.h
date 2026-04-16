@@ -77,13 +77,6 @@ typedef sys_snode_t pouch_slist_node_internal_t;
 #include <zephyr/logging/log.h>
 #include <zephyr/logging/log_ctrl.h>
 
-#define POUCH_LOG_LEVEL_NONE_INTERNAL LOG_LEVEL_NONE
-#define POUCH_LOG_LEVEL_ERR_INTERNAL LOG_LEVEL_ERR
-#define POUCH_LOG_LEVEL_WRN_INTERNAL LOG_LEVEL_WRN
-#define POUCH_LOG_LEVEL_INF_INTERNAL LOG_LEVEL_INF
-#define POUCH_LOG_LEVEL_DBG_INTERNAL LOG_LEVEL_DBG
-#define POUCH_LOG_LEVEL_VERBOSE_INTERNAL LOG_LEVEL_DBG
-
 /* The Zephyr port doesn't use POUCH_LOG_TAG but it needs to be defined for macros to work */
 #define POUCH_LOG_TAG
 
