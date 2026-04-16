@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Based on Zephyr's Kconfig.template.log_config:
+# https://github.com/zephyrproject-rtos/zephyr/blob/v4.3.0/subsys/logging/Kconfig.template.log_config
+
+# Example usage in a Kconfig file:
+#
+#   module = MY_MODULE_NAME
+#   module-str = My Module Name
+#   rsource "path_to_pouch/src/Kconfig.template.pouch_log_config"
+#
+
+choice "$(module)_LOG_LEVEL_CHOICE"
+	prompt "Max compiled-in log level for $(module-str)"
+	default $(module)_LOG_LEVEL_DEFAULT
+
+config $(module)_LOG_LEVEL_OFF
+	bool "Off"
+
+config $(module)_LOG_LEVEL_ERR
+	bool "Error"
+
+config $(module)_LOG_LEVEL_WRN
+	bool "Warning"
+
+config $(module)_LOG_LEVEL_INF
+	bool "Info"
+
+config $(module)_LOG_LEVEL_DBG
+	bool "Debug"
+
+config $(module)_LOG_LEVEL_VERBOSE
+	bool "Verbose"
+
+config $(module)_LOG_LEVEL_DEFAULT
+	bool "Default"
+
+endchoice
+
+config $(module)_LOG_LEVEL
+	int
+	default POUCH_LOG_LEVEL_NONE if $(module)_LOG_LEVEL_OFF
+	default POUCH_LOG_LEVEL_ERR if $(module)_LOG_LEVEL_ERR
+	default POUCH_LOG_LEVEL_WRN if $(module)_LOG_LEVEL_WRN
+	default POUCH_LOG_LEVEL_INF if $(module)_LOG_LEVEL_INF
+	default POUCH_LOG_LEVEL_DBG if $(module)_LOG_LEVEL_DBG
+	default POUCH_LOG_LEVEL_VERBOSE if $(module)_LOG_LEVEL_VERBOSE
+	default POUCH_LOG_DEFAULT_LEVEL if $(module)_LOG_LEVEL_DEFAULT
