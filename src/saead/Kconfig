@@ -13,6 +13,7 @@ menuconfig POUCH_VALIDATE_SERVER_CERT
 
 config POUCH_SERVER_CERT_CN
   string "Server certificate common name"
+  default "$(CONFIG_POUCH_SERVER_CERT_CN)" if "$(CONFIG_POUCH_SERVER_CERT_CN)" != ""
   default "pouch.golioth.io"
   help
     The expected common name or subject alternative name for the

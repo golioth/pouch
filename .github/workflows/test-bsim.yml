@@ -86,14 +86,15 @@ jobs:
       - name: Build and run
         shell: bash
         run: |
+          export CONFIG_GOLIOTH_COAP_HOST_URI="${{ inputs.coap_gateway_url }}"
+
           zephyr/scripts/twister                                                  \
             -c -v -W                                                              \
             -p nrf52_bsim/native                                                  \
             -T pouch/examples/gateway/                                            \
             -T pouch/examples/gateway_custom_connect                              \
             --pytest-args="--api-url=${{ inputs.api_url }}"                       \
-            --pytest-args="--api-key=${{ secrets[inputs.api_key_id] }}"           \
-            -x SB_CONFIG_GOLIOTH_COAP_HOST_URI=\"${{ inputs.coap_gateway_url }}\"
+            --pytest-args="--api-key=${{ secrets[inputs.api_key_id] }}"
 
       - name: Safe upload twister artifacts
         if: success() || failure()
