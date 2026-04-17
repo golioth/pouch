@@ -4,6 +4,8 @@ common:
   tags: bluetooth
   harness: pytest
   harness_config:
+    pytest_root:
+      - "../gateway/pytest"
     pytest_dut_scope: module
   sysbuild: true
   platform_allow:
