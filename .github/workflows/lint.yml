@@ -4,7 +4,7 @@ on:
   workflow_call:
 
 jobs:
-  lint:
+  clang-format:
     runs-on: ubuntu-24.04
 
     steps:
@@ -30,3 +30,27 @@ jobs:
               BASE=origin/$GITHUB_BASE_REF
           fi
           git clang-format --verbose --extensions c,h --diff --diffstat $BASE
+
+  ruff:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          # Fetch depth must be greater than the number of commits included in the push in order to
+          # compare against commit prior to merge. 15 is chosen as a reasonable default for the
+          # upper bound of commits in a single PR.
+          fetch-depth: 15
+
+      - name: Install ruff
+        shell: bash
+        run: pip install ruff
+
+      - name: Run ruff check
+        shell: bash
+        run: ruff check .
+
+      - name: Run ruff format check
+        shell: bash
+        run: ruff format --check .
