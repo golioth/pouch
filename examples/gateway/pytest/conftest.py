@@ -8,12 +8,19 @@ import logging
 import os
 import random
 import string
-import subprocess
+import sys
 from pathlib import Path
 from typing import Generator
 
-import pytest
-from twister_harness.device.device_adapter import DeviceAdapter
+sys.path.insert(
+    0, str(Path(__file__).resolve().parents[3] / "scripts" / "pytest-pouch")
+)
+
+pytest_plugins = ["pytest_pouch.plugin"]
+
+import pytest  # noqa: E402
+
+from twister_harness.device.device_adapter import DeviceAdapter  # noqa: E402
 
 
 def pytest_addoption(parser):
@@ -84,116 +91,31 @@ async def dut(
         device_object.close()
 
 
-@pytest.fixture(scope="session")
-def anyio_backend():
-    return "trio"
-
-
 @pytest.fixture(scope="module")
-async def creds(request: pytest.FixtureRequest, device, project):
-    creds = (
+def creds_dir(request: pytest.FixtureRequest):
+    """Override default creds_dir for gateway sysbuild layout."""
+    return (
         Path(request.config.option.build_dir)
         / "peripheral_ble_gatt_example_0"
         / "creds"
     )
 
-    creds.mkdir(mode=0o755, exist_ok=True, parents=True)
-
-    logging.info("CA private key and cert")
-
-    subprocess.run(
-        "openssl ecparam -name prime256v1 -genkey -noout -out ca.key.pem",
-        check=True,
-        shell=True,
-        cwd=creds,
-    )
-
-    subprocess.run(
-        """\
-    openssl req -x509 -new -nodes \
-        -key ca.key.pem \
-        -sha256 -subj "/C=US/CN=Root CA" \
-        -days 14 -out ca.crt.pem""",
-        check=True,
-        shell=True,
-        cwd=creds,
-    )
-
-    logging.info("Edge node private key, csr and cert")
-
-    subprocess.run(
-        f"openssl ecparam -name prime256v1 -genkey -noout -out {device.name}.key.pem",
-        check=True,
-        shell=True,
-        cwd=creds,
-    )
-
-    subprocess.run(
-        f"""\
-    openssl req -new \
-        -key {device.name}.key.pem \
-        -subj "/C=US/O={project.id}/CN={device.name}" \
-        -out {device.name}.csr.pem""",
-        check=True,
-        shell=True,
-        cwd=creds,
-    )
-
-    subprocess.run(
-        f"""\
-    openssl x509 -req \
-        -in "{device.name}.csr.pem" \
-        -CA "ca.crt.pem" \
-        -CAkey "ca.key.pem" \
-        -CAcreateserial \
-        -out "{device.name}.crt.pem" \
-        -days 500 -sha256""",
-        check=True,
-        shell=True,
-        cwd=creds,
-    )
-
-    logging.info("Convert key and cert to DER format")
-
-    subprocess.run(
-        f"openssl x509 -in {device.name}.crt.pem -outform DER -out crt.der",
-        check=True,
-        shell=True,
-        cwd=creds,
-    )
-    subprocess.run(
-        f"openssl ec -in {device.name}.key.pem -outform DER -out key.der",
-        check=True,
-        shell=True,
-        cwd=creds,
-    )
-
-    logging.info("Upload root public key to Golioth server")
-
-    with open(creds / "ca.crt.pem", "rb") as f:
-        cert_pem = f.read()
-    root_cert = await project.certificates.add(cert_pem, "root")
-    yield root_cert["data"]["id"]
-
-    await project.certificates.delete(root_cert["data"]["id"])
-
 
 @pytest.fixture(scope="module", autouse=True)
 async def setup(project, device, creds):
-    logging.info("Delete existing device-level setting")
+    logging.info("Delete existing device-level LED setting")
 
     settings = await device.settings.get_all()
     for setting in settings:
         if "deviceId" in setting and setting["key"] == "LED":
             await device.settings.delete(setting["key"])
 
-    logging.info("Ensure the project-level setting exists")
-
+    logging.info("Ensure the project-level LED setting exists")
     await project.settings.set("LED", False)
 
     yield
 
-    logging.info("Delete any existing device-level settings (cleanup)")
+    logging.info("Delete any existing device-level LED settings (cleanup)")
 
     settings = await device.settings.get_all()
     for setting in settings:
