@@ -13,7 +13,7 @@ POUCH_LOG_REGISTER(main, POUCH_LOG_LEVEL_DBG);
 
 #include <pouch/golioth/settings_callbacks.h>
 #include <string.h>
-#include "../../../../golioth_sdk/settings.h"
+#include "../../../../../golioth_sdk/settings.h"
 
 static int led_setting_cb(bool new_value)
 {

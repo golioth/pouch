@@ -18,4 +18,4 @@ jobs:
         with:
           esp_idf_version: v5.4.1
           target: esp32s3
-          path: port/esp_idf/test
+          path: port/esp_idf/test/port_features
