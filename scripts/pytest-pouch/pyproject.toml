@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling>=1.19"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pytest-pouch"
+version = "0.1.0"
+dependencies = [
+    "pytest",
+    "anyio[trio]",
+]
+classifiers = [
+    "Framework :: Pytest",
+]
+
+[project.entry-points.pytest11]
+pouch = "pytest_pouch.plugin"
