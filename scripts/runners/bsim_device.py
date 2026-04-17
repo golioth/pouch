@@ -8,12 +8,13 @@ from pathlib import Path
 
 from bsim_base import BsimBinaryRunnerBase
 
+
 class BsimDeviceBinaryRunner(BsimBinaryRunnerBase):
     """Runs the BabbleSim arbitrary application."""
 
     @classmethod
     def name(cls):
-        return 'bsim_device'
+        return "bsim_device"
 
     @classmethod
     def args_from_previous_runner(cls, previous_runner, args):
@@ -26,12 +27,12 @@ class BsimDeviceBinaryRunner(BsimBinaryRunnerBase):
     def exec_cmd(self):
         bsim_cmd = [
             self.cfg.exe_file,
-            f'-s={self.bsim_id}',
-            f'-d={self.bsim_dev}',
+            f"-s={self.bsim_id}",
+            f"-d={self.bsim_dev}",
         ] + self.bsim_args
 
         # Requires running from inside tools/bsim/bin directory in order to
         # properly access shared libraries, which are linked with relative path
         return bsim_cmd, {
-            'cwd': Path(self.cfg.exe_file).parent,
+            "cwd": Path(self.cfg.exe_file).parent,
         }

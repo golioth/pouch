@@ -6,12 +6,13 @@ flashing (running) a BabbleSim Zephyr application."""
 
 from bsim_base import BsimBinaryRunnerBase
 
+
 class BsimZephyrBinaryRunner(BsimBinaryRunnerBase):
     """Runs the BabbleSim Zephyr application."""
 
     @classmethod
     def name(cls):
-        return 'bsim_zephyr'
+        return "bsim_zephyr"
 
     @classmethod
     def args_from_previous_runner(cls, previous_runner, args):
