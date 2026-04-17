@@ -1,5 +1,16 @@
 menu "Example: Pouch HTTP Client"
 
+menu "PKI Credentials"
+
+config SERVER_CA_CERT_PEM_FILE
+    string "Server CA cert file location (PEM format)"
+    default "main/isrgrootx1_goliothrootx1.pem"
+    help
+        Relative path to the server ca cert file in PEM format. This
+        file is used by the HTTP transport to verify the server.
+
+endmenu
+
 menu "Wi-Fi Configuration"
 
     config ESP_WIFI_SSID

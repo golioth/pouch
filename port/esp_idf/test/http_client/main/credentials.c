@@ -17,6 +17,10 @@ extern const char device_crt_der_end[] asm("_binary_placeholder_device_crt_der_e
 extern const char device_key_der_start[] asm("_binary_placeholder_device_key_der_start");
 extern const char device_key_der_end[] asm("_binary_placeholder_device_key_der_end");
 
+/* Server CA Cert in PEM format for mTLS */
+extern const char server_ca_cert_pem_start[] asm("_binary_server_ca_cert_pem_start");
+extern const char server_ca_cert_pem_end[] asm("_binary_server_ca_cert_pem_end");
+
 static mbedtls_svc_key_id_t _device_key_id = PSA_KEY_ID_NULL;
 
 int get_device_cert(struct pouch_cert *cert)
