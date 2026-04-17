@@ -10,7 +10,6 @@ from pathlib import Path
 import random
 import string
 import subprocess
-import sys
 from typing import Generator
 
 import pytest
