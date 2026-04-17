@@ -40,4 +40,9 @@ jobs:
 
             pip install -r requirements.txt
 
+            echo "CONFIG_DEVICE_CRT_DER_FILE=\"main/test/placeholder_device.crt.der\"" >> \
+                  ${EXAMPLE_APP_PATH}/sdkconfig.defaults
+            echo "CONFIG_DEVICE_KEY_DER_FILE=\"main/test/placeholder_device.key.der\"" >> \
+                  ${EXAMPLE_APP_PATH}/sdkconfig.defaults
+
             idf.py -C $EXAMPLE_APP_PATH build
