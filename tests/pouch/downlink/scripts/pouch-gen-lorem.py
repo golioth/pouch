@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 
-from contextlib import contextmanager
 import json
 import struct
-
+from contextlib import contextmanager
 from itertools import batched
+
 import cbor2
 import typer
 from typing_extensions import Annotated
-
 
 LOREM_IPSUM = """\
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris varius leo sed elit rutrum, sit amet imperdiet velit suscipit. Curabitur eget iaculis quam. Quisque porta risus orci, id sodales enim ullamcorper et. Donec eleifend orci velit, vel efficitur diam hendrerit eu. Donec et tempor sapien. Fusce ultrices varius fermentum. Interdum et malesuada fames ac ante ipsum primis in faucibus. Duis maximus id elit vel rutrum. Vestibulum in turpis pharetra, venenatis dolor consequat, commodo ligula. Nunc ac mi viverra, accumsan sapien vitae, porta velit. Nam diam lacus, luctus in consectetur quis, congue eget sapien. Vivamus interdum, nisi quis viverra tempor, erat justo pulvinar urna, non condimentum tortor ligula molestie nisl. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam eu tempus quam.
@@ -43,8 +42,8 @@ def entry_stream_chunks(entry: bytes):
     flags = BLOCK_FIRST
 
     while entry:
-        chunk = entry[:BLOCK_SIZE - BLOCK_HEADER_LEN]
-        entry = entry[BLOCK_SIZE - BLOCK_HEADER_LEN:]
+        chunk = entry[: BLOCK_SIZE - BLOCK_HEADER_LEN]
+        entry = entry[BLOCK_SIZE - BLOCK_HEADER_LEN :]
 
         if len(entry) == 0:
             flags |= BLOCK_LAST
@@ -59,11 +58,15 @@ def entry_pack(entry: dict, stream: bool) -> bytes:
     if not stream:
         entry_bin += struct.pack(">H", len(entry["data"]))
 
-    entry_bin += struct.pack(">HB",
-                             CONTENT_TYPE_MAP[entry["content_type"]],
-                             len(entry["path"]))
+    entry_bin += struct.pack(
+        ">HB", CONTENT_TYPE_MAP[entry["content_type"]], len(entry["path"])
+    )
     entry_bin += entry["path"].encode("utf-8")
-    entry_bin += (entry["data"].encode("utf-8") if isinstance(entry["data"], str) else entry["data"])
+    entry_bin += (
+        entry["data"].encode("utf-8")
+        if isinstance(entry["data"], str)
+        else entry["data"]
+    )
 
     return entry_bin
 
@@ -134,11 +137,11 @@ class CInitializer:
 
 @app.command()
 def main(
-        name: Annotated[str, typer.Argument],
-        out: Annotated[typer.FileTextWrite, typer.Argument()],
-        device_name: Annotated[str, typer.Option()] = "id123",
-        length: Annotated[int, typer.Option(min=0)] = len(LOREM_IPSUM),
-        count: Annotated[int, typer.Option()] = 1,
+    name: Annotated[str, typer.Argument],
+    out: Annotated[typer.FileTextWrite, typer.Argument()],
+    device_name: Annotated[str, typer.Option()] = "id123",
+    length: Annotated[int, typer.Option(min=0)] = len(LOREM_IPSUM),
+    count: Annotated[int, typer.Option()] = 1,
 ):
     obj = {
         "device_id": device_name,
@@ -148,7 +151,8 @@ def main(
                 "content_type": "application/json",
                 "data": json.dumps({"lorem": (LOREM_IPSUM * 50)[:length]}),
             },
-        ] * count,
+        ]
+        * count,
     }
 
     # Fixed header for plaintext encoding
@@ -198,8 +202,10 @@ def main(
         with c.array("entries", cast="(const struct pouch_test_item_entry[]) "):
             for entry in obj["entries"]:
                 with c.struct(""):
-                    c.writeln(f'.path = "{entry['path']}",')
-                    c.writeln(f'.content_type = {CONTENT_TYPE_MAP[entry['content_type']]},')
+                    c.writeln(f'.path = "{entry["path"]}",')
+                    c.writeln(
+                        f".content_type = {CONTENT_TYPE_MAP[entry['content_type']]},"
+                    )
 
                     with c.byte_array("data"):
                         c.write_batched(entry["data"])
@@ -207,5 +213,5 @@ def main(
         c.writeln(f".num_entries = {len(obj['entries'])},")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app()
