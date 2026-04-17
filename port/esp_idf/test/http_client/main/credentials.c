@@ -12,10 +12,10 @@
 #include "mbedtls/psa_util.h"
 
 #define TAG "credentials"
-extern const char device_crt_der_start[] asm("_binary_placeholder_device_crt_der_start");
-extern const char device_crt_der_end[] asm("_binary_placeholder_device_crt_der_end");
-extern const char device_key_der_start[] asm("_binary_placeholder_device_key_der_start");
-extern const char device_key_der_end[] asm("_binary_placeholder_device_key_der_end");
+extern const char device_crt_der_start[] asm("_binary_device_crt_der_start");
+extern const char device_crt_der_end[] asm("_binary_device_crt_der_end");
+extern const char device_key_der_start[] asm("_binary_device_key_der_start");
+extern const char device_key_der_end[] asm("_binary_device_key_der_end");
 
 /* Server CA Cert in PEM format for mTLS */
 extern const char server_ca_cert_pem_start[] asm("_binary_server_ca_cert_pem_start");

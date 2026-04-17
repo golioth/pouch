@@ -1,5 +1,4 @@
 menu "Example: Pouch HTTP Client"
-
 menu "PKI Credentials"
 
 config SERVER_CA_CERT_PEM_FILE
@@ -8,6 +7,22 @@ config SERVER_CA_CERT_PEM_FILE
     help
         Relative path to the server ca cert file in PEM format. This
         file is used by the HTTP transport to verify the server.
+
+config DEVICE_CRT_DER_FILE
+    string "Device crt file location (DER format)"
+    default "device.crt.der"
+    help
+        Relative path to the device crt file in DER format. This file is
+        is used both by the HTTP transport (mTLS) and for Pouch
+        encryption.
+
+config DEVICE_KEY_DER_FILE
+    string "Device key file location (DER format)"
+    default "device.key.der"
+    help
+        Relative path to the device key file in DER format. This file is
+        is used both by the HTTP transport (mTLS) and for Pouch
+        encryption.
 
 endmenu
 
