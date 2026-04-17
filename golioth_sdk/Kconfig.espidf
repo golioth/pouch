@@ -1,0 +1,19 @@
+#########################
+# Golioth SDK
+#########################
+
+list(APPEND POUCH_SDK_SRCS ${POUCH_SDK}/dispatch.c)
+list(APPEND POUCH_SDK_LINKER_FILES ${POUCH_PORT}/esp_idf/dispatch.lf)
+
+if ("${CONFIG_GOLIOTH_SETTINGS}" STREQUAL "y")
+    list(APPEND POUCH_SDK_SRCS ${POUCH_SDK}/settings_callbacks.c)
+    list(APPEND POUCH_SDK_LINKER_FILES ${POUCH_PORT}/esp_idf/settings_callbacks.lf)
+endif()
+
+if ("${CONFIG_GOLIOTH_OTA}" STREQUAL "y")
+    list(APPEND POUCH_SDK_SRCS
+        ${POUCH_SDK}/ota.c
+        ${POUCH_SDK}/ota_upper.c
+    )
+    list(APPEND POUCH_SDK_LINKER_FILES ${POUCH_PORT}/esp_idf/ota.lf)
+endif()

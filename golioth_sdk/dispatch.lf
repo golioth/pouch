@@ -1,0 +1,13 @@
+[sections:golioth_downlink_service_sections]
+entries:
+    ._golioth_downlink_service.static+
+
+[scheme:golioth_downlink_service_iterable]
+entries:
+    golioth_downlink_service_sections -> flash_rodata
+
+[mapping:golioth_downlink_service]
+archive: *
+entries:
+    * (golioth_downlink_service_iterable);
+        golioth_downlink_service_sections -> flash_rodata KEEP() SORT(name) SURROUND(golioth_downlink_service)

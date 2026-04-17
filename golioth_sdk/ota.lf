@@ -1,0 +1,28 @@
+[sections:golioth_ota_registered_component_sections]
+entries:
+    ._golioth_ota_registered_component.static+
+
+[scheme:golioth_ota_registered_component_iterable]
+entries:
+    golioth_ota_registered_component_sections -> flash_rodata
+
+[mapping:golioth_ota_registered_component]
+archive: *
+entries:
+    * (golioth_ota_registered_component_iterable);
+        golioth_ota_registered_component_sections -> flash_rodata KEEP() SORT(name) SURROUND(golioth_ota_registered_component)
+
+
+[sections:golioth_ota_manifest_handler_sections]
+entries:
+    ._golioth_ota_manifest_handler.static+
+
+[scheme:golioth_ota_manifest_handler_iterable]
+entries:
+    golioth_ota_manifest_handler_sections -> flash_rodata
+
+[mapping:golioth_ota_manifest_handler]
+archive: *
+entries:
+    * (golioth_ota_manifest_handler_iterable);
+        golioth_ota_manifest_handler_sections -> flash_rodata KEEP() SORT(name) SURROUND(golioth_ota_manifest_handler)
