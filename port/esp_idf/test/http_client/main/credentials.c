@@ -8,8 +8,12 @@
 #include <errno.h>
 #include <pouch/pouch.h>
 #include <pouch/types.h>
+#include <string.h>
 #include "mbedtls/pk.h"
+#include "mbedtls/pem.h"
 #include "mbedtls/psa_util.h"
+#include "mbedtls/x509_crt.h"
+#include "mtls_type.h"
 
 #define TAG "credentials"
 extern const char device_crt_der_start[] asm("_binary_device_crt_der_start");
@@ -98,6 +102,120 @@ int fill_pouch_config(struct pouch_config *config)
         ESP_LOGE(TAG, "Failed to get device key id");
         return -1;
     }
+
+    return 0;
+}
+
+/* Buffer and function to convert device key der to pem */
+/* This can be removed after ESP-IDF v6 (includes der support for HTTP client) */
+static char device_crt_pem[768];
+
+static int convert_device_pk_der_to_pem(char *pem_buf, size_t pem_buf_len)
+{
+    psa_crypto_init();
+    mbedtls_pk_context pk;
+    mbedtls_pk_init(&pk);
+
+    int err = mbedtls_pk_parse_key(&pk,
+                                   (unsigned char *) device_key_der_start,
+                                   device_key_der_end - device_key_der_start,
+                                   NULL,
+                                   0,
+                                   mbedtls_psa_get_random,
+                                   MBEDTLS_PSA_RANDOM_STATE);
+
+    if (0 != err)
+    {
+        ESP_LOGE(TAG, "Failed to parse device.key.der: %d", err);
+        return err;
+    }
+
+    err = mbedtls_pk_write_key_pem(&pk, (unsigned char *) pem_buf, pem_buf_len);
+    if (0 != err)
+    {
+        ESP_LOGE(TAG, "Failed to convert device.key.der to PEM: %d", err);
+        return err;
+    }
+
+    mbedtls_pk_free(&pk);
+
+    return 0;
+}
+
+/* Buffer and function to convert device crt der to pem */
+/* This can be removed after ESP-IDF v6 (includes der support for HTTP client) */
+static char device_key_pem[310];
+
+static int convert_device_cert_der_to_pem(char *pem_buf, size_t pem_buf_len)
+{
+    psa_crypto_init();
+    mbedtls_x509_crt crt;
+    mbedtls_x509_crt_init(&crt);
+
+    int err = mbedtls_x509_crt_parse_der(&crt,
+                                         (unsigned char *) device_crt_der_start,
+                                         device_key_der_end - device_crt_der_start);
+    if (0 != err)
+    {
+        ESP_LOGE(TAG, "Failed to parse device.crt.der: %d", err);
+        return err;
+    }
+
+    size_t pem_written = 0;
+    err = mbedtls_pem_write_buffer("-----BEGIN CERTIFICATE-----\n",
+                                   "-----END CERTIFICATE-----\n",
+                                   crt.raw.p,
+                                   crt.raw.len,
+                                   (unsigned char *) pem_buf,
+                                   pem_buf_len,
+                                   &pem_written);
+    if (0 != err)
+    {
+        ESP_LOGE(TAG, "Failed to convert device.crt.der to PEM: %d", err);
+        return err;
+    }
+
+    mbedtls_x509_crt_free(&crt);
+    return 0;
+}
+
+int fill_mtls_credentials(struct mtls_credentials *creds)
+{
+    creds->cert_pem = server_ca_cert_pem_start;
+    creds->cert_len = server_ca_cert_pem_end - server_ca_cert_pem_start;
+
+    if ((NULL == creds->cert_pem) || (0 == creds->cert_len))
+    {
+        ESP_LOGE(TAG, "Failed to load mTLS server CA cert");
+        return -ENOENT;
+    }
+
+    int err = load_device_pk(&_device_key_id);
+    if (0 != err)
+    {
+        ESP_LOGE(TAG, "Failed to load device key");
+        return err;
+    }
+
+    /* NOTE: DER support in ESP-IDF HTTP Client wasn't added until v6 */
+    /* Device DER files need to be converted to PEM */
+    err = convert_device_pk_der_to_pem(device_key_pem, sizeof(device_key_pem));
+    if (0 != err)
+    {
+        return err;
+    }
+    creds->client_key_pem = device_key_pem;
+    /* Get size including null terminator */
+    creds->client_key_len = strlen(device_key_pem) + 1;
+
+    err = convert_device_cert_der_to_pem(device_crt_pem, sizeof(device_crt_pem));
+    if (0 != err)
+    {
+        return err;
+    }
+    creds->client_cert_pem = device_crt_pem;
+    /* Get size including null terminator */
+    creds->client_cert_len = strlen(device_crt_pem) + 1;
 
     return 0;
 }
