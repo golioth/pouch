@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+menu "Pouch"
+
 menuconfig POUCH
   bool "Golioth Pouch protocol"
   select ZCBOR
@@ -84,3 +86,5 @@ endif
 
 # Libraries and SDK
 rsource "../../Kconfig"
+
+endmenu # Pouch
