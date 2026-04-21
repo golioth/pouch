@@ -24,6 +24,10 @@
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 #endif
 
+#ifndef IN_RANGE
+#define IN_RANGE(val, min, max) ((val) >= (min) && (val) <= (max))
+#endif
+
 #ifndef LOG2
 #define LOG2(x) (31 - __builtin_clz(x))
 #endif
