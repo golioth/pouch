@@ -20,12 +20,6 @@
 #define HTTP_PATH_SERVER_CERT "/.g/server-cert"
 #define HTTP_PATH_DEVICE_CERT "/.g/device-cert"
 
-#define CONFIG_POUCH_HTTP_GW_URI "gw.golioth.io"
-#define CONFIG_POUCH_HTTP_GW_PORT "443"
-#define CONFIG_POUCH_HTTP_TIMEOUT_S 120
-
-#define CONFIG_POUCH_HTTP_SERVER_CRT_MAX_SIZE 4096
-
 static struct mtls_credentials *_mtls_creds;
 
 static struct get_server_cert_context
@@ -83,8 +77,9 @@ static int fetch_server_cert(struct mtls_credentials *mtls_creds)
     cert_ctx->pos = 0;
 
     esp_http_client_config_t config = {
-        .host = CONFIG_POUCH_HTTP_GW_URI,
         .path = HTTP_PATH_SERVER_CERT,
+        .host = CONFIG_POUCH_HTTP_GW_URI,
+        .port = CONFIG_POUCH_HTTP_GW_PORT,
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
         .event_handler = pouch_server_cert_response_callback,
         .cert_pem = mtls_creds->cert_pem,

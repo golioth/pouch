@@ -1,0 +1,47 @@
+# Copyright (c) 2026 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+menu "HTTP Transport Options"
+    visible if POUCH_TRANSPORT_HTTP_CLIENT
+
+config POUCH_HTTP_GW_URI
+    string "Pouch gateway address"
+    default "$(CONFIG_POUCH_HTTP_GW_URI)" if "$(CONFIG_POUCH_HTTP_GW_URI)" != ""
+    default "gw.golioth.io"
+    help
+        URI address of the HTTP gateway
+
+config POUCH_HTTP_GW_PORT
+    int "Pouch gateway port"
+    default 443
+    help
+        Port to use for the HTTP gateway
+
+config POUCH_HTTP_TIMEOUT_S
+    int "Pouch HTTP timeout (seconds)"
+    default 120
+    help
+        Timeout for HTTP requests. This value must be long enough for
+        the entire uplink and downlink process to complete. When using
+        the OTA service, ensure this value is greater than the total
+        expected download time for the OTA component.
+
+config POUCH_HTTP_SCRATCH_BUF_SIZE
+    int "HTTP upload scratch buffer size"
+    default 1024
+    range 15 65535
+    help
+        Size of the scratch buffer used for storing chunks during uplink
+
+config POUCH_HTTP_SERVER_CRT_MAX_SIZE
+    int "HTTP server cert storage size"
+    default 4096
+    help
+        Amount of memory to allocate for storing the downloaded gateway certificate
+
+module = POUCH_HTTP_CLIENT
+module-str = Pouch HTTP Client
+rsource "../../../../../src/Kconfig.template.pouch_log_config"
+
+endmenu # "HTTP Transport Options"
