@@ -324,3 +324,8 @@ GOLIOTH_DOWNLINK_HANDLER(ota_component,
                          ota_receive_component_start,
                          ota_receive_component_data);
 POUCH_UPLINK_HANDLER(ota_uplink);
+
+/*
+ * Add a hook used by ESP-IDF CMakeLists.txt to ensure this file is not optimized out
+ */
+void link_hook_ota_c(void) {}

@@ -213,3 +213,8 @@ static void settings_uplink(void)
 
 GOLIOTH_DOWNLINK_HANDLER(settings, SETTINGS_DOWNLINK_PATH, NULL, settings_downlink);
 POUCH_UPLINK_HANDLER(settings_uplink);
+
+/*
+ * Add a hook used by ESP-IDF CMakeLists.txt to ensure this file is not optimized out
+ */
+void link_hook_settings_c(void) {}
