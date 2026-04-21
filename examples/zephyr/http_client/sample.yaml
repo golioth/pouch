@@ -13,8 +13,21 @@ common:
   timeout: 180
 tests:
   pouch.http_client.settings:
+    harness_config:
+      pytest_root:
+        - pytest/test_sample.py
     extra_configs:
       - CONFIG_FILE_SYSTEM_NSIM_MOUNT=y
       - 'CONFIG_NATIVE_EXTRA_CMDLINE_ARGS="-volume=./creds:/creds"'
       - 'CONFIG_EXAMPLE_CREDENTIALS_DIR="/creds"'
       - CONFIG_EXAMPLE_HTTP_CLIENT_SYNC_PERIOD_S=2
+  pouch.http_client.ota:
+    harness_config:
+      pytest_root:
+        - pytest/test_ota.py
+    extra_configs:
+      - CONFIG_FILE_SYSTEM_NSIM_MOUNT=y
+      - 'CONFIG_NATIVE_EXTRA_CMDLINE_ARGS="-volume=./creds:/creds"'
+      - 'CONFIG_EXAMPLE_CREDENTIALS_DIR="/creds"'
+      - CONFIG_EXAMPLE_HTTP_CLIENT_SYNC_PERIOD_S=2
+      - CONFIG_EXAMPLE_FW_UPDATE_SHA256_VERIFY=y
