@@ -93,3 +93,8 @@ static void pouch_downlink_data(unsigned int stream_id, const void *data, size_t
 }
 
 POUCH_DOWNLINK_HANDLER(pouch_downlink_start, pouch_downlink_data);
+
+/*
+ * Add a hook used by ESP-IDF CMakeLists.txt to ensure this file is not optimized out
+ */
+void link_hook_dispatch_c(void) {}
