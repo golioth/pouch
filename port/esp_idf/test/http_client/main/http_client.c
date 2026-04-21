@@ -31,6 +31,7 @@ static struct get_server_cert_context
 
 #define IN_USE_FLAG BIT(0)
 #define SERVER_CERT_DOWNLOADED_BIT BIT(1)
+#define POUCH_CERT_UPLOADED_BIT BIT(2)
 
 static struct sync_context
 {
@@ -85,12 +86,6 @@ static esp_err_t pouch_server_cert_response_callback(esp_http_client_event_t *ev
         return ESP_OK;
     }
 
-    if (HTTP_EVENT_ON_DATA != evt->event_id)
-    {
-        ESP_LOGI(TAG, "Non-data event: %d", (int) evt->event_id);
-        return ESP_OK;
-    }
-
     ESP_LOGD(TAG, "Received http cert response %d", evt->data_len);
 
     /* FIXME: Handle event where data is not chunked */
@@ -105,7 +100,6 @@ static esp_err_t pouch_server_cert_response_callback(esp_http_client_event_t *ev
 
         memcpy(sync->server_cert.cert_buf + sync->server_cert.pos, evt->data, evt->data_len);
         sync->server_cert.pos += evt->data_len;
-        ESP_LOGI(TAG, "This is a chunked response");
         return ESP_OK;
     }
 
@@ -153,6 +147,58 @@ static int fetch_server_cert(struct sync_context *sync)
     }
 
     pouch_atomic_set_bit(&sync->flags, SERVER_CERT_DOWNLOADED_BIT);
+    return 0;
+}
+
+esp_err_t pouch_device_cert_response_callback(esp_http_client_event_t *evt)
+{
+    if (HTTP_EVENT_ON_FINISH == evt->event_id)
+    {
+        ESP_LOGI(TAG, "Device cert uploaded: %d", esp_http_client_get_status_code(evt->client));
+    }
+
+    return 0;
+}
+
+static int upload_pouch_cert(struct sync_context *sync)
+{
+    if (true == pouch_atomic_test_bit(&sync->flags, POUCH_CERT_UPLOADED_BIT))
+    {
+        return 0;
+    }
+
+    struct pouch_cert device_cert;
+    int ret = get_device_cert(&device_cert);
+    if (0 != ret)
+    {
+        ESP_LOGE(TAG, "Unable to read pouch device certificate: %d", ret);
+        return ret;
+    }
+
+    sync->server_cert.pos = 0;
+    sync->event_cb = pouch_device_cert_response_callback;
+
+    int err = set_url(sync, HTTP_PATH_DEVICE_CERT);
+    if (0 != err)
+    {
+        return err;
+    }
+
+    esp_http_client_set_url(sync->client, (char *) sync->url_buf);
+    esp_http_client_set_method(sync->client, HTTP_METHOD_POST);
+    esp_http_client_set_header(sync->client, "Content-Type", "application/octet-stream");
+    esp_http_client_set_post_field(sync->client, (char *) device_cert.buffer, device_cert.size);
+
+    err = esp_http_client_perform(sync->client);
+
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Error performing http request %s", esp_err_to_name(err));
+        err = -(esp_http_client_get_errno(sync->client));
+        return err;
+    }
+
+    pouch_atomic_set_bit(&sync->flags, POUCH_CERT_UPLOADED_BIT);
     return 0;
 }
 
@@ -226,6 +272,13 @@ int http_client_transport_sync(void)
     if (0 != err)
     {
         ESP_LOGE(TAG, "Failed to download server certificate: %d", err);
+        goto clear_and_return;
+    }
+
+    err = upload_pouch_cert(sync);
+    if (0 != err)
+    {
+        ESP_LOGE(TAG, "Failed to upload Pouch certificate: %d", err);
         goto clear_and_return;
     }
 
