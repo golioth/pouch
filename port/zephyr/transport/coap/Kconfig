@@ -1,0 +1,40 @@
+# Copyright (c) 2026 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+
+menu "CoAP Transport Options"
+    visible if POUCH_TRANSPORT_COAP_CLIENT
+
+config POUCH_COAP_GW_URI
+    string "CoAP gateway address"
+    default "$(CONFIG_POUCH_COAP_GW_URI)" if "$(CONFIG_POUCH_COAP_GW_URI)" != ""
+    default "coap.golioth.io"
+    help
+      URI address of the CoAP gateway.
+
+config POUCH_COAP_GW_PORT
+    string "CoAP gateway port"
+    default "5684"
+    help
+      Port to use for the CoAP gateway.
+
+config POUCH_COAP_REQUEST_TIMEOUT_S
+    int "CoAP request timeout (seconds)"
+    default 300
+    help
+      Timeout for individual CoAP requests.
+
+config POUCH_COAP_BLOCK_SIZE
+    int "CoAP block size for blockwise transfers"
+    default 1024
+    range 64 1024
+    help
+      CoAP block size used for blockwise transfers (Block1/Block2).
+      Possible values: 64, 128, 256, 512, 1024.
+
+module = POUCH_COAP_CLIENT
+module-str = Pouch CoAP Client
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu # "CoAP Transport Options"
