@@ -14,6 +14,7 @@
 
 #include <pouch/port.h>
 #include <pouch/transport/certificate.h>
+#include <pouch/transport/downlink.h>
 #include <pouch/transport/uplink.h>
 
 #define MAX_HTTP_RECV_BUFFER 512
@@ -49,6 +50,8 @@ static struct sync_context
 
     struct pouch_uplink *uplink;
     uint8_t scratch[CONFIG_POUCH_HTTP_SCRATCH_BUF_SIZE];
+
+    int64_t downlink_pos;
 } _sync_ctx;
 
 static void sync_context_init(struct sync_context *sync, struct mtls_credentials *mtls_creds)
@@ -218,17 +221,43 @@ esp_err_t pouch_uplink_response_callback(esp_http_client_event_t *evt)
         if (false == pouch_atomic_test_and_set_bit(&sync->flags, DOWNLINK_IN_PROGRESS))
         {
             pouch_uplink_finish(sync->uplink);
+            ESP_LOGD(TAG, "Uplink complete");
+
             sync->uplink = NULL;
-            /* TODO: pouch_downlink_start(); */
+            pouch_downlink_start();
         }
 
-        /* TODO: Push downlink data here */
-        ESP_LOG_BUFFER_HEXDUMP(TAG, evt->data, evt->data_len, ESP_LOG_INFO);
+        int err = pouch_downlink_push(evt->data, evt->data_len);
+        if (0 != err)
+        {
+            ESP_LOGE(TAG, "Failed to push downlink data: %i", err);
+            return ESP_FAIL;
+        }
+
+        sync->downlink_pos += evt->data_len;
+
+        if (!esp_http_client_is_chunked_response(evt->client))
+        {
+            /* Data was not chunked, this is the end of the downlink */
+            ESP_LOGD(TAG, "Downlink complete: %" PRIi64 " bytes", sync->downlink_pos);
+            pouch_downlink_finish();
+            pouch_atomic_clear_bit(&sync->flags, DOWNLINK_IN_PROGRESS);
+            return 0;
+        }
+
+        /* Data is chunked, feed the watchdog timer between each payload */
+        taskYIELD();
     }
-    else if (HTTP_EVENT_ON_FINISH == evt->event_id)
+
+    if (HTTP_EVENT_ON_FINISH == evt->event_id)
     {
-        /*TODO: pouch_downlink_finish(); */
-        pouch_atomic_clear_bit(&sync->flags, DOWNLINK_IN_PROGRESS);
+        if (true == pouch_atomic_test_and_clear_bit(&sync->flags, DOWNLINK_IN_PROGRESS))
+        {
+            /* This is the end of a chunked downlink */
+            ESP_LOGI(TAG, "Received final downlink block");
+            pouch_downlink_finish();
+            pouch_atomic_clear_bit(&sync->flags, DOWNLINK_IN_PROGRESS);
+        }
     }
 
     return 0;
@@ -316,6 +345,7 @@ static int send_pouch_uplink(struct sync_context *sync)
         return -ENOMEM;
     }
 
+    sync->downlink_pos = 0;
     sync->event_cb = pouch_uplink_response_callback;
 
     int err = set_url(sync, HTTP_PATH_POUCH);
@@ -342,10 +372,10 @@ static int send_pouch_uplink(struct sync_context *sync)
         goto finish_and_return;
     }
 
-    err = esp_http_client_fetch_headers(sync->client);
+    err = esp_http_client_perform(sync->client);
     if (0 > err)
     {
-        ESP_LOGE(TAG, "Failed to fetch headers: %d", err);
+        ESP_LOGE(TAG, "Failed to perform downlink: %d", err);
         goto finish_and_return;
     }
 
@@ -353,13 +383,13 @@ static int send_pouch_uplink(struct sync_context *sync)
 
     if (!IN_RANGE(status_code, 200, 299))
     {
-        ESP_LOGE(TAG, "Uplink failed: %d", status_code);
+        ESP_LOGE(TAG, "Sync failed: %d", status_code);
         err = -EIO;
         goto finish_and_return;
     }
     else
     {
-        ESP_LOGI(TAG, "Uplink successful: %d", status_code);
+        ESP_LOGI(TAG, "Sync successful: %d", status_code);
     }
 
     esp_http_client_close(sync->client);
