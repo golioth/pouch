@@ -12,7 +12,7 @@ target_sources(app PRIVATE
   src/credentials.c
 )
 
-zephyr_sources_ifdef(CONFIG_GOLIOTH_OTA src/fw_update.c)
+target_sources_ifdef(CONFIG_GOLIOTH_OTA app PRIVATE src/fw_update.c)
 
 if (NOT CONFIG_EXAMPLE_HTTP_CLIENT_TLS_LOAD_CA_FROM_FILESYSTEM)
     generate_inc_file_for_target(app src/isrgrootx1.der
