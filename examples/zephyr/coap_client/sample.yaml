@@ -1,5 +1,5 @@
 sample:
-  name: Pouch HTTP Client
+  name: Pouch CoAP Client
 common:
   harness: pytest
   harness_config:
@@ -10,9 +10,9 @@ common:
   integration_platforms:
     - native_sim
     - native_sim/native/64
-  timeout: 180
+  timeout: 300
 tests:
-  pouch.http_client.settings:
+  pouch.coap_client.settings:
     harness_config:
       pytest_root:
         - ../pytest/test_sample.py
@@ -20,8 +20,8 @@ tests:
       - CONFIG_FILE_SYSTEM_NSIM_MOUNT=y
       - 'CONFIG_NATIVE_EXTRA_CMDLINE_ARGS="-volume=./creds:/creds"'
       - 'CONFIG_EXAMPLE_CREDENTIALS_DIR="/creds"'
-      - CONFIG_EXAMPLE_HTTP_CLIENT_SYNC_PERIOD_S=2
-  pouch.http_client.ota:
+      - CONFIG_EXAMPLE_COAP_CLIENT_SYNC_PERIOD_S=2
+  pouch.coap_client.ota:
     harness_config:
       pytest_root:
         - ../pytest/test_ota.py
@@ -29,5 +29,9 @@ tests:
       - CONFIG_FILE_SYSTEM_NSIM_MOUNT=y
       - 'CONFIG_NATIVE_EXTRA_CMDLINE_ARGS="-volume=./creds:/creds"'
       - 'CONFIG_EXAMPLE_CREDENTIALS_DIR="/creds"'
-      - CONFIG_EXAMPLE_HTTP_CLIENT_SYNC_PERIOD_S=2
+      - CONFIG_EXAMPLE_COAP_CLIENT_SYNC_PERIOD_S=2
+      - CONFIG_GOLIOTH_OTA=y
       - CONFIG_EXAMPLE_FW_UPDATE_SHA256_VERIFY=y
+      # OTA download over CoAP block2 requires a longer timeout because
+      # each 1024-byte block needs a full CoAP round trip (~150ms).
+      - CONFIG_POUCH_COAP_REQUEST_TIMEOUT_S=120

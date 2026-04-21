@@ -1,0 +1,65 @@
+# Copyright (c) 2026 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+source "$ZEPHYR_BASE/Kconfig"
+
+config EXAMPLE_COAP_CLIENT_LOG_LEVEL
+    int "CoAP client example log level"
+    default 4
+
+config EXAMPLE_COAP_CLIENT_SYNC_PERIOD_S
+    int "CoAP client example sync period (s)"
+    default 30
+
+config EXAMPLE_CREDENTIALS_DIR
+    string "Directory containing credentials"
+    default "/lfs1/credentials"
+    help
+      Directory on mounted file system containing credentials.
+
+config EXAMPLE_COAP_CLIENT_DTLS_CREDENTIALS
+    int "Sec Tag to use when storing DTLS credentials"
+    default 515765868
+
+config EXAMPLE_COAP_CLIENT_DTLS_LOAD_CA_FROM_FILESYSTEM
+    bool "Load the server CA cert from filesystem"
+    default n
+    help
+      Optionally load the CA certificate used for DTLS/mTLS from
+      EXAMPLE_CREDENTIALS_DIR/ca.der. If this symbol is not selected,
+      ISRG Root X1 is used.
+
+config EXAMPLE_COAP_CLIENT_GW_DEVICE_CRT_FILENAME
+    string "Gateway device crt filename in filesystem"
+    default "crt.der"
+    help
+      The filename used to store the mTLS device certificate in the filesystem.
+      By default this is the same as the filename used for the Pouch device
+      certificate, but may be changed if different credentials are desired.
+
+config EXAMPLE_COAP_CLIENT_GW_DEVICE_KEY_FILENAME
+    string "Gateway device key filename in filesystem"
+    default "key.der"
+    help
+      The filename used to store the mTLS device private key in the filesystem.
+      By default this is the same as the filename used for the Pouch device key,
+      but may be changed if different credentials are desired.
+
+choice EXAMPLE_FW_UPDATE_MODE
+    prompt "Firmware update mode"
+    depends on GOLIOTH_OTA
+    default EXAMPLE_FW_UPDATE_FLASH
+
+config EXAMPLE_FW_UPDATE_FLASH
+    bool "Normal (write to flash)"
+    help
+        OTA component data is written to flash and mcuboot upgrade is requested.
+
+config EXAMPLE_FW_UPDATE_SHA256_VERIFY
+    bool "Download only and verify SHA256"
+    help
+        OTA component data is hashed with SHA256 instead of written
+        to flash. The resulting hash is logged to the console for verification.
+
+endchoice
