@@ -12,7 +12,7 @@
 #include <stdint.h>
 #include <string.h>
 
-POUCH_LOG_REGISTER(esp - idf - port - layer, POUCH_LOG_LEVEL_DBG);
+POUCH_LOG_REGISTER(esp_idf_port_layer, POUCH_LOG_LEVEL_DBG);
 
 /*--------------------------------------------------
  * Atomic
