@@ -12,7 +12,11 @@ target_sources(app PRIVATE
   src/credentials.c
 )
 
-target_sources_ifdef(CONFIG_GOLIOTH_OTA app PRIVATE src/fw_update.c)
+if(CONFIG_EXAMPLE_FW_UPDATE_SHA256_VERIFY)
+    target_sources(app PRIVATE src/fw_update_test.c)
+elseif(CONFIG_EXAMPLE_FW_UPDATE_FLASH)
+    target_sources(app PRIVATE src/fw_update.c)
+endif()
 
 if (NOT CONFIG_EXAMPLE_HTTP_CLIENT_TLS_LOAD_CA_FROM_FILESYSTEM)
     generate_inc_file_for_target(app src/isrgrootx1.der

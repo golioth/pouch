@@ -45,3 +45,20 @@ config EXAMPLE_HTTP_CLIENT_GW_DEVICE_KEY_FILENAME
         the same as the filename used for the Pouch device key, but may be changed if different
         credentials are desired for mTLS versus Pouch.
 
+choice EXAMPLE_FW_UPDATE_MODE
+    prompt "Firmware update mode"
+    depends on GOLIOTH_OTA
+    default EXAMPLE_FW_UPDATE_FLASH
+
+config EXAMPLE_FW_UPDATE_FLASH
+    bool "Normal (write to flash)"
+    help
+        OTA component data is written to flash and mcuboot upgrade is requested.
+
+config EXAMPLE_FW_UPDATE_SHA256_VERIFY
+    bool "Download only and verify SHA256"
+    help
+        OTA component data is hashed with SHA256 instead of written
+        to flash. The resulting hash is logged to the console for verification.
+
+endchoice
