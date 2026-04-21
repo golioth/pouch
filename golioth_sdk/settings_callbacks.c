@@ -9,6 +9,7 @@ POUCH_LOG_REGISTER(settings_callbacks, CONFIG_GOLIOTH_LOG_LEVEL);
 
 #include <errno.h>
 #include <stddef.h>
+#include <string.h>
 #include "settings.h"
 
 int golioth_settings_receive_one(const struct setting_value *value)

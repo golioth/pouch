@@ -7,6 +7,7 @@
 #include <pouch/port.h>
 POUCH_LOG_REGISTER(settings, CONFIG_GOLIOTH_LOG_LEVEL);
 
+#include <errno.h>
 #include <pouch/types.h>
 #include <pouch/uplink.h>
 #include <zcbor_utils.h>
@@ -39,7 +40,7 @@ static int settings_decode(zcbor_state_t *zsd, void *value)
     ok = zcbor_map_start_decode(zsd);
     if (!ok)
     {
-        LOG_WRN("Did not start CBOR list correctly");
+        POUCH_LOG_WRN("Did not start CBOR list correctly");
         return -EBADMSG;
     }
 
@@ -54,7 +55,7 @@ static int settings_decode(zcbor_state_t *zsd, void *value)
         ok = zcbor_tstr_decode(zsd, &label);
         if (!ok)
         {
-            LOG_ERR("Failed to get label");
+            POUCH_LOG_ERR("Failed to get label");
             return -EBADMSG;
         }
 
@@ -81,7 +82,7 @@ static int settings_decode(zcbor_state_t *zsd, void *value)
                 }
 
                 value.type = GOLIOTH_SETTING_VALUE_TYPE_STRING;
-                value.str_val.data = str.value;
+                value.str_val.data = (char *) str.value;
                 value.str_val.len = str.len;
                 break;
             }
@@ -128,7 +129,7 @@ static int settings_decode(zcbor_state_t *zsd, void *value)
             ok = zcbor_any_skip(zsd, NULL);
             if (!ok)
             {
-                LOG_ERR("Failed to skip unsupported type");
+                POUCH_LOG_ERR("Failed to skip unsupported type");
                 return -EBADMSG;
             }
         }
@@ -137,7 +138,7 @@ static int settings_decode(zcbor_state_t *zsd, void *value)
     ok = zcbor_map_end_decode(zsd);
     if (!ok)
     {
-        LOG_WRN("Did not end CBOR list correctly");
+        POUCH_LOG_WRN("Did not end CBOR list correctly");
         return -EBADMSG;
     }
 
@@ -146,7 +147,7 @@ static int settings_decode(zcbor_state_t *zsd, void *value)
 
 static void settings_downlink(golioth_downlink_id_t id, const void *data, size_t len, bool is_last)
 {
-    LOG_DBG("Received settings downlink");
+    POUCH_LOG_DBG("Received settings downlink");
 
     ZCBOR_STATE_D(zsd, 2, data, len, 1, 0);
 
@@ -155,7 +156,7 @@ static void settings_downlink(golioth_downlink_id_t id, const void *data, size_t
         ZCBOR_TSTR_LIT_MAP_ENTRY("version", zcbor_map_int64_decode, &settings_version),
     };
 
-    zcbor_map_decode(zsd, map_entries, ARRAY_SIZE(map_entries));
+    zcbor_map_decode(zsd, map_entries, sizeof(map_entries) / sizeof(map_entries[0]));
 }
 
 static void settings_uplink(void)
@@ -167,14 +168,14 @@ static void settings_uplink(void)
     bool ok = zcbor_map_start_encode(zse, 2);
     if (!ok)
     {
-        LOG_ERR("Could not form settings uplink");
+        POUCH_LOG_ERR("Could not form settings uplink");
         return;
     }
 
     ok = zcbor_tstr_put_lit(zse, "version");
     if (!ok)
     {
-        LOG_ERR("Could not form settings uplink");
+        POUCH_LOG_ERR("Could not form settings uplink");
         return;
     }
 
@@ -183,7 +184,7 @@ static void settings_uplink(void)
         ok = zcbor_int64_put(zse, settings_version);
         if (!ok)
         {
-            LOG_ERR("Could not form settings uplink");
+            POUCH_LOG_ERR("Could not form settings uplink");
             return;
         }
     }
@@ -192,14 +193,14 @@ static void settings_uplink(void)
         ok = zcbor_nil_put(zse, NULL);
         if (!ok)
         {
-            LOG_ERR("Could not form settings uplink");
+            POUCH_LOG_ERR("Could not form settings uplink");
             return;
         }
     }
     ok = zcbor_map_end_encode(zse, 2);
     if (!ok)
     {
-        LOG_ERR("Could not form settings uplink");
+        POUCH_LOG_ERR("Could not form settings uplink");
         return;
     }
 
