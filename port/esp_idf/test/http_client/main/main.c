@@ -7,13 +7,27 @@
 #include <esp_log.h>
 #define TAG "pouch_http_client_example"
 
+#include <freertos/FreeRTOS.h>
 #include <pouch/pouch.h>
+#include <pouch/uplink.h>
+#include <string.h>
 
 #include "credentials.h"
 #include "http_client.h"
 #include "mtls_type.h"
 #include "nvs_flash.h"
 #include "wifi.h"
+
+static void do_uplink(void)
+{
+    const char *payload = "{\"temp\":22}";
+    pouch_uplink_entry_write(".s/sensor",
+                             POUCH_CONTENT_TYPE_JSON,
+                             payload,
+                             strlen(payload),
+                             POUCH_FOREVER);
+}
+POUCH_UPLINK_HANDLER(do_uplink);
 
 void app_main(void)
 {
@@ -55,5 +69,11 @@ void app_main(void)
     }
     ESP_LOGI(TAG, "Pouch successfully initialized");
 
-    http_client_transport_sync();
+    while (true)
+    {
+        /* Sync Pouch uplink and downlink */
+        http_client_transport_sync();
+
+        vTaskDelay(pdMS_TO_TICKS(CONFIG_EXAMPLE_HTTP_CLIENT_SYNC_PERIOD_S * 1000));
+    }
 }
