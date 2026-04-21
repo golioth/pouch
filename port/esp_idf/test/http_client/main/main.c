@@ -18,6 +18,12 @@
 #include "nvs_flash.h"
 #include "wifi.h"
 
+#include <pouch/golioth/settings_callbacks.h>
+#include <pouch/pouch.h>
+#include <pouch/pouch_ca_cert.h>
+#include <pouch/uplink.h>
+#include <string.h>
+
 static void do_uplink(void)
 {
     const char *payload = "{\"temp\":22}";
@@ -28,6 +34,15 @@ static void do_uplink(void)
                              POUCH_FOREVER);
 }
 POUCH_UPLINK_HANDLER(do_uplink);
+
+static int led_setting_cb(bool new_value)
+{
+    ESP_LOGI(TAG, "Received LED setting: %d", (int) new_value);
+
+    return 0;
+}
+
+GOLIOTH_SETTINGS_HANDLER(LED, led_setting_cb);
 
 void app_main(void)
 {
