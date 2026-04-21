@@ -1,0 +1,29 @@
+# Copyright (c) 2026 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+cmake_minimum_required(VERSION 3.20.0)
+
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+project(coap_transport)
+
+target_sources(app PRIVATE
+  src/main.c
+  src/credentials.c
+)
+
+if(CONFIG_EXAMPLE_FW_UPDATE_SHA256_VERIFY)
+    target_sources(app PRIVATE src/fw_update_test.c)
+elseif(CONFIG_EXAMPLE_FW_UPDATE_FLASH)
+    target_sources(app PRIVATE src/fw_update.c)
+endif()
+
+if(CONFIG_WIFI)
+    target_sources(app PRIVATE src/wifi.c)
+endif()
+
+if(NOT CONFIG_EXAMPLE_COAP_CLIENT_DTLS_LOAD_CA_FROM_FILESYSTEM)
+    generate_inc_file_for_target(app
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/isrgrootx1.der
+        ${ZEPHYR_BINARY_DIR}/include/generated/pouch-ca-crt.inc)
+endif()

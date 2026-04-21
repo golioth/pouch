@@ -23,6 +23,14 @@ config POUCH_TRANSPORT_HTTP_CLIENT
   help
     HTTP transport for Pouch
 
+config POUCH_TRANSPORT_COAP_CLIENT
+  bool "CoAP"
+  select COAP
+  select NET_SOCKETS_SOCKOPT_TLS
+  select NET_SOCKETS_ENABLE_DTLS
+  help
+    CoAP/DTLS transport for Pouch
+
 endchoice
 
 config POUCH_TRANSPORT_ACK_TIMEOUT_MS
@@ -34,6 +42,7 @@ config POUCH_TRANSPORT_ACK_TIMEOUT_MS
 
 rsource "gatt/Kconfig"
 rsource "http/Kconfig"
+rsource "coap/Kconfig"
 
 module = POUCH_TRANSPORT
 module-str = Pouch Transport
