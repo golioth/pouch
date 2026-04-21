@@ -12,6 +12,9 @@
 #include "credentials.h"
 #include "mtls_type.h"
 
+#include <pouch/port.h>
+#include <pouch/transport/certificate.h>
+
 #define MAX_HTTP_RECV_BUFFER 512
 #define MAX_HTTP_OUTPUT_BUFFER 2048
 
@@ -26,14 +29,19 @@ static struct get_server_cert_context
     size_t pos;
 };
 
+#define IN_USE_FLAG BIT(0)
+#define SERVER_CERT_DOWNLOADED_BIT BIT(1)
+
 static struct sync_context
 {
+    pouch_atomic_t flags;
     struct mtls_credentials *mtls_creds;
     struct get_server_cert_context server_cert;
 } _sync_ctx;
 
 static void sync_context_init(struct sync_context *sync, struct mtls_credentials *mtls_creds)
 {
+    pouch_atomic_clear(&sync->flags);
     sync->mtls_creds = mtls_creds;
 }
 
@@ -82,6 +90,11 @@ static esp_err_t pouch_server_cert_response_callback(esp_http_client_event_t *ev
 
 static int fetch_server_cert(struct sync_context *sync)
 {
+    if (true == pouch_atomic_test_bit(&sync->flags, SERVER_CERT_DOWNLOADED_BIT))
+    {
+        return 0;
+    }
+
     sync->server_cert.pos = 0;
 
     esp_http_client_config_t config = {
@@ -104,8 +117,12 @@ static int fetch_server_cert(struct sync_context *sync)
 
     if (err != ESP_OK)
     {
-        ESP_LOGE(TAG, "Error perform http request %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "Error performing http request %s", esp_err_to_name(err));
+        err = -(esp_http_client_get_errno(client));
+        esp_http_client_cleanup(client);
+        return err;
     }
+
     esp_http_client_cleanup(client);
 
     struct pouch_cert cert = {
@@ -113,9 +130,14 @@ static int fetch_server_cert(struct sync_context *sync)
         .size = sync->server_cert.pos,
     };
 
-    /* TODO: replace log with call to pouch_server_certificate_set(&cert); */
-    ESP_LOG_BUFFER_HEXDUMP(TAG, cert.buffer, cert.size, ESP_LOG_WARN);
+    err = pouch_server_certificate_set(&cert);
+    if (0 != err)
+    {
+        ESP_LOGE(TAG, "Failed to set pouch server cert: %i", err);
+        return err;
+    }
 
+    pouch_atomic_set_bit(&sync->flags, SERVER_CERT_DOWNLOADED_BIT);
     return 0;
 }
 
@@ -134,12 +156,20 @@ int http_client_transport_sync(void)
         return -EINVAL;
     }
 
+    if (true == pouch_atomic_test_and_set_bit(&sync->flags, IN_USE_FLAG))
+    {
+        ESP_LOGW(TAG, "Sync already in progress, aborting.");
+        return -EACCES;
+    }
+
     int err = fetch_server_cert(sync);
     if (0 != err)
     {
         ESP_LOGE(TAG, "Failed to download server certificate: %d", err);
-        return err;
+        goto clear_and_return;
     }
 
+clear_and_return:
+    pouch_atomic_clear_bit(&sync->flags, IN_USE_FLAG);
     return err;
 }
