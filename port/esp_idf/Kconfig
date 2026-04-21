@@ -67,12 +67,6 @@ config POUCH_ENCRYPTION_AES_GCM
 
 endchoice
 
-config MBEDTLS_USER_CONFIG_ENABLE
-  default y
-
-config MBEDTLS_USER_CONFIG_FILE
-  default "$(ZEPHYR_POUCH_MODULE_DIR)/src/saead/mbedtls_config.h"
-
 # Pouch sources
 rsource "../../src/saead/Kconfig"
 
