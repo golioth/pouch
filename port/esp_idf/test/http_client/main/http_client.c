@@ -14,16 +14,19 @@
 
 #include <pouch/port.h>
 #include <pouch/transport/certificate.h>
+#include <pouch/transport/uplink.h>
 
 #define MAX_HTTP_RECV_BUFFER 512
 #define MAX_HTTP_OUTPUT_BUFFER 2048
 
-#define HTTP_TIMEOUT_MS (CONFIG_POUCH_HTTP_TIMEOUT_S * MSEC_PER_SEC)
+#define HTTP_TIMEOUT_MS (CONFIG_POUCH_HTTP_TIMEOUT_S * 1000)
 #define HTTP_PATH_POUCH "/.g/pouch"
 #define HTTP_PATH_SERVER_CERT "/.g/server-cert"
 #define HTTP_PATH_DEVICE_CERT "/.g/device-cert"
 
-static struct get_server_cert_context
+#define POUCH_FILL_COUNT_LIMIT 100
+
+struct get_server_cert_context
 {
     uint8_t cert_buf[CONFIG_POUCH_HTTP_SERVER_CRT_MAX_SIZE];
     size_t pos;
@@ -32,6 +35,7 @@ static struct get_server_cert_context
 #define IN_USE_FLAG BIT(0)
 #define SERVER_CERT_DOWNLOADED_BIT BIT(1)
 #define POUCH_CERT_UPLOADED_BIT BIT(2)
+#define DOWNLINK_IN_PROGRESS BIT(3)
 
 static struct sync_context
 {
@@ -42,6 +46,9 @@ static struct sync_context
     esp_http_client_handle_t client;
     http_event_handle_cb event_cb;
     char url_buf[CONFIG_POUCH_HTTP_CLIENT_URL_BUF_SIZE];
+
+    struct pouch_uplink *uplink;
+    uint8_t scratch[CONFIG_POUCH_HTTP_SCRATCH_BUF_SIZE];
 } _sync_ctx;
 
 static void sync_context_init(struct sync_context *sync, struct mtls_credentials *mtls_creds)
@@ -202,6 +209,177 @@ static int upload_pouch_cert(struct sync_context *sync)
     return 0;
 }
 
+esp_err_t pouch_uplink_response_callback(esp_http_client_event_t *evt)
+{
+    struct sync_context *sync = (struct sync_context *) evt->user_data;
+
+    if (HTTP_EVENT_ON_DATA == evt->event_id)
+    {
+        if (false == pouch_atomic_test_and_set_bit(&sync->flags, DOWNLINK_IN_PROGRESS))
+        {
+            pouch_uplink_finish(sync->uplink);
+            sync->uplink = NULL;
+            /* TODO: pouch_downlink_start(); */
+        }
+
+        /* TODO: Push downlink data here */
+        ESP_LOG_BUFFER_HEXDUMP(TAG, evt->data, evt->data_len, ESP_LOG_INFO);
+    }
+    else if (HTTP_EVENT_ON_FINISH == evt->event_id)
+    {
+        /*TODO: pouch_downlink_finish(); */
+        pouch_atomic_clear_bit(&sync->flags, DOWNLINK_IN_PROGRESS);
+    }
+
+    return 0;
+}
+
+static int pouch_http_client_uplink_payload_send(struct sync_context *sync,
+                                                 esp_http_client_handle_t client)
+{
+    if (NULL == sync)
+    {
+        ESP_LOGE(TAG, "Sync context cannot be NULL");
+        return -EINVAL;
+    }
+
+    int err = 0;
+    int ret;
+    size_t pouch_data_len = sizeof(sync->scratch);
+    size_t payload_size = 0;
+    enum pouch_result res = POUCH_ERROR;
+    char chunk_header[16];
+
+    do
+    {
+        pouch_data_len = sizeof(sync->scratch);
+        res = pouch_uplink_fill(sync->uplink, sync->scratch, &pouch_data_len);
+        if (POUCH_ERROR == res)
+        {
+            ESP_LOGE(TAG, "Error getting pouch data: %d", err);
+            return -EINVAL;
+        }
+
+        /* Write HEX_CHUNK_SIZE + CRLF to start chunk */
+        int chunk_header_len =
+            snprintf(chunk_header, sizeof(chunk_header), "%X\r\n", (int) pouch_data_len);
+        if (0 > chunk_header_len)
+        {
+            ESP_LOGE(TAG, "Failed to format chunk size");
+            return ESP_ERR_INVALID_SIZE;
+        }
+        ret = esp_http_client_write(client, chunk_header, chunk_header_len);
+        if (0 > ret)
+        {
+            ESP_LOGE(TAG, "Failed to send chunk header: %d", ret);
+
+            return -(esp_http_client_get_errno(client));
+        }
+
+        ret = esp_http_client_write(client, (char *) sync->scratch, pouch_data_len);
+        if (0 > ret)
+        {
+            ESP_LOGE(TAG, "Failed to send data: %d", ret);
+            return -(esp_http_client_get_errno(client));
+        }
+        payload_size += ret;
+
+        /* Write CRLF to complete chunk */
+        ret = esp_http_client_write(client, "\r\n", 2);
+        if (0 > ret)
+        {
+            ESP_LOGE(TAG, "Failed to send chunk footer: %d", ret);
+            return -(esp_http_client_get_errno(client));
+        }
+
+    } while (POUCH_MORE_DATA == res);
+
+    ESP_LOGD(TAG, "Uplink chunks sent: %zu bytes", payload_size);
+
+    /* Write 0 block to finish chunk post */
+    ret = esp_http_client_write(client, "0\r\n\r\n", 5);
+    if (0 > ret)
+    {
+        ESP_LOGE(TAG, "Failed to finish chunk post: %d", ret);
+        return -(esp_http_client_get_errno(client));
+    }
+
+    return 0;
+}
+
+static int send_pouch_uplink(struct sync_context *sync)
+{
+    sync->uplink = pouch_uplink_start();
+    if (NULL == sync->uplink)
+    {
+        ESP_LOGE(TAG, "Failed to start uplink");
+        return -ENOMEM;
+    }
+
+    sync->event_cb = pouch_uplink_response_callback;
+
+    int err = set_url(sync, HTTP_PATH_POUCH);
+    if (0 != err)
+    {
+        goto finish_and_return;
+    }
+
+    esp_http_client_set_url(sync->client, (char *) sync->url_buf);
+    esp_http_client_set_method(sync->client, HTTP_METHOD_POST);
+    esp_http_client_set_header(sync->client, "Content-Type", "application/octet-stream");
+
+    err = esp_http_client_open(sync->client, -1);
+    if (0 > err)
+    {
+        ESP_LOGE(TAG, "Failed to open uplink: %d", err);
+        goto finish_and_return;
+    }
+
+    err = pouch_http_client_uplink_payload_send(sync, sync->client);
+    if (0 > err)
+    {
+        ESP_LOGE(TAG, "Failed to send payload: %d", err);
+        goto finish_and_return;
+    }
+
+    err = esp_http_client_fetch_headers(sync->client);
+    if (0 > err)
+    {
+        ESP_LOGE(TAG, "Failed to fetch headers: %d", err);
+        goto finish_and_return;
+    }
+
+    int status_code = esp_http_client_get_status_code(sync->client);
+
+    if (!IN_RANGE(status_code, 200, 299))
+    {
+        ESP_LOGE(TAG, "Uplink failed: %d", status_code);
+        err = -EIO;
+        goto finish_and_return;
+    }
+    else
+    {
+        ESP_LOGI(TAG, "Uplink successful: %d", status_code);
+    }
+
+    esp_http_client_close(sync->client);
+
+    err = 0;
+
+finish_and_return:
+    if (NULL != sync->uplink)
+    {
+        pouch_uplink_finish(sync->uplink);
+    }
+
+    if (true == pouch_atomic_test_and_clear_bit(&sync->flags, DOWNLINK_IN_PROGRESS))
+    {
+        /* TODO: pouch_downlink_finish(); */
+    }
+
+    return err;
+}
+
 void http_client_transport_init(struct mtls_credentials *mtls_creds)
 {
     sync_context_init(&_sync_ctx, mtls_creds);
@@ -279,6 +457,13 @@ int http_client_transport_sync(void)
     if (0 != err)
     {
         ESP_LOGE(TAG, "Failed to upload Pouch certificate: %d", err);
+        goto clear_and_return;
+    }
+
+    err = send_pouch_uplink(sync);
+    if (0 != err)
+    {
+        ESP_LOGE(TAG, "Failed to send Pouch uplink: %d", err);
         goto clear_and_return;
     }
 

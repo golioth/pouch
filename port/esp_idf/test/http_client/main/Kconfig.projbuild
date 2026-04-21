@@ -1,4 +1,9 @@
 menu "Example: Pouch HTTP Client"
+
+config EXAMPLE_HTTP_CLIENT_SYNC_PERIOD_S
+    int "HTTP client example sync period (s)"
+    default 30
+
 menu "PKI Credentials"
 
 config SERVER_CA_CERT_PEM_FILE
