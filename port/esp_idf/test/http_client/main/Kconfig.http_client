@@ -27,6 +27,13 @@ config POUCH_HTTP_TIMEOUT_S
         the OTA service, ensure this value is greater than the total
         expected download time for the OTA component.
 
+config POUCH_HTTP_CLIENT_URL_BUF_SIZE
+    int "HTTP upload scratch buffer size"
+    default 64
+    range 32 4096
+    help
+        Size of the scratch buffer used for storing chunks during uplink
+
 config POUCH_HTTP_SCRATCH_BUF_SIZE
     int "HTTP upload scratch buffer size"
     default 1024
