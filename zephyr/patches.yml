@@ -72,3 +72,11 @@ patches:
     date: 2025-08-05
     apply-command: >-
       bash -c 'if [ $(west config manifest.file) = "west-zephyr.yml" ]; then git am $@; fi' --
+  - path: zephyr/zephyr/0007-net-nsos-always-update-poll-revents.patch
+    sha256sum: 4695c2c43e3904d7c251a5a319028b83f7d1302595b5998fb12aff51ab7db194
+    module: zephyr
+    author: Marcin Niestroj
+    email: m.niestroj@emb.dev
+    date: 2026-04-23
+    apply-command: >-
+      bash -c 'if [ $(west config manifest.file) = "west-zephyr.yml" ]; then git am $@; fi' --
