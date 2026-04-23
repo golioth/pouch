@@ -24,5 +24,9 @@ zephyr_linker_sources_ifdef(CONFIG_GOLIOTH_SETTINGS_FRONTEND_CALLBACKS
 
 # OTA
 
-zephyr_library_sources_ifdef(CONFIG_GOLIOTH_OTA ota.c ota_upper.c)
+zephyr_library_sources_ifdef(CONFIG_GOLIOTH_OTA
+                                hex.c
+                                ota_upper.c
+                                ota.c
+                            )
 zephyr_linker_sources_ifdef(CONFIG_GOLIOTH_OTA SECTIONS ota.ld)
