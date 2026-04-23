@@ -90,6 +90,19 @@ static struct pouch_characteristic *pouch_characteristic(const struct bt_gatt_at
     return attr->user_data;
 }
 
+static int recv(const struct pouch_characteristic *c, const void *buf, size_t len)
+{
+    switch (c->type)
+    {
+        case CHAR_RECEIVER:
+            return pouch_receiver_recv(c->receiver, buf, len);
+        case CHAR_SENDER:
+            return pouch_sender_recv(c->sender, buf, len);
+    }
+
+    return -EINVAL;
+}
+
 static int data_write(struct bt_conn *conn,
                       const struct bt_gatt_attr *attr,
                       const void *buf,
@@ -100,15 +113,13 @@ static int data_write(struct bt_conn *conn,
     const struct pouch_characteristic *c = pouch_characteristic(attr);
     LOG_DBG("%p: rx: %u", c, len);
     LOG_HEXDUMP_DBG(buf, len, "rx");
-    switch (c->type)
+    int err = recv(c, buf, len);
+    if (err)
     {
-        case CHAR_RECEIVER:
-            return pouch_receiver_recv(c->receiver, buf, len);
-        case CHAR_SENDER:
-            return pouch_sender_recv(c->sender, buf, len);
+        return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
     }
 
-    return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
+    return 0;
 }
 
 static int open(struct pouch_characteristic *c)
