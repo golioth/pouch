@@ -14,6 +14,8 @@ struct pouch_buf *blockbuf_alloc(pouch_timeout_t timeout)
         return NULL;
     }
 
+    buf_restore(buf, POUCH_BUF_STATE_INITIAL);
+
     return buf;
 }
 
