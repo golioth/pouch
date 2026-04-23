@@ -133,5 +133,8 @@ endif
 # Gateway
 rsource "../../src/gateway/Kconfig"
 
-# Libraries and SDK
+# Libraries
 rsource "../../Kconfig"
+
+# Golioth SDK
+rsource "../../golioth_sdk/Kconfig"
