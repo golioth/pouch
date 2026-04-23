@@ -179,4 +179,6 @@ int pouch_sender_recv(struct pouch_sender *sender, const uint8_t *buf, size_t le
 void pouch_sender_close(struct pouch_sender *sender)
 {
     sender->state = STATE_IDLE;
+    free(sender->buf);
+    sender->buf = NULL;
 }
