@@ -1,0 +1,39 @@
+From 54951e1ad0e2117d3cd0014d698f88c6a9087af8 Mon Sep 17 00:00:00 2001
+From: Marcin Niestroj <m.niestroj@emb.dev>
+Date: Thu, 23 Apr 2026 14:32:57 +0200
+Subject: [PATCH] net: nsos: always update poll revents
+
+Set poll revents even when epoll didn't have a chance to run.
+
+Signed-off-by: Marcin Niestroj <m.niestroj@emb.dev>
+---
+ drivers/net/nsos_sockets.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/net/nsos_sockets.c b/drivers/net/nsos_sockets.c
+index ee96b43f31f..71432380692 100644
+--- a/drivers/net/nsos_sockets.c
++++ b/drivers/net/nsos_sockets.c
+@@ -340,6 +340,7 @@ static int nsos_poll_update(struct nsos_socket *sock, struct zsock_pollfd *pfd,
+ 
+ 	if (!sys_dnode_is_linked(&poll->node)) {
+ 		nsos_adapt_poll_update(&poll->mid);
++		pfd->revents = poll->mid.revents;
+ 		return 0;
+ 	}
+ 
+@@ -348,6 +349,11 @@ static int nsos_poll_update(struct nsos_socket *sock, struct zsock_pollfd *pfd,
+ 
+ 	k_poll_signal_check(&poll->signal, &signaled, &flags);
+ 	if (!signaled) {
++		/* Async epoll may not have run yet (e.g. timeout=0).
++		 * Do a synchronous poll check to catch ready events.
++		 */
++		nsos_adapt_poll_update(&poll->mid);
++		pfd->revents = poll->mid.revents;
+ 		return 0;
+ 	}
+ 
+-- 
+2.53.0
+
