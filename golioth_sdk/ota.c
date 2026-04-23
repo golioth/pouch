@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <errno.h>
 #include <string.h>
 
 #include <pouch/port.h>
@@ -86,7 +87,7 @@ static int component_entry_decode_value(zcbor_state_t *zsd, void *void_value)
 
     if (tstr.len > value->value_len)
     {
-        LOG_ERR("Not enough space to store");
+        POUCH_LOG_ERR("Not enough space to store");
         return -ENOMEM;
     }
 
@@ -106,7 +107,7 @@ static void ota_receive_manifest(golioth_downlink_id_t id,
     bool ok = zcbor_map_start_decode(zsd);
     if (!ok)
     {
-        LOG_ERR("Failed to deserialize manifest");
+        POUCH_LOG_ERR("Failed to deserialize manifest");
         return;
     }
 
@@ -116,7 +117,7 @@ static void ota_receive_manifest(golioth_downlink_id_t id,
         ok = zcbor_uint32_decode(zsd, &key);
         if (!ok)
         {
-            LOG_ERR("Failed to deserialize manifest");
+            POUCH_LOG_ERR("Failed to deserialize manifest");
             return;
         }
 
@@ -125,7 +126,7 @@ static void ota_receive_manifest(golioth_downlink_id_t id,
             ok = zcbor_list_start_decode(zsd);
             if (!ok)
             {
-                LOG_ERR("Failed to deserialize manifest");
+                POUCH_LOG_ERR("Failed to deserialize manifest");
                 return;
             }
 
@@ -162,10 +163,12 @@ static void ota_receive_manifest(golioth_downlink_id_t id,
                                         &hash_tstr),
                 };
 
-                int err = zcbor_map_decode(zsd, map_entries, ARRAY_SIZE(map_entries));
+                int err = zcbor_map_decode(zsd,
+                                           map_entries,
+                                           sizeof(map_entries) / sizeof(map_entries[0]));
                 if (err)
                 {
-                    LOG_ERR("Failed to deserialize manifest");
+                    POUCH_LOG_ERR("Failed to deserialize manifest");
                     return;
                 }
 
@@ -175,7 +178,7 @@ static void ota_receive_manifest(golioth_downlink_id_t id,
                                               sizeof(component.hash));
                 if (GOLIOTH_OTA_COMPONENT_HASH_BIN_LEN != hash_buf_len)
                 {
-                    LOG_ERR("Failed to deserialize hash");
+                    POUCH_LOG_ERR("Failed to deserialize hash");
                     return;
                 }
 
@@ -187,7 +190,7 @@ static void ota_receive_manifest(golioth_downlink_id_t id,
             ok = zcbor_list_or_map_end(zsd);
             if (!ok)
             {
-                LOG_ERR("Failed to deserialize manifest");
+                POUCH_LOG_ERR("Failed to deserialize manifest");
                 return;
             }
         }
@@ -196,7 +199,7 @@ static void ota_receive_manifest(golioth_downlink_id_t id,
             ok = zcbor_any_skip(zsd, NULL);
             if (!ok)
             {
-                LOG_ERR("Failed to deserialize manifest");
+                POUCH_LOG_ERR("Failed to deserialize manifest");
                 return;
             }
         }
@@ -310,7 +313,7 @@ static void ota_uplink(void)
                                            POUCH_FOREVER);
         if (err)
         {
-            LOG_ERR("Could not report OTA state for %s (%d)", name, err);
+            POUCH_LOG_ERR("Could not report OTA state for %s (%d)", name, err);
         }
     }
 }

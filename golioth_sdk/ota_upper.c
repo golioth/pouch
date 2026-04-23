@@ -54,7 +54,7 @@ int golioth_ota_manifest_receive_one(const struct golioth_ota_component *compone
     POUCH_LOG_DBG("Received one component:");
     POUCH_LOG_DBG("  package: %s", component->package);
     POUCH_LOG_DBG("  version: %s", component->version);
-    POUCH_LOG_DBG("  size: %d", component->size);
+    POUCH_LOG_DBG("  size: %" PRIi32, component->size);
 
     POUCH_STRUCT_SECTION_FOREACH(golioth_ota_registered_component, registered)
     {
