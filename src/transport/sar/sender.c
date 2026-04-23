@@ -159,7 +159,8 @@ int pouch_sender_recv(struct pouch_sender *sender, const uint8_t *buf, size_t le
         return err;
     }
 
-    sender->window = ack.seq + ack.window;
+    sender->window = ack.seq + ack.window + 1;
+
     LOG_DBG("Received ack (%x window: %u. New target seq: %x)",
             ack.seq,
             ack.window,
