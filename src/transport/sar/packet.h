@@ -13,6 +13,7 @@
 #define POUCH_SAR_RX_PKT_LEN 3
 #define POUCH_SAR_SEQ_MAX 0xff
 #define POUCH_SAR_SEQ_MASK POUCH_SAR_SEQ_MAX
+#define POUCH_SAR_WINDOW_MAX 127
 
 enum pouch_sar_rx_pkt_code
 {

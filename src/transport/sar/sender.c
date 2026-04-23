@@ -20,6 +20,14 @@ enum state
     STATE_FIN,
 };
 
+static void end(struct pouch_sender *sender, bool success)
+{
+    if (sender->endpoint->end)
+    {
+        sender->endpoint->end(success);
+    }
+}
+
 static void send_fin(struct pouch_sender *p)
 {
     struct pouch_sar_tx_pkt pkt = {
@@ -159,6 +167,22 @@ int pouch_sender_recv(struct pouch_sender *sender, const uint8_t *buf, size_t le
         return err;
     }
 
+    if (ack.code != POUCH_RECEIVER_CODE_ACK)
+    {
+        LOG_ERR("Received NACK");
+        sender->state = STATE_IDLE;
+        end(sender, false);
+        return -EIO;
+    }
+
+    if (ack.window > POUCH_SAR_WINDOW_MAX)
+    {
+        LOG_ERR("Invalid window");
+        sender->state = STATE_IDLE;
+        end(sender, false);
+        return -EINVAL;
+    }
+
     sender->window = ack.seq + ack.window + 1;
 
     LOG_DBG("Received ack (%x window: %u. New target seq: %x)",
@@ -173,10 +197,7 @@ int pouch_sender_recv(struct pouch_sender *sender, const uint8_t *buf, size_t le
     else if (((ack.seq + 1) & POUCH_SAR_SEQ_MASK) == sender->seq)
     {
         send_fin(sender);
-        if (sender->endpoint->end)
-        {
-            sender->endpoint->end(sender);
-        }
+        end(sender, true);
     }
 
     return 0;
