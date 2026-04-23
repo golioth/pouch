@@ -55,4 +55,5 @@ idf_component_register(SRCS
                          esp_wifi
                          nvs_flash
                          pouch
+                         golioth_sdk
                        )
