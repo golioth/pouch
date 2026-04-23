@@ -17,6 +17,7 @@ POUCH_LOG_REGISTER(ota, CONFIG_GOLIOTH_LOG_LEVEL);
 
 #include "dispatch.h"
 #include "ota.h"
+#include "hex.h"
 
 #define GOLIOTH_OTA_COMPONENT_PATH_PREFIX ".u/c/"
 #define GOLIOTH_OTA_MANIFEST_PATH "/.u/desired"
