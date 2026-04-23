@@ -146,6 +146,11 @@ int pouch_sender_open(struct pouch_sender *sender, struct pouch_bearer *bearer)
 int pouch_sender_recv(struct pouch_sender *sender, const uint8_t *buf, size_t len)
 {
     struct pouch_sar_rx_pkt ack;
+    if (sender->bearer == NULL)
+    {
+        LOG_DBG("Received before opening");
+        return -EBUSY;
+    }
 
     int err = pouch_sar_rx_pkt_decode(buf, len, &ack);
     if (err)
@@ -181,4 +186,5 @@ void pouch_sender_close(struct pouch_sender *sender)
     sender->state = STATE_IDLE;
     free(sender->buf);
     sender->buf = NULL;
+    sender->bearer = NULL;
 }
