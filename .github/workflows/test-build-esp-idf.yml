@@ -36,7 +36,7 @@ jobs:
           esp_idf_version: v5.4.1
           target: esp32s3
           command: |
-            EXAMPLE_APP_PATH=port/esp_idf/test/http_client
+            EXAMPLE_APP_PATH=examples/esp_idf/http_client
 
             pip install -r requirements.txt
 
