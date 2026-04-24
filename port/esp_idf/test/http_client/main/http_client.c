@@ -10,7 +10,6 @@
 #include <esp_http_client.h>
 #include <esp_tls.h>
 #include "credentials.h"
-#include "mtls_type.h"
 
 #include <pouch/port.h>
 #include <pouch/transport/certificate.h>
@@ -177,13 +176,10 @@ static int upload_pouch_cert(struct sync_context *sync)
         return 0;
     }
 
-    struct pouch_cert device_cert;
-    int ret = get_device_cert(&device_cert);
-    if (0 != ret)
-    {
-        ESP_LOGE(TAG, "Unable to read pouch device certificate: %d", ret);
-        return ret;
-    }
+    struct pouch_cert device_cert = {
+        .buffer = (uint8_t *) sync->mtls_creds->client_cert_der,
+        .size = sync->mtls_creds->client_cert_der_len,
+    };
 
     sync->server_cert.pos = 0;
     sync->event_cb = pouch_device_cert_response_callback;
@@ -436,11 +432,11 @@ esp_http_client_handle_t client_initialize(struct sync_context *sync)
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
         .event_handler = event_handler_proxy,
         .cert_pem = sync->mtls_creds->cert_pem,
-        .cert_len = sync->mtls_creds->cert_len,
+        .cert_len = sync->mtls_creds->cert_pem_len,
         .client_cert_pem = sync->mtls_creds->client_cert_pem,
-        .client_cert_len = sync->mtls_creds->client_cert_len,
+        .client_cert_len = sync->mtls_creds->client_cert_pem_len,
         .client_key_pem = sync->mtls_creds->client_key_pem,
-        .client_key_len = sync->mtls_creds->client_key_len,
+        .client_key_len = sync->mtls_creds->client_key_pem_len,
         .timeout_ms = HTTP_TIMEOUT_MS,
         .user_data = sync,
     };

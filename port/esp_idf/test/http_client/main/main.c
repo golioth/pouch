@@ -14,7 +14,6 @@
 
 #include "credentials.h"
 #include "http_client.h"
-#include "mtls_type.h"
 #include "nvs_flash.h"
 #include "wifi.h"
 
