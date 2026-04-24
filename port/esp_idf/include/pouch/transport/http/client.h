@@ -23,5 +23,4 @@ struct mtls_credentials
 };
 
 void http_client_transport_init(struct mtls_credentials *mtls_creds);
-void http_client_fetch_manifest(struct mtls_credentials *mtls_creds);
 int http_client_transport_sync(void);
