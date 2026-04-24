@@ -31,11 +31,6 @@ LOG_MODULE_REGISTER(pouch_http);
 #define HTTP_PATH_SERVER_CERT "/.g/server-cert"
 #define HTTP_PATH_DEVICE_CERT "/.g/device-cert"
 
-#define POUCH_FILL_COUNT_LIMIT 100
-#define CHUNK_DATA_LEN_FMT "%04zx"
-#define CHUNK_HEADER_LEN 6  // ascii hex len(4) + CRLF(2)
-#define CHUNK_FOOTER_LEN 2  // CRLF(2)
-
 static atomic_t pouch_cert_flags;
 #define SERVER_CERT_DOWNLOADED_BIT BIT(0)
 #define POUCH_CERT_UPLOADED_BIT BIT(1)
@@ -159,13 +154,11 @@ static int pouch_http_response_callback(struct http_response *rsp,
     if (!IN_RANGE(rsp->http_status_code, 200, 299))
     {
         LOG_ERR("HTTP request failed: %u", rsp->http_status_code);
-        pouch_uplink_finish(ctx->uplink);
         return -EINVAL;
     }
 
     if (0 == ctx->rcv_offset)
     {
-        pouch_uplink_finish(ctx->uplink);
         pouch_downlink_start();
     }
 
@@ -174,83 +167,45 @@ static int pouch_http_response_callback(struct http_response *rsp,
 
     if (HTTP_DATA_FINAL == final_data)
     {
-        LOG_INF("Received final downlink block");
+        LOG_INF("Received final downlink block: %zu bytes", ctx->rcv_offset);
         pouch_downlink_finish();
     }
 
     return 0;
 }
 
-/**
- * Fill a buffer with data from a given Pouch uplink
- *
- * @param uplink The uplink struct that will provide the data
- * @param buf Buffer into which data should be written.
- * @param[in,out] buf_len As an input, the length of /buf, as an output, the length of data written
- *                        to /buf
- * @param[out] is_last Set to true when no more data is available
- */
-static int pouch_fill_data_cb(struct pouch_uplink *uplink,
-                              uint8_t *buf,
-                              size_t *buf_len,
-                              bool *is_last)
+static int get_data_from_pouch(struct pouch_uplink *uplink,
+                               uint8_t *buf,
+                               size_t *buf_len,
+                               bool *is_last)
 {
-    int8_t fill_count = 0;
-    size_t available_space = *buf_len;
-    while (available_space)
+    int err;
+    enum pouch_result res = POUCH_ERROR;
+    const size_t buf_size = *buf_len;
+
+    while (true)
     {
-        size_t size = available_space;
-        size_t used_space = *buf_len - available_space;
-        enum pouch_result res = pouch_uplink_fill(uplink, buf + used_space, &size);
-        LOG_DBG("uplink_fill res = %d, size = %d", res, size);
+        *buf_len = buf_size; /* restore buf_len after each loop because it's in/out */
+        res = pouch_uplink_fill(uplink, buf, buf_len);
         if (POUCH_ERROR == res)
         {
-            return pouch_uplink_error(uplink);
+            LOG_ERR("Error getting pouch data: %d", res);
+            return -EINVAL;
         }
 
-        available_space -= size;
-
-        if (POUCH_NO_MORE_DATA == res)
+        if ((0 != *buf_len) || (POUCH_NO_MORE_DATA == res))
         {
-            *is_last = true;
-            break;
+            *is_last = (POUCH_NO_MORE_DATA == res) ? true : false;
+            return 0;
         }
 
-        if (available_space)
+        err = pouch_wait_for_queue(uplink, POUCH_MSEC_INTERNAL(100));
+        if (0 != err)
         {
-            k_sleep(K_MSEC(100));
-        }
-
-        if (POUCH_FILL_COUNT_LIMIT < ++fill_count)
-        {
-            LOG_ERR("Failed to get uplink data after %d attempts", POUCH_FILL_COUNT_LIMIT);
-            return -ENOENT;
+            LOG_ERR("Failed to receive uplink blocks");
+            return err;
         }
     }
-
-    *buf_len = *buf_len - available_space;
-    return 0;
-}
-
-/**
- * Write the header and footer for chunked transfer encoding
- *
- * This helper function writes the data length and CRLF to the header as well as the CRLF to the
- * footer.
- *
- * @param buf Buffer containing the data payload which must be offset by CHUNK_HEADER_LEN
- * @param data_len Length of the data being sent in this chunk. This value includes only the length
- *                 of the data itself and doesn't account for any offset, header, or footer.
- */
-static int write_chunk_header_footer(uint8_t *buf, size_t data_len)
-{
-    snprintk(buf, CHUNK_HEADER_LEN - 1, CHUNK_DATA_LEN_FMT, data_len);
-    buf[CHUNK_HEADER_LEN - 2] = '\r';
-    buf[CHUNK_HEADER_LEN - 1] = '\n';
-    buf[CHUNK_HEADER_LEN + data_len] = '\r';
-    buf[CHUNK_HEADER_LEN + data_len + 1] = '\n';
-
-    return CHUNK_HEADER_LEN + data_len + CHUNK_FOOTER_LEN;
 }
 
 /**
@@ -262,58 +217,89 @@ static int write_chunk_header_footer(uint8_t *buf, size_t data_len)
  */
 static int pouch_http_payload_callback(int sock, struct http_request *req, void *user_data)
 {
-    struct sync_context *ctx = user_data;
+    struct sync_context *sync = user_data;
 
     LOG_INF("HTTP Client requesting payload");
 
-    int err = 0;
+    int err;
     ssize_t ret;
-    size_t tx_len = 0;
-    size_t pouch_data_len = 0;
+    size_t pouch_data_len;
+    bool is_last = false;
     size_t payload_size = 0;
-    bool last_chunk = false;
+    char chunk_header[16];
+    int chunk_header_len;
 
-    do
+    sync->uplink = pouch_uplink_start();
+    if (NULL == sync->uplink)
     {
-        pouch_data_len = sizeof(ctx->scratch) - CHUNK_HEADER_LEN - CHUNK_FOOTER_LEN;
+        LOG_ERR("Failed to start uplink");
+        return -ENOMEM;
+    }
 
-        err = pouch_fill_data_cb(ctx->uplink,
-                                 ctx->scratch + CHUNK_HEADER_LEN,
-                                 &pouch_data_len,
-                                 &last_chunk);
+    while (false == is_last)
+    {
+        pouch_data_len = sizeof(sync->scratch);
+        err = get_data_from_pouch(sync->uplink, sync->scratch, &pouch_data_len, &is_last);
         if (0 != err)
         {
-            LOG_ERR("Error getting pouch data: %d", err);
-            pouch_uplink_finish(ctx->uplink);
-            return -EINVAL;
+            goto finish_with_error;
         }
 
-        tx_len = write_chunk_header_footer(ctx->scratch, pouch_data_len);
+        /* Write HEX_CHUNK_SIZE + CRLF to start chunk */
+        chunk_header_len =
+            snprintk(chunk_header, sizeof(chunk_header), "%X\r\n", (int) pouch_data_len);
+        if (0 > chunk_header_len)
+        {
+            LOG_ERR("Failed to format chunk size");
+            err = -EINVAL;
+            goto finish_with_error;
+        }
 
-        ret = zsock_send(sock, ctx->scratch, tx_len, 0);
+        ret = zsock_send(sock, chunk_header, chunk_header_len, 0);
         if (0 > ret)
         {
-            LOG_ERR("Failed to send data: %d", ret);
-            return -errno;
+            err = -errno;
+            LOG_ERR("Failed to send chunk header: %d", err);
+            goto finish_with_error;
         }
         payload_size += ret;
 
-    } while (false == last_chunk);
+        ret = zsock_send(sock, sync->scratch, pouch_data_len, 0);
+        if (0 > ret)
+        {
+            err = -errno;
+            LOG_ERR("Failed to send data: %d", err);
+            goto finish_with_error;
+        }
+        payload_size += ret;
 
-    /* Write final zero chunk */
-    ctx->scratch[CHUNK_HEADER_LEN] = 0;
-    tx_len = write_chunk_header_footer(ctx->scratch, 0);
+        /* Write CRLF to complete chunk */
+        ret = zsock_send(sock, "\r\n", 2, 0);
+        if (0 > ret)
+        {
+            err = -errno;
+            LOG_ERR("Failed to send chunk footer: %d", err);
+            goto finish_with_error;
+        }
+        payload_size += ret;
+    }
 
-    ret = zsock_send(sock, ctx->scratch, tx_len, 0);
+    /* Write 0 block to finish chunk post */
+    ret = zsock_send(sock, "0\r\n\r\n", 5, 0);
     if (0 > ret)
     {
-        LOG_ERR("Failed to send data: %d", ret);
-        return -errno;
+        err = -errno;
+        LOG_ERR("Failed to finish chunk post: %d", err);
+        goto finish_with_error;
     }
     payload_size += ret;
 
-    LOG_INF("Uplink payload sent: %zu bytes", payload_size);
-    return payload_size;
+    LOG_INF("Uplink chunks sent: %zu bytes", payload_size);
+    err = 0;
+
+finish_with_error:
+    pouch_uplink_finish(sync->uplink);
+    return err;
 }
 
 static int pouch_http_set_sockopt_tls(int sock, sec_tag_t sec_tag)
@@ -509,13 +495,6 @@ static int upload_pouch_cert(struct sync_context *sync)
 
 static int send_pouch_uplink(struct sync_context *sync)
 {
-    sync->uplink = pouch_uplink_start();
-    if (NULL == sync->uplink)
-    {
-        LOG_ERR("Failed to start uplink");
-        return -ENOMEM;
-    }
-
     const char *headers[] = {"Transfer-Encoding: chunked\r\n", NULL};
 
     sync->rcv_offset = 0;

@@ -28,6 +28,13 @@ config POUCH_HTTP_TIMEOUT_S
         the OTA service, ensure this value is greater than the total
         expected download time for the OTA component.
 
+config POUCH_HTTP_UPLINK_BLOCK_TIMEOUT_MS
+    int "Pouch HTTP uplink block timeout (milliseconds)"
+    default 100
+    help
+        Number of milliseconds to wait for an available uplink block to
+        become available in the queue before returning an error.
+
 config POUCH_HTTP_RCV_BUF_SIZE
     int "HTTP receive buffer size"
     default 1024
