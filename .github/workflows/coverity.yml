@@ -38,10 +38,10 @@ jobs:
           /opt/toolchains/coverity/bin/cov-configure --comptype gcc \
             --compiler /opt/toolchains/zephyr-sdk-0.17.0/arm-zephyr-eabi/bin/arm-zephyr-eabi-gcc
           /opt/toolchains/coverity/bin/cov-build --dir cov-int \
-            west build -p -b nrf52840dk/nrf52840 pouch/examples/ble_gatt \
+            west build -p -b nrf52840dk/nrf52840 pouch/examples/zephyr/ble_gatt \
             -- -DCONFIG_LOG=n
           /opt/toolchains/coverity/bin/cov-build --dir cov-int --append \
-            west build -p -b nrf9160dk/nrf9160/ns pouch/examples/gateway \
+            west build -p -b nrf9160dk/nrf9160/ns pouch/examples/zephyr/gateway \
             -- -DCONFIG_NET_LOG=n -DCONFIG_LOG=n
           tar czvf pouch.tgz cov-int
           curl --form token=${{ secrets.POUCH_COVERITY_TOKEN }} \

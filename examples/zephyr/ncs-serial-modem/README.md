@@ -22,7 +22,7 @@ imports the upstream `ncs-serial-modem` project tree.
 Switch to the serial modem manifest and update:
 
 ```
-west config manifest.file examples/ncs-serial-modem/west.yml
+west config manifest.file examples/zephyr/ncs-serial-modem/west.yml
 west update
 west patch apply
 ```
@@ -31,11 +31,11 @@ Then build and flash for your target:
 
 ```
 # Thingy:91 X
-west build -p -b thingy91x/nrf9151/ns pouch/examples/ncs-serial-modem/
+west build -p -b thingy91x/nrf9151/ns pouch/examples/zephyr/ncs-serial-modem/
 west flash
 
 # nRF9160 DK
-west build -p -b nrf9160dk/nrf9160/ns pouch/examples/ncs-serial-modem/
+west build -p -b nrf9160dk/nrf9160/ns pouch/examples/zephyr/ncs-serial-modem/
 west flash
 ```
 
@@ -51,5 +51,5 @@ west update
 west patch apply
 ```
 
-See [`examples/gateway/README.md`](../gateway/README.md#gateway-on-nordic-nrf91-platforms)
+See [`examples/zephyr/gateway/README.md`](../gateway/README.md#gateway-on-nordic-nrf91-platforms)
 for the full end-to-end flow.
