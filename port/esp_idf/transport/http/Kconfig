@@ -45,10 +45,11 @@ config POUCH_HTTP_SERVER_CRT_MAX_SIZE
     int "HTTP server cert storage size"
     default 4096
     help
-        Amount of memory to allocate for storing the downloaded gateway certificate
+        Amount of memory to allocate for storing the downloaded gateway
+        certificate
 
 module = POUCH_HTTP_CLIENT
 module-str = Pouch HTTP Client
-rsource "../../../../../src/Kconfig.template.pouch_log_config"
+rsource "../../../../src/Kconfig.template.pouch_log_config"
 
 endmenu # "HTTP Transport Options"

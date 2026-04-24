@@ -7,13 +7,13 @@
 #include <esp_log.h>
 #include <errno.h>
 #include <pouch/pouch.h>
+#include <pouch/transport/http/client.h>
 #include <pouch/types.h>
 #include <string.h>
 #include "mbedtls/pk.h"
 #include "mbedtls/pem.h"
 #include "mbedtls/psa_util.h"
 #include "mbedtls/x509_crt.h"
-#include "http_client.h"
 
 #define TAG "credentials"
 extern const char device_crt_der_start[] asm("_binary_device_crt_der_start");

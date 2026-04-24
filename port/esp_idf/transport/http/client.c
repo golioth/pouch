@@ -9,11 +9,11 @@
 
 #include <esp_http_client.h>
 #include <esp_tls.h>
-#include "credentials.h"
 
 #include <pouch/port.h>
 #include <pouch/transport/certificate.h>
 #include <pouch/transport/downlink.h>
+#include <pouch/transport/http/client.h>
 #include <pouch/transport/uplink.h>
 
 #define MAX_HTTP_RECV_BUFFER 512
