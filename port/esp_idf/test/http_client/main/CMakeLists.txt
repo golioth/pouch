@@ -4,6 +4,7 @@
 
 list(APPEND EXAMPLE_SRCS
         "credentials.c"
+        "fw_update.c"
         "http_client.c"
         "main.c"
         "wifi.c"
@@ -56,4 +57,7 @@ idf_component_register(SRCS
                          nvs_flash
                          pouch
                          golioth_sdk
+                         app_update
                        )
+
+target_link_libraries(${COMPONENT_LIB} INTERFACE "-u link_hook_fw_update_c")
