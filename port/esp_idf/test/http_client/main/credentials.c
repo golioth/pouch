@@ -13,7 +13,7 @@
 #include "mbedtls/pem.h"
 #include "mbedtls/psa_util.h"
 #include "mbedtls/x509_crt.h"
-#include "mtls_type.h"
+#include "http_client.h"
 
 #define TAG "credentials"
 extern const char device_crt_der_start[] asm("_binary_device_crt_der_start");
@@ -27,7 +27,7 @@ extern const char server_ca_cert_pem_end[] asm("_binary_server_ca_cert_pem_end")
 
 static mbedtls_svc_key_id_t _device_key_id = PSA_KEY_ID_NULL;
 
-int get_device_cert(struct pouch_cert *cert)
+static int get_device_cert(struct pouch_cert *cert)
 {
     cert->buffer = (uint8_t *) device_crt_der_start;
     cert->size = device_crt_der_end - device_crt_der_start;
@@ -182,9 +182,9 @@ static int convert_device_cert_der_to_pem(char *pem_buf, size_t pem_buf_len)
 int fill_mtls_credentials(struct mtls_credentials *creds)
 {
     creds->cert_pem = server_ca_cert_pem_start;
-    creds->cert_len = server_ca_cert_pem_end - server_ca_cert_pem_start;
+    creds->cert_pem_len = server_ca_cert_pem_end - server_ca_cert_pem_start;
 
-    if ((NULL == creds->cert_pem) || (0 == creds->cert_len))
+    if ((NULL == creds->cert_pem) || (0 == creds->cert_pem_len))
     {
         ESP_LOGE(TAG, "Failed to load mTLS server CA cert");
         return -ENOENT;
@@ -206,7 +206,10 @@ int fill_mtls_credentials(struct mtls_credentials *creds)
     }
     creds->client_key_pem = device_key_pem;
     /* Get size including null terminator */
-    creds->client_key_len = strlen(device_key_pem) + 1;
+    creds->client_key_pem_len = strlen(device_key_pem) + 1;
+
+    creds->client_key_der = device_key_der_start;
+    creds->client_key_der_len = device_key_der_end - device_key_der_start;
 
     err = convert_device_cert_der_to_pem(device_crt_pem, sizeof(device_crt_pem));
     if (0 != err)
@@ -215,7 +218,10 @@ int fill_mtls_credentials(struct mtls_credentials *creds)
     }
     creds->client_cert_pem = device_crt_pem;
     /* Get size including null terminator */
-    creds->client_cert_len = strlen(device_crt_pem) + 1;
+    creds->client_cert_pem_len = strlen(device_crt_pem) + 1;
+
+    creds->client_cert_der = device_crt_der_start;
+    creds->client_cert_der_len = device_crt_der_end - device_crt_der_start;
 
     return 0;
 }
