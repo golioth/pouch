@@ -62,5 +62,5 @@ if(BOARD MATCHES "bsim")
   add_peripheral(periodic_uplink
     ${ZEPHYR_POUCH_MODULE_DIR}/samples/peripheral/periodic_uplink)
   add_peripheral(ble_gatt_example
-    ${ZEPHYR_POUCH_MODULE_DIR}/examples/ble_gatt)
+    ${ZEPHYR_POUCH_MODULE_DIR}/examples/zephyr/ble_gatt)
 endif()
