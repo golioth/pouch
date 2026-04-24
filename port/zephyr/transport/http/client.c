@@ -182,78 +182,6 @@ static int pouch_http_response_callback(struct http_response *rsp,
 }
 
 /**
- * Fill a buffer with data from a given Pouch uplink
- *
- * @param uplink The uplink struct that will provide the data
- * @param buf Buffer into which data should be written.
- * @param[in,out] buf_len As an input, the length of /buf, as an output, the length of data written
- *                        to /buf
- * @param[out] is_last Set to true when no more data is available
- */
-static int pouch_fill_data_cb(struct pouch_uplink *uplink,
-                              uint8_t *buf,
-                              size_t *buf_len,
-                              bool *is_last)
-{
-    int8_t fill_count = 0;
-    size_t available_space = *buf_len;
-    while (available_space)
-    {
-        size_t size = available_space;
-        size_t used_space = *buf_len - available_space;
-        enum pouch_result res = pouch_uplink_fill(uplink, buf + used_space, &size);
-        LOG_DBG("uplink_fill res = %d, size = %d", res, size);
-        if (POUCH_ERROR == res)
-        {
-            return pouch_uplink_error(uplink);
-        }
-
-        available_space -= size;
-
-        if (POUCH_NO_MORE_DATA == res)
-        {
-            *is_last = true;
-            break;
-        }
-
-        if (available_space)
-        {
-            k_sleep(K_MSEC(100));
-        }
-
-        if (POUCH_FILL_COUNT_LIMIT < ++fill_count)
-        {
-            LOG_ERR("Failed to get uplink data after %d attempts", POUCH_FILL_COUNT_LIMIT);
-            return -ENOENT;
-        }
-    }
-
-    *buf_len = *buf_len - available_space;
-    return 0;
-}
-
-/**
- * Write the header and footer for chunked transfer encoding
- *
- * This helper function writes the data length and CRLF to the header as well as the CRLF to the
- * footer.
- *
- * @param buf Buffer containing the data payload which must be offset by CHUNK_HEADER_LEN
- * @param data_len Length of the data being sent in this chunk. This value includes only the length
- *                 of the data itself and doesn't account for any offset, header, or footer.
- */
-static int write_chunk_header_footer(uint8_t *buf, size_t data_len)
-{
-    snprintk(buf, CHUNK_HEADER_LEN - 1, CHUNK_DATA_LEN_FMT, data_len);
-    buf[CHUNK_HEADER_LEN - 2] = '\r';
-    buf[CHUNK_HEADER_LEN - 1] = '\n';
-    buf[CHUNK_HEADER_LEN + data_len] = '\r';
-    buf[CHUNK_HEADER_LEN + data_len + 1] = '\n';
-
-    return CHUNK_HEADER_LEN + data_len + CHUNK_FOOTER_LEN;
-}
-
-/**
  * Callback for the http_client to supply uplink data
  *
  * The Pouch uplink size is unknown when the HTTP request starts. This callback will be run once by
@@ -268,29 +196,46 @@ static int pouch_http_payload_callback(int sock, struct http_request *req, void 
 
     int err = 0;
     ssize_t ret;
-    size_t tx_len = 0;
-    size_t pouch_data_len = 0;
+    size_t pouch_data_len = sizeof(ctx->scratch);
     size_t payload_size = 0;
-    bool last_chunk = false;
+    enum pouch_result res = POUCH_ERROR;
+    char chunk_header[16];
 
     do
     {
-        pouch_data_len = sizeof(ctx->scratch) - CHUNK_HEADER_LEN - CHUNK_FOOTER_LEN;
-
-        err = pouch_fill_data_cb(ctx->uplink,
-                                 ctx->scratch + CHUNK_HEADER_LEN,
-                                 &pouch_data_len,
-                                 &last_chunk);
-        if (0 != err)
+        pouch_data_len = sizeof(ctx->scratch);
+        res = pouch_uplink_fill(ctx->uplink, ctx->scratch, &pouch_data_len);
+        if (POUCH_ERROR == res)
         {
             LOG_ERR("Error getting pouch data: %d", err);
             pouch_uplink_finish(ctx->uplink);
             return -EINVAL;
         }
 
-        tx_len = write_chunk_header_footer(ctx->scratch, pouch_data_len);
+        if (0 == pouch_data_len && POUCH_MORE_DATA == res)
+        {
+            LOG_DBG("Pouch supplied 0 bytes with more data coming");
+            k_msleep(1);
+            continue;
+        }
 
-        ret = zsock_send(sock, ctx->scratch, tx_len, 0);
+        /* Write HEX_CHUNK_SIZE + CRLF to start chunk */
+        int chunk_header_len =
+            snprintk(chunk_header, sizeof(chunk_header), "%X\r\n", (int) pouch_data_len);
+        if (0 > chunk_header_len)
+        {
+            LOG_ERR("Failed to format chunk size");
+            return -EINVAL;
+        }
+
+        ret = zsock_send(sock, chunk_header, chunk_header_len, 0);
+        if (0 > ret)
+        {
+            LOG_ERR("Failed to send chunk header: %d", ret);
+            return -errno;
+        }
+
+        ret = zsock_send(sock, ctx->scratch, pouch_data_len, 0);
         if (0 > ret)
         {
             LOG_ERR("Failed to send data: %d", ret);
@@ -298,21 +243,26 @@ static int pouch_http_payload_callback(int sock, struct http_request *req, void 
         }
         payload_size += ret;
 
-    } while (false == last_chunk);
+        /* Write CRLF to complete chunk */
+        ret = zsock_send(sock, "\r\n", 2, 0);
+        if (0 > ret)
+        {
+            LOG_ERR("Failed to send chunk footer: %d", ret);
+            return -errno;
+        }
+    } while (POUCH_MORE_DATA == res);
 
-    /* Write final zero chunk */
-    ctx->scratch[CHUNK_HEADER_LEN] = 0;
-    tx_len = write_chunk_header_footer(ctx->scratch, 0);
-
-    ret = zsock_send(sock, ctx->scratch, tx_len, 0);
+    /* Write 0 block to finish chunk post */
+    ret = zsock_send(sock, "0\r\n\r\n", 5, 0);
     if (0 > ret)
     {
-        LOG_ERR("Failed to send data: %d", ret);
+        LOG_ERR("Failed to finish chunk post: %d", ret);
         return -errno;
     }
     payload_size += ret;
 
-    LOG_INF("Uplink payload sent: %zu bytes", payload_size);
+    LOG_DBG("Uplink chunks sent: %zu bytes", payload_size);
+
     return payload_size;
 }
 
