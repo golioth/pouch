@@ -6,6 +6,8 @@
 # Based on:
 # https://github.com/zephyrproject-rtos/zephyr/blob/v4.3.0/modules/zcbor/Kconfig
 
+menu "ZCBOR Library"
+
 config ZCBOR
 	bool "zcbor CBOR library"
 	help
@@ -44,3 +46,4 @@ config ZCBOR_MAX_STR_LEN
 	  using this is discouraged.
 
 endif # ZCBOR
+endmenu

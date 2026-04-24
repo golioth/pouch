@@ -98,13 +98,4 @@ menu "Wi-Fi Configuration"
     endchoice
 
 endmenu
-
-config POUCH_TRANSPORT_HTTP_CLIENT
-    bool "HTTP"
-    default y
-    help
-        HTTP transport for Pouch
-
-rsource "Kconfig.http_client"
-
 endmenu

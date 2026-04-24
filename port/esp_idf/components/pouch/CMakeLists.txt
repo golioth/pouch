@@ -16,9 +16,10 @@ set(POUCH_TRANSPORT_COMMON ${POUCH_ROOT}/src/transport)
 #########################
 
 list(APPEND POUCH_PORT_INC_DIRS
-    ${POUCH_PORT}/esp_idf  # esp_idf/pouch_port_macros_internal.h
-    ${POUCH_PORT}/include  # pouch/port.h
-    ${POUCH_PORT}/freertos # port/freertos
+    ${POUCH_PORT}/esp_idf         # esp_idf/pouch_port_macros_internal.h
+    ${POUCH_PORT}/esp_idf/include # port transport headers
+    ${POUCH_PORT}/include         # pouch/port.h
+    ${POUCH_PORT}/freertos        # port/freertos
 )
 
 list(APPEND POUCH_PORT_SRCS
@@ -158,6 +159,18 @@ if("${CONFIG_POUCH_TRANSPORT_GATT_COMMON}" STREQUAL "y")
 endif()
 
 #########################
+# Transports
+#########################
+
+if("${CONFIG_POUCH_TRANSPORT_HTTP_CLIENT}" STREQUAL "y")
+    list(APPEND POUCH_TRANSPORT_SRCS ${POUCH_PORT}/esp_idf/transport/http/client.c)
+    list(APPEND POUCH_PRIV_REQUIRES
+        esp_http_client
+        esp-tls
+    )
+endif()
+
+#########################
 # Libraries
 #########################
 
@@ -218,3 +231,6 @@ idf_component_register(SRCS
                          mbedtls
                          zcbor
                        )
+
+# Conditionally required components need to be process after initial registration
+idf_component_optional_requires(PRIVATE ${POUCH_PRIV_REQUIRES})

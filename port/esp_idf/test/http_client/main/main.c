@@ -13,14 +13,13 @@
 #include <string.h>
 
 #include "credentials.h"
-#include "http_client.h"
-#include "mtls_type.h"
 #include "nvs_flash.h"
 #include "wifi.h"
 
 #include <pouch/golioth/settings_callbacks.h>
 #include <pouch/pouch.h>
 #include <pouch/pouch_ca_cert.h>
+#include <pouch/transport/http/client.h>
 #include <pouch/uplink.h>
 #include <string.h>
 
