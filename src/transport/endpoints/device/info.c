@@ -58,12 +58,12 @@ static int build_info_data(void)
     return cbor_encode_pouch_gatt_info(info.buf, INFO_MAX_SIZE, &cbor, &info.len);
 }
 
-static int start(void)
+static int start(struct pouch_bearer *bearer)
 {
     return build_info_data();
 }
 
-static enum pouch_result send(void *dst, size_t *dst_len)
+static enum pouch_result send(struct pouch_bearer *bearer, void *dst, size_t *dst_len)
 {
     enum pouch_result res = POUCH_MORE_DATA;
     if (info.offset + *dst_len >= info.len)

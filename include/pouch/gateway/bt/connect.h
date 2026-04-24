@@ -8,33 +8,13 @@
 
 #include <zephyr/bluetooth/conn.h>
 
-#include <pouch/gateway/types.h>
+/** Bluetooth gateway end callback */
+typedef void (*pouch_gateway_bt_end_t)(struct bt_conn *conn);
 
 /**
- * Get the node info for the given Bluetooth connection.
+ * Start Bluetooth Pouch gateway for the given connection.
  *
  * @param conn The Bluetooth connection.
- * @return Pointer to the node info structure.
+ * @param callback Callback to call when the gateway operation finished for the given connection.
  */
-struct pouch_gateway_node_info *pouch_gateway_get_node_info(const struct bt_conn *conn);
-
-/**
- * Start Bluetooth operations for the given connection.
- *
- * @param conn The Bluetooth connection.
- */
-void pouch_gateway_bt_start(struct bt_conn *conn);
-
-/**
- * Stop Bluetooth operations for the given connection.
- *
- * @param conn The Bluetooth connection.
- */
-void pouch_gateway_bt_stop(struct bt_conn *conn);
-
-/**
- * Finish Bluetooth operations for the given connection.
- *
- * @param conn The Bluetooth connection.
- */
-void pouch_gateway_bt_finished(struct bt_conn *conn);
+int pouch_gateway_bt_start(struct bt_conn *conn, pouch_gateway_bt_end_t callback);

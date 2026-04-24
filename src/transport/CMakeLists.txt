@@ -7,18 +7,17 @@ zephyr_library()
 zephyr_library_link_libraries(pouch)
 
 zephyr_library_sources(
-    endpoints/info.c
-    endpoints/uplink.c
-    endpoints/downlink.c
+    endpoints/device/info.c
+    endpoints/device/uplink.c
+    endpoints/device/downlink.c
     sar/sender.c
     sar/receiver.c
     sar/packet.c
     ${CMAKE_CURRENT_BINARY_DIR}/info_encode.c
 )
-
 zephyr_library_sources_ifdef(CONFIG_POUCH_ENCRYPTION_SAEAD
-    endpoints/device_cert.c
-    endpoints/server_cert.c
+    endpoints/device/device_cert.c
+    endpoints/device/server_cert.c
 )
 
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/info_encode.c

@@ -9,24 +9,23 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 
-#include <pouch/transport/gatt/common/uuids.h>
+#include "common.h"
 
 #include "transport/sar/receiver.h"
 #include "transport/sar/sender.h"
-#include "transport/endpoints/endpoints.h"
+#include "transport/endpoints/device/endpoints.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(pouch_gatt, CONFIG_POUCH_GATT_LOG_LEVEL);
 
-#define BT_ATT_OVERHEAD 3
 
 #define CHAR_INIT_RECVEIVER(_endpoint)                                   \
     {                                                                    \
         .bearer =                                                        \
             {                                                            \
                 .send = bearer_send,                                     \
-                .abort = bearer_abort,                                   \
-                .window = CONFIG_POUCH_TRANSPORT_GATT_WINDOW_SIZE,       \
+                .close = bearer_close,                                   \
+                .ready = bearer_ready,                                   \
             },                                                           \
         .type = CHAR_RECEIVER,                                           \
         .receiver = &((struct pouch_receiver){.endpoint = (_endpoint)}), \
@@ -36,8 +35,8 @@ LOG_MODULE_REGISTER(pouch_gatt, CONFIG_POUCH_GATT_LOG_LEVEL);
         .bearer =                                                    \
             {                                                        \
                 .send = bearer_send,                                 \
-                .abort = bearer_abort,                               \
-                .window = CONFIG_POUCH_TRANSPORT_GATT_WINDOW_SIZE,   \
+                .close = bearer_close,                               \
+                .ready = bearer_ready,                               \
             },                                                       \
         .type = CHAR_SENDER,                                         \
         .sender = &((struct pouch_sender){.endpoint = (_endpoint)}), \
@@ -76,13 +75,29 @@ static int bearer_send(struct pouch_bearer *bearer, const uint8_t *buf, size_t l
     return bt_gatt_notify(c->conn, c->attr, buf, len);
 }
 
-static void bearer_abort(struct pouch_bearer *bearer)
+static void bearer_close(struct pouch_bearer *bearer, bool success)
 {
     struct pouch_characteristic *c = CONTAINER_OF(bearer, struct pouch_characteristic, bearer);
 
-    LOG_DBG("%p: abort", c);
+    if (!success)
+    {
+        LOG_DBG("%p: close", c);
+        bt_conn_disconnect(c->conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+    }
+}
 
-    bt_conn_disconnect(c->conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+static void bearer_ready(struct pouch_bearer *bearer)
+{
+    struct pouch_characteristic *c = CONTAINER_OF(bearer, struct pouch_characteristic, bearer);
+
+    LOG_DBG("%p: ready", c);
+    switch (c->type)
+    {
+        case CHAR_RECEIVER:
+            return pouch_receiver_ready(c->receiver);
+        case CHAR_SENDER:
+            return pouch_sender_ready(c->sender);
+    }
 }
 
 static struct pouch_characteristic *pouch_characteristic(const struct bt_gatt_attr *attr)
@@ -127,7 +142,9 @@ static int open(struct pouch_characteristic *c)
     switch (c->type)
     {
         case CHAR_RECEIVER:
-            return pouch_receiver_open(c->receiver, &c->bearer);
+            return pouch_receiver_open(c->receiver,
+                                       &c->bearer,
+                                       CONFIG_POUCH_TRANSPORT_GATT_WINDOW_SIZE);
         case CHAR_SENDER:
             return pouch_sender_open(c->sender, &c->bearer);
     }

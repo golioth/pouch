@@ -24,8 +24,10 @@ static void end(struct pouch_sender *sender, bool success)
 {
     if (sender->endpoint->end)
     {
-        sender->endpoint->end(success);
+        sender->endpoint->end(sender->bearer, success);
     }
+
+    pouch_bearer_close(sender->bearer, success);
 }
 
 static void send_fin(struct pouch_sender *p)
@@ -72,11 +74,11 @@ static void push_fragments(struct pouch_sender *sender)
             pkt.flags |= POUCH_SAR_TX_PKT_FLAG_FIRST;
         }
 
-        enum pouch_result res = sender->endpoint->send((void *) pkt.data, &pkt.len);
+        enum pouch_result res = sender->endpoint->send(sender->bearer, (void *) pkt.data, &pkt.len);
         if (res == POUCH_ERROR)
         {
             LOG_ERR("Error from endpoint, aborting");
-            pouch_bearer_abort(sender->bearer);
+            pouch_bearer_close(sender->bearer, false);
             return;
         }
         if (res == POUCH_MORE_DATA && pkt.len == 0)
@@ -119,11 +121,8 @@ static void push_fragments(struct pouch_sender *sender)
     }
 }
 
-
 int pouch_sender_open(struct pouch_sender *sender, struct pouch_bearer *bearer)
 {
-    LOG_DBG("Starting transfer %p", sender);
-
     sender->bearer = bearer;
     sender->seq = 0;
     sender->window = 0;
@@ -137,7 +136,7 @@ int pouch_sender_open(struct pouch_sender *sender, struct pouch_bearer *bearer)
 
     if (sender->endpoint->start != NULL)
     {
-        int err = sender->endpoint->start();
+        int err = sender->endpoint->start(sender->bearer);
         if (err)
         {
             free(sender->buf);
@@ -196,15 +195,30 @@ int pouch_sender_recv(struct pouch_sender *sender, const uint8_t *buf, size_t le
     }
     else if (((ack.seq + 1) & POUCH_SAR_SEQ_MASK) == sender->seq)
     {
+        bool already_ended = (sender->state == STATE_IDLE);
         send_fin(sender);
-        end(sender, true);
+        if (!already_ended)
+        {
+            end(sender, true);
+        }
     }
 
     return 0;
 }
 
+void pouch_sender_ready(struct pouch_sender *sender)
+{
+    push_fragments(sender);
+}
+
 void pouch_sender_close(struct pouch_sender *sender)
 {
+    if (sender->state == STATE_ACTIVE || sender->state == STATE_READY)
+    {
+        // aborted without reaching the end of the transfer
+        end(sender, false);
+    }
+
     sender->state = STATE_IDLE;
     free(sender->buf);
     sender->buf = NULL;

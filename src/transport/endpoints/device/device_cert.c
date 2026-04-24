@@ -12,13 +12,13 @@
 static struct pouch_cert cert;
 static size_t offset;
 
-static int start(void)
+static int start(struct pouch_bearer *bearer)
 {
     offset = 0;
     return pouch_device_certificate_get(&cert);
 }
 
-static enum pouch_result send(void *dst, size_t *dst_len)
+static enum pouch_result send(struct pouch_bearer *bearer, void *dst, size_t *dst_len)
 {
     enum pouch_result res = POUCH_MORE_DATA;
     if (offset + *dst_len >= cert.size)

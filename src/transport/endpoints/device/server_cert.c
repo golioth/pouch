@@ -19,7 +19,7 @@ static struct
     size_t size;
 } cert;
 
-static int start(void)
+static int start(struct pouch_bearer *bearer)
 {
     cert.buffer = malloc(CONFIG_POUCH_SERVER_CERT_MAX_LEN);
     if (cert.buffer == NULL)
@@ -31,7 +31,7 @@ static int start(void)
     return 0;
 }
 
-static int recv(const void *buf, size_t len)
+static int recv(struct pouch_bearer *bearer, const void *buf, size_t len)
 {
     if (cert.size + len > CONFIG_POUCH_SERVER_CERT_MAX_LEN)
     {
@@ -45,7 +45,7 @@ static int recv(const void *buf, size_t len)
     return 0;
 }
 
-static void end(bool success)
+static void end(struct pouch_bearer *bearer, bool success)
 {
     if (success)
     {

@@ -6,7 +6,10 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <pouch/transport/types.h>
+
+struct pouch_bearer;
 
 /**
  * Pouch transport endpoint definition.
@@ -18,11 +21,11 @@ struct pouch_endpoint
      *
      * @return 0 if the transfer could be started, or an error code if the endpoint is not ready.
      */
-    int (*start)(void);
+    int (*start)(struct pouch_bearer *bearer);
     /**
      * End callback, signalling the end of a transfer.
      */
-    void (*end)(bool success);
+    void (*end)(struct pouch_bearer *bearer, bool success);
     /**
      * Receive callback, pushing data to the endpoint.
      * This callback is only used in receiver endpoints.
@@ -30,7 +33,7 @@ struct pouch_endpoint
      * @return 0 if the data was processed successfully, or an error code if the data could not be
      * processed.
      */
-    int (*recv)(const void *buf, size_t len);
+    int (*recv)(struct pouch_bearer *bearer, const void *buf, size_t len);
     /**
      * Send callback, pulling data from the endpoint.
      * This callback is only used in sender endpoints.
@@ -45,11 +48,5 @@ struct pouch_endpoint
      * endpoint.
      * @retval POUCH_ERROR An error occured, and the transfer should be aborted.
      */
-    enum pouch_result (*send)(void *dst, size_t *dst_len);
+    enum pouch_result (*send)(struct pouch_bearer *bearer, void *dst, size_t *dst_len);
 };
-
-extern const struct pouch_endpoint pouch_endpoint_info;
-extern const struct pouch_endpoint pouch_endpoint_device_cert;
-extern const struct pouch_endpoint pouch_endpoint_server_cert;
-extern const struct pouch_endpoint pouch_endpoint_uplink;
-extern const struct pouch_endpoint pouch_endpoint_downlink;
