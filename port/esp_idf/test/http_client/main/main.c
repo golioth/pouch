@@ -82,7 +82,9 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to init pouch: %d", err);
         return;
     }
-    ESP_LOGI(TAG, "Pouch successfully initialized");
+    ESP_LOGI(TAG,
+             "Pouch successfully initialized; sync interval: %ds",
+             CONFIG_EXAMPLE_HTTP_CLIENT_SYNC_PERIOD_S);
 
     while (true)
     {
