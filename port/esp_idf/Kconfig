@@ -72,8 +72,7 @@ rsource "../../src/saead/Kconfig"
 endmenu
 
 # Transport choices
-# TODO: implement port-specific transports
-#rsource "transport/Kconfig"
+rsource "transport/Kconfig"
 
 endif
 

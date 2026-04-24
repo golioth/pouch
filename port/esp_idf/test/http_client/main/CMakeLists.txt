@@ -5,7 +5,6 @@
 list(APPEND EXAMPLE_SRCS
         "credentials.c"
         "fw_update.c"
-        "http_client.c"
         "main.c"
         "wifi.c"
 )
@@ -51,8 +50,6 @@ idf_component_register(SRCS
                          ${EXAMPLE_TXT_EMBEDS}
 
                        REQUIRES
-                         esp_http_client
-                         esp-tls
                          esp_wifi
                          nvs_flash
                          pouch
