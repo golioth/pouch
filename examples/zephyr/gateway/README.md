@@ -59,8 +59,8 @@ firmware is split across two chips:
 
 - **Serial modem firmware** runs on the nRF91 chip and provides LTE
   connectivity to the gateway over UART. See
-  [`examples/ncs-serial-modem`](../ncs-serial-modem) for the serial
-  modem application.
+  [`examples/zephyr/ncs-serial-modem`](../ncs-serial-modem) for the
+  serial modem application.
 - **Gateway firmware** runs on the Bluetooth-capable chip (nRF52840 on
   nRF9160 DK, nRF5340 on Thingy:91 X). It runs the Bluetooth Host
   stack and communicates with the nRF91 serial modem over UART for
@@ -75,10 +75,10 @@ modem manifest, build and flash by changing the `SWD` switch (`SW2`)
 to `nRF91`, then:
 
 ```
-west config manifest.file examples/ncs-serial-modem/west.yml
+west config manifest.file examples/zephyr/ncs-serial-modem/west.yml
 west update
 west patch apply
-west build -p -b thingy91x/nrf9151/ns pouch/examples/ncs-serial-modem/
+west build -p -b thingy91x/nrf9151/ns pouch/examples/zephyr/ncs-serial-modem/
 west flash
 ```
 
@@ -90,7 +90,7 @@ manifest, build and flash by changing the `SWD` switch (`SW2`) to
 west config manifest.file west-ncs.yml
 west update
 west patch apply
-west build -p -b thingy91x/nrf5340/cpuapp --sysbuild pouch/examples/gateway/
+west build -p -b thingy91x/nrf5340/cpuapp --sysbuild pouch/examples/zephyr/gateway/
 west flash
 ```
 
@@ -101,10 +101,10 @@ modem manifest, build and flash by changing the `SWD` switch (`SW10`)
 to `nRF91`, then:
 
 ```
-west config manifest.file examples/ncs-serial-modem/west.yml
+west config manifest.file examples/zephyr/ncs-serial-modem/west.yml
 west update
 west patch apply
-west build -p -b nrf9160dk/nrf9160/ns pouch/examples/ncs-serial-modem/
+west build -p -b nrf9160dk/nrf9160/ns pouch/examples/zephyr/ncs-serial-modem/
 west flash
 ```
 
@@ -116,7 +116,7 @@ manifest, build and flash by changing the `SWD` switch (`SW10`) to
 west config manifest.file west-ncs.yml
 west update
 west patch apply
-west build -p -b nrf9160dk/nrf52840 --sysbuild pouch/examples/gateway/
+west build -p -b nrf9160dk/nrf52840 --sysbuild pouch/examples/zephyr/gateway/
 west flash
 ```
 

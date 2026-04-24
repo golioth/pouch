@@ -44,4 +44,3 @@ config EXAMPLE_HTTP_CLIENT_GW_DEVICE_KEY_FILENAME
         The filename used to store the mTLS device private key in the filesystem. By default this is
         the same as the filename used for the Pouch device key, but may be changed if different
         credentials are desired for mTLS versus Pouch.
-

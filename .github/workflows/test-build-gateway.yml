@@ -10,7 +10,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - manifest: examples/ncs-serial-modem/west.yml
+          - manifest: examples/zephyr/ncs-serial-modem/west.yml
             target: thingy91x/nrf9151/ns
             app: ncs-serial-modem
             sysbuild: true
@@ -18,7 +18,7 @@ jobs:
             target: thingy91x/nrf5340/cpuapp
             app: gateway
             sysbuild: true
-          - manifest: examples/ncs-serial-modem/west.yml
+          - manifest: examples/zephyr/ncs-serial-modem/west.yml
             target: nrf9160dk/nrf9160/ns
             app: ncs-serial-modem
             sysbuild: true
@@ -94,7 +94,7 @@ jobs:
         run: |
           west build \
             -b $TARGET \
-            pouch/examples/${{ matrix.app }} \
+            pouch/examples/zephyr/${{ matrix.app }} \
             ${{ matrix.sysbuild && '--sysbuild' || '--no-sysbuild' }} \
             -- ${{ matrix.extra_args }}
 

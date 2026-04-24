@@ -64,4 +64,4 @@ jobs:
             SYSBUILD_FLAG="--sysbuild"
           fi
 
-          west build ${SYSBUILD_FLAG} -p -b ${{ matrix.board }} pouch/examples/${{ matrix.example }}
+          west build ${SYSBUILD_FLAG} -p -b ${{ matrix.board }} pouch/examples/zephyr/${{ matrix.example }}
