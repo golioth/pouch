@@ -4,6 +4,7 @@
 
 list(APPEND EXAMPLE_SRCS
         "credentials.c"
+        "fw_update.c"
         "http_client.c"
         "main.c"
         "wifi.c"
@@ -56,4 +57,8 @@ idf_component_register(SRCS
                          nvs_flash
                          pouch
                          golioth_sdk
+                         app_update
                        )
+
+# fw_update.c has no global references, use WHOLE_ARCHIVE to ensure it gets processed by the linker
+idf_component_set_property(${COMPONENT_NAME} WHOLE_ARCHIVE TRUE)
