@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <pouch/port.h>
 #include <stdint.h>
 #include <stddef.h>
 #include "types.h"
@@ -20,6 +21,9 @@ struct pouch_uplink;
 
 /** Start a new uplink session */
 struct pouch_uplink *pouch_uplink_start(void);
+
+/** Wait for a block to become available in the uplink queue */
+int pouch_wait_for_queue(struct pouch_uplink *uplink, pouch_timeout_t timeout);
 
 /** Fill the uplink buffer */
 enum pouch_result pouch_uplink_fill(struct pouch_uplink *uplink, uint8_t *dst, size_t *dst_len);
