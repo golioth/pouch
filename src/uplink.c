@@ -47,6 +47,8 @@ struct pouch_uplink
         pouch_buf_queue_t queue;
         /** Buffer reader for the buffer currently being processed. */
         struct pouch_bufview reader;
+        /** Semaphore to signal available blocks in the queue */
+        pouch_sem_t has_queue_sem;
     } transport;
 };
 
@@ -91,6 +93,8 @@ static void process_blocks(pouch_work_t *work)
     {
         pouch_atomic_set_bit(uplink.flags, POUCH_CLOSED);
     }
+
+    pouch_sem_give(&uplink.transport.has_queue_sem);
 }
 
 static void end_session(void)
@@ -132,6 +136,8 @@ void uplink_init(void)
                            CONFIG_POUCH_UPLINK_PROCESSING_STACK_SIZE,
                            CONFIG_POUCH_UPLINK_PROCESSING_PRIORITY,
                            "uplink_workq");
+
+    pouch_sem_init(&uplink.transport.has_queue_sem, 0, 1);
 }
 
 uint32_t uplink_session_id(void)
@@ -202,6 +208,11 @@ struct pouch_uplink *pouch_uplink_start(void)
     }
 
     return &uplink;
+}
+
+int pouch_wait_for_queue(struct pouch_uplink *uplink, pouch_timeout_t timeout)
+{
+    return pouch_sem_take(&uplink->transport.has_queue_sem, timeout);
 }
 
 enum pouch_result pouch_uplink_fill(struct pouch_uplink *uplink, uint8_t *dst, size_t *len)
