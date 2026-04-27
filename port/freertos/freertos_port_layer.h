@@ -67,6 +67,26 @@ typedef SemaphoreHandle_t pouch_mutex_internal_t;
     POUCH_APPLICATION_STARTUP_HOOK(static_mutex_init_##name)
 
 /*--------------------------------------------------
+ * Semaphore
+ *------------------------------------------------*/
+
+struct freertos_sem
+{
+    SemaphoreHandle_t handle;
+    StaticSemaphore_t buf;
+};
+
+typedef struct freertos_sem pouch_sem_internal_t;
+
+#define POUCH_SEM_DEFINE_INTERNAL(name, initial_count, count_limit) \
+    pouch_sem_t name;                                               \
+    static void static_semaphore_init_##name(void)                  \
+    {                                                               \
+        pouch_sem_init(&name, initial_count, count_limit);          \
+    }                                                               \
+    POUCH_APPLICATION_STARTUP_HOOK(static_semaphore_init_##name)
+
+/*--------------------------------------------------
  * Work Queue
  *------------------------------------------------*/
 

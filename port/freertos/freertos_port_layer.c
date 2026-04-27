@@ -7,6 +7,7 @@
 
 #include "errno.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include <pouch/port.h>
 #include "freertos_port_layer.h"
 #include <stdint.h>
@@ -295,8 +296,6 @@ void pouch_yield(void)
  * /port/freertos/freertos_port_layer.h
  */
 
-#include "freertos/semphr.h"
-
 void pouch_mutex_init(pouch_mutex_t *mutex)
 {
     *mutex = xSemaphoreCreateMutex();
@@ -310,6 +309,38 @@ bool pouch_mutex_lock(pouch_mutex_t *mutex, pouch_timeout_t timeout)
 bool pouch_mutex_unlock(pouch_mutex_t *mutex)
 {
     return xSemaphoreGive(*mutex);
+}
+
+/*--------------------------------------------------
+ * Semaphore
+ *------------------------------------------------*/
+
+int pouch_sem_init(pouch_sem_t *sem, unsigned int initial_count, unsigned int limit)
+{
+    sem->handle = xSemaphoreCreateCountingStatic(limit, initial_count, &sem->buf);
+    configASSERT(sem->handle != NULL);
+    return 0;
+}
+
+int pouch_sem_take(pouch_sem_t *sem, pouch_timeout_t timeout)
+{
+    bool success = xSemaphoreTake(sem->handle, timeout);
+    return (pdTRUE == success) ? 0 : -EBUSY;
+}
+
+void pouch_sem_give(pouch_sem_t *sem)
+{
+    xSemaphoreGive(sem->handle);
+}
+
+void pouch_sem_reset(pouch_sem_t *sem)
+{
+    int success = 0;
+
+    while (success == 0)
+    {
+        success = pouch_sem_take(sem, POUCH_NO_WAIT);
+    }
 }
 
 /*--------------------------------------------------
