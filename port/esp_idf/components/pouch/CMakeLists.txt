@@ -52,6 +52,12 @@ list(APPEND POUCH_CORE_SRCS
       # Generated Sources
       ${CMAKE_CURRENT_BINARY_DIR}/header_decode.c
       ${CMAKE_CURRENT_BINARY_DIR}/header_encode.c
+
+      ${POUCH_ROOT}/src/crypto_saead.c
+      ${POUCH_ROOT}/src/cert.c
+      ${POUCH_ROOT}/src/saead/session.c
+      ${POUCH_ROOT}/src/saead/uplink.c
+      ${POUCH_ROOT}/src/saead/downlink.c
   )
 
 list(APPEND POUCH_CORE_LINKER_FILES
@@ -59,20 +65,6 @@ list(APPEND POUCH_CORE_LINKER_FILES
     ${POUCH_PORT}/esp_idf/event_handlers.lf
     ${POUCH_PORT}/esp_idf/uplink_handlers.lf
 )
-
-if ("${CONFIG_POUCH_ENCRYPTION_NONE}" STREQUAL "y")
-    list(APPEND POUCH_CORE_SRCS ${POUCH_ROOT}/src/crypto_none.c)
-endif()
-
-if ("${CONFIG_POUCH_ENCRYPTION_SAEAD}" STREQUAL "y")
-    list(APPEND POUCH_CORE_SRCS
-        ${POUCH_ROOT}/src/crypto_saead.c
-        ${POUCH_ROOT}/src/cert.c
-        ${POUCH_ROOT}/src/saead/session.c
-        ${POUCH_ROOT}/src/saead/uplink.c
-        ${POUCH_ROOT}/src/saead/downlink.c
-    )
-endif()
 
 if(NOT CMAKE_BUILD_EARLY_EXPANSION)
     add_custom_command(

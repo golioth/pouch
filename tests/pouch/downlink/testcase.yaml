@@ -1,4 +1,5 @@
 common:
+  build_only: true # TODO: Disabled running this for now, as unencrypted mode is no longer supported.
   platform_allow:
     - native_sim
     - native_sim/native/64

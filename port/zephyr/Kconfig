@@ -9,25 +9,7 @@ menuconfig POUCH
   select MBEDTLS
   select MBEDTLS_PSA_CRYPTO_C
   select PSA_WANT_ALG_SHA_256
-  help
-    Pouch is a protocol for communicating with Golioth from devices not
-    directly connected to the internet.
-
-# Port-specific log-level constants
-rsource "Kconfig.port_log_levels"
-
-if POUCH
-
-# Pouch common
-rsource "../../src/Kconfig"
-
-choice
-  prompt "Pouch uplink encryption scheme"
-  help
-    Select the encryption method to use for uplink Pouch transfers.
-
-config POUCH_ENCRYPTION_SAEAD
-  bool "Streaming AEAD"
+  # Encryption:
   select PSA_WANT_ALG_ECDSA
   select PSA_WANT_ALG_ECDH
   select PSA_WANT_ALG_HKDF
@@ -41,24 +23,28 @@ config POUCH_ENCRYPTION_SAEAD
   select PSA_WANT_KEY_TYPE_ECC_PUBLIC_KEY
   select MBEDTLS_ECDSA_C
   select MBEDTLS_ECP_C
-  # nRF Connect SDK only:
+  help
+    Pouch is a protocol for communicating with Golioth from devices not
+    directly connected to the internet.
+
+# nRF Connect SDK only:
+config POUCH
+  depends on SOC_FAMILY_NORDIC_NRF
   select NORDIC_SECURITY_BACKEND
   select MBEDTLS_PK_PARSE_C
   select MBEDTLS_PK_C
   select MBEDTLS_X509_LIBRARY
   select MBEDTLS_X509_CRT_PARSE_C
-  help
-    Use a streaming AEAD encryption scheme for uplink Pouch transfers.
 
-config POUCH_ENCRYPTION_NONE
-  bool "Plaintext"
-  help
-    No encryption.
+# Port-specific log-level constants
+rsource "Kconfig.port_log_levels"
 
-endchoice
+if POUCH
 
-menu "Streaming AEAD encryption"
-  depends on POUCH_ENCRYPTION_SAEAD
+# Pouch common
+rsource "../../src/Kconfig"
+
+menu "Encryption"
 
 choice
   prompt "Encryption algorithm"
