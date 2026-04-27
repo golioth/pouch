@@ -601,6 +601,57 @@ bool pouch_mutex_lock(pouch_mutex_t *mutex, pouch_timeout_t timeout);
 bool pouch_mutex_unlock(pouch_mutex_t *mutex);
 
 /*--------------------------------------------------
+ * Semaphore
+ *------------------------------------------------*/
+
+typedef pouch_sem_internal_t pouch_sem_t;
+
+/**
+ * @brief Statically define and initialize a semaphore
+ *
+ * @param name Name of the semaphore
+ * @param initial_count Initial count of the semaphore
+ * @param count_limit Maximum value of the semaphore count
+ */
+#define POUCH_SEM_DEFINE(name, initial_count, count_limit) \
+    POUCH_SEM_DEFINE_INTERNAL(name, initial_count, count_limit)
+
+/**
+ * @brief Initialize a semaphore
+ *
+ * @param sem Semaphore to initialize
+ * @param initial_count Initial count of the semaphore
+ * @param limit Maximum value of the semaphore count
+ *
+ * @return 0 on success or a negative error value
+ */
+int pouch_sem_init(pouch_sem_t *sem, unsigned int initial_count, unsigned int limit);
+
+/**
+ * @brief Take a semaphore
+ *
+ * @param sem Semaphore to take
+ * @param timeout How long to wait for the semaphore
+ *
+ * @return 0 on success or a negative error value
+ */
+int pouch_sem_take(pouch_sem_t *sem, pouch_timeout_t timeout);
+
+/**
+ * @brief Give a semaphore
+ *
+ * @param sem Semaphore to give
+ */
+void pouch_sem_give(pouch_sem_t *sem);
+
+/**
+ * @brief Reset a semaphore count to zero
+ *
+ * @param sem Semaphore to reset
+ */
+void pouch_sem_reset(pouch_sem_t *sem);
+
+/*--------------------------------------------------
  * Work Queue
  *------------------------------------------------*/
 
