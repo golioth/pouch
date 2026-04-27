@@ -115,6 +115,15 @@ typedef struct k_mutex pouch_mutex_internal_t;
 #define POUCH_MUTEX_DEFINE_INTERNAL(name) K_MUTEX_DEFINE(name)
 
 /*--------------------------------------------------
+ * Semaphore
+ *------------------------------------------------*/
+
+typedef struct k_sem pouch_sem_internal_t;
+
+#define POUCH_SEM_DEFINE_INTERNAL(name, initial_count, count_limit) \
+    K_SEM_DEFINE(name, initial_count, count_limit)
+
+/*--------------------------------------------------
  * Time
  *------------------------------------------------*/
 

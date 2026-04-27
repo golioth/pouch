@@ -206,6 +206,30 @@ bool pouch_mutex_unlock(pouch_mutex_t *mutex)
 }
 
 /*--------------------------------------------------
+ * Semaphore
+ *------------------------------------------------*/
+
+int pouch_sem_init(pouch_sem_t *sem, unsigned int initial_count, unsigned int limit)
+{
+    return k_sem_init(sem, initial_count, limit);
+}
+
+int pouch_sem_take(pouch_sem_t *sem, pouch_timeout_t timeout)
+{
+    return k_sem_take(sem, timeout);
+}
+
+void pouch_sem_give(pouch_sem_t *sem)
+{
+    k_sem_give(sem);
+}
+
+void pouch_sem_reset(pouch_sem_t *sem)
+{
+    k_sem_reset(sem);
+}
+
+/*--------------------------------------------------
  * Work Queue
  *------------------------------------------------*/
 
