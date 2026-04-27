@@ -2,6 +2,7 @@
 #include "test_linked_list.h"
 #include "test_msgq.h"
 #include "test_mutex.h"
+#include "test_semaphore.h"
 #include "test_work_queue.h"
 #include "unity.h"
 
@@ -14,5 +15,6 @@ void run_unity_tests(void)
     run_unity_linked_list_tests();
     run_unity_msgq_tests();
     run_unity_mutex_tests();
+    run_unity_semaphore_tests();
     run_unity_work_queue_tests();
 }
