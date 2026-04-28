@@ -22,17 +22,12 @@ jobs:
       - name: Install pip packages
         run: |
           uv pip install \
-            -r zephyr/scripts/requirements-base.txt        \
-            -r pouch/requirements.txt
+            -r zephyr/scripts/requirements-base.txt
 
-          uv pip install            \
-            cryptography==41.0.7  \
-            pyasn1                \
-            pyyaml                \
-            cbor>=1.0.0           \
-            imgtool>=1.9.0        \
-            jinja2                \
-            click
+          uv pip install \
+            -r pouch/requirements-ci.txt \
+            --require-hashes
+
       - name: Coverity build
         run: |
           /opt/toolchains/coverity/bin/cov-configure --comptype gcc \
