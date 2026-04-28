@@ -90,7 +90,6 @@ typedef struct freertos_sem pouch_sem_internal_t;
  * Work Queue
  *------------------------------------------------*/
 
-#define POUCH_FREERTOS_WORK_Q_DEFAULT_QUEUE_LENGTH 10
 #define POUCH_FREERTOS_WORK_FLAG_QUEUED 0
 
 typedef struct pouch_freertos_work_q pouch_work_q_internal_t;
@@ -108,7 +107,7 @@ struct pouch_freertos_work_q
 
     QueueHandle_t items;
     StaticQueue_t priv_static_queue;
-    uint8_t priv_storage[POUCH_FREERTOS_WORK_Q_DEFAULT_QUEUE_LENGTH * sizeof(pouch_work_t *)];
+    uint8_t priv_storage[CONFIG_POUCH_FREERTOS_WORK_Q_SIZE * sizeof(pouch_work_t *)];
 };
 
 struct pouch_freertos_work

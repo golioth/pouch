@@ -76,6 +76,15 @@ rsource "transport/Kconfig"
 
 endif
 
+config POUCH_FREERTOS_WORK_Q_SIZE
+    int "Work queue size"
+    default 10
+    help
+        Maximum number of pouch_work_t pointers that may be added to a
+        work queue. When this limit is reached,
+        pouch_work_submit_to_queue() will return an error code until a
+        work item is processed and removed from the queue.
+
 # Libraries and SDK
 rsource "../../Kconfig"
 
