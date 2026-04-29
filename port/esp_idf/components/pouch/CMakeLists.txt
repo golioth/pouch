@@ -209,6 +209,10 @@ endif()
 # ESP-IDF Component
 #########################
 
+list(APPEND EXTRA_COMPONENT_DIRS
+    ${CMAKE_CURRENT_LIST_DIR}/../zcbor
+)
+
 idf_component_register(SRCS
                         ${POUCH_CORE_SRCS}
                         ${POUCH_LIB_SRCS}
