@@ -209,9 +209,7 @@ endif()
 # ESP-IDF Component
 #########################
 
-list(APPEND EXTRA_COMPONENT_DIRS
-    ${CMAKE_CURRENT_LIST_DIR}/../zcbor
-)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../zcbor)
 
 idf_component_register(SRCS
                         ${POUCH_CORE_SRCS}
@@ -233,7 +231,6 @@ idf_component_register(SRCS
 
                        REQUIRES
                          mbedtls
-                         zcbor
                        )
 
 # Conditionally required components need to be processed after initial registration
