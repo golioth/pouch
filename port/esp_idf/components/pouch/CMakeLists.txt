@@ -206,24 +206,45 @@ if(NOT "${CONFIG_POUCH_CA_CERT_FILENAME}" STREQUAL "")
 endif()
 
 #########################
-# ESP-IDF Component
+# ESP-IDF Components
 #########################
 
-if(NOT CMAKE_BUILD_EARLY_EXPANSION)
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../zcbor zcbor)
-endif()
+set(ZCBOR_DIR ${CMAKE_CURRENT_LIST_DIR}/../zcbor/zcbor)
+
+list(APPEND ZCBOR_SRCS
+    ${ZCBOR_DIR}/src/zcbor_common.c
+    ${ZCBOR_DIR}/src/zcbor_decode.c
+    ${ZCBOR_DIR}/src/zcbor_encode.c
+)
+
+
+# These mappings adapted from the Zephyr-centric approach:
+# https://github.com/zephyrproject-rtos/zephyr/blob/v4.3.0/modules/zcbor/CMakeLists.txt
+if(CONFIG_ZCBOR_CANONICAL)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE ZCBOR_CANONICAL)
+endif(CONFIG_ZCBOR_CANONICAL)
+
+if(CONFIG_ZCBOR_STOP_ON_ERROR)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE ZCBOR_STOP_ON_ERROR)
+endif(CONFIG_ZCBOR_STOP_ON_ERROR)
+
+if(CONFIG_ZCBOR_BIG_ENDIAN)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE ZCBOR_BIG_ENDIAN)
+endif(CONFIG_ZCBOR_BIG_ENDIAN)
 
 idf_component_register(SRCS
                         ${POUCH_CORE_SRCS}
                         ${POUCH_LIB_SRCS}
                         ${POUCH_PORT_SRCS}
                         ${POUCH_TRANSPORT_SRCS}
+                        ${ZCBOR_SRCS}
 
                        INCLUDE_DIRS
                         ${POUCH_CORE_INC_DIRS}
                         ${POUCH_LIB_INC_DIRS}
                         ${POUCH_PORT_INC_DIRS}
                         ${POUCH_TRANSPORT_INC_DIRS}
+                        ${ZCBOR_DIR}/include
 
                        EMBED_FILES
                         ${CA_CERT_IF_SELECTED}
@@ -234,8 +255,6 @@ idf_component_register(SRCS
                        REQUIRES
                          mbedtls
                        )
-
-target_link_libraries(${COMPONENT_LIB} INTERFACE zcbor)
 
 # Conditionally required components need to be processed after initial registration
 idf_component_optional_requires(PRIVATE ${POUCH_PRIV_REQUIRES})
