@@ -81,13 +81,11 @@ void test_msgq_can_be_reused_after_emptying(void)
     TEST_ASSERT_EQUAL_INT(val_in, val_out);
 }
 
-int run_unity_msgq_tests(void)
+TEST_CASE("Message Queues", "[pouch][msgq]")
 {
-    UNITY_BEGIN();
     RUN_TEST(test_msgq_send_and_receive_basic);
     RUN_TEST(test_msgq_returns_eagain_on_full);
     RUN_TEST(test_msgq_returns_enomsg_on_empty);
     RUN_TEST(test_msgq_fifo_order);
     RUN_TEST(test_msgq_can_be_reused_after_emptying);
-    return UNITY_END();
 }

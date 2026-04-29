@@ -21,8 +21,6 @@ static void free_node(test_node_t *n)
     free(n);
 }
 
-/* Do not define setUP() or tearDown() as they're defined in test_mutex.c */
-
 void test_slist_init_and_append(void)
 {
     pouch_slist_t list;
@@ -79,10 +77,8 @@ void test_slist_peek_head(void)
     free_node(got);
 }
 
-int run_unity_linked_list_tests(void)
+TEST_CASE("Linked Lists", "[pouch][slist]")
 {
-    UNITY_BEGIN();
     RUN_TEST(test_slist_init_and_append);
     RUN_TEST(test_slist_peek_head);
-    return UNITY_END();
 }

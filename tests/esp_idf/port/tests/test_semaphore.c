@@ -54,6 +54,11 @@ void test_sem_reset(void)
 
 void test_sem_static_define(void)
 {
+#ifdef linux
+    /* Linux doesn't run ESP_SYSTEM_INIT_FN so we do it manually */
+    static_semaphore_init_static_sem();
+#endif
+
     int ret;
     TEST_ASSERT_NOT_NULL(&static_sem);
 
@@ -69,14 +74,9 @@ void test_sem_static_define(void)
     TEST_ASSERT_NOT_EQUAL(0, ret);
 }
 
-void run_unity_semaphore_tests(void)
+TEST_CASE("Semaphores", "[pouch][semaphore]")
 {
-
-    UNITY_BEGIN();
-
     RUN_TEST(test_sem_init_give_take);
     RUN_TEST(test_sem_reset);
     RUN_TEST(test_sem_static_define);
-
-    UNITY_END();
 }
