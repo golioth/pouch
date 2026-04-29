@@ -150,11 +150,9 @@ void test_pouch_work_multiple_queues(void)
     vTaskDelete(multi_workq2.handle);
 }
 
-void run_unity_work_queue_tests(void)
+TEST_CASE("Work Queue Multiple Queues", "[pouch][workq]")
 {
-    UNITY_BEGIN();
     RUN_TEST(test_pouch_work_init_and_submit);
     RUN_TEST(test_pouch_work_submit_twice);
     RUN_TEST(test_pouch_work_multiple_queues);
-    UNITY_END();
 }

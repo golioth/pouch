@@ -15,9 +15,7 @@ void test_timepoint(void)
     TEST_ASSERT_TRUE(pouch_timepoint_timeout(timepoint) > 0);
 }
 
-int run_unity_mutex_tests(void)
+TEST_CASE("Time", "[pouch][time]")
 {
-    UNITY_BEGIN();
     RUN_TEST(test_timepoint);
-    return UNITY_END();
 }

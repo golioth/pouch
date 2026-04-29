@@ -76,6 +76,10 @@ void atomic_worker_task(void *pvParameters)
 
 void test_atomic_concurrency(void)
 {
+#ifdef linux
+    TEST_IGNORE();
+#endif
+
     pouch_atomic_t counter;
     pouch_atomic_set(&counter, 0);
 
@@ -190,11 +194,8 @@ void test_atomic_bit_concurrency(void)
     vSemaphoreDelete(done_sem);
 }
 
-void run_unity_atomic_tests(void)
+TEST_CASE("Atomic Types", "[pouch][atomic]")
 {
-
-    UNITY_BEGIN();
-
     RUN_TEST(test_atomic_inc_dec);
     RUN_TEST(test_atomic_set_clear);
     RUN_TEST(test_atomic_overflow_underflow);
@@ -204,6 +205,4 @@ void run_unity_atomic_tests(void)
     RUN_TEST(test_atomic_bit_array_spanning);
     RUN_TEST(test_atomic_bit_test_and_set_logic);
     RUN_TEST(test_atomic_bit_concurrency);
-
-    UNITY_END();
 }

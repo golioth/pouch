@@ -87,12 +87,15 @@ void test_mutex_static_define(void)
     TEST_ASSERT_TRUE(pouch_mutex_unlock(&static_mutex));
 }
 
-int run_unity_mutex_tests(void)
+TEST_CASE("Mutex", "[pouch][mutex]")
 {
-    UNITY_BEGIN();
+#ifdef linux
+    /* Linux doesn't run ESP_SYSTEM_INIT_FN so we do it manually */
+    static_mutex_init_static_mutex();
+#endif
+
     RUN_TEST(test_mutex_init_and_lock_unlock);
     RUN_TEST(test_mutex_protection_multithread);
     RUN_TEST(test_mutex_timeout_multithread);
     RUN_TEST(test_mutex_static_define);
-    return UNITY_END();
 }
