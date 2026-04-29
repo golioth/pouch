@@ -210,7 +210,7 @@ endif()
 #########################
 
 if(NOT CMAKE_BUILD_EARLY_EXPANSION)
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../zcbor)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../zcbor zcbor)
 endif()
 
 idf_component_register(SRCS
