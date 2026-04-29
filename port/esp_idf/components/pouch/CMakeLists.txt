@@ -235,5 +235,7 @@ idf_component_register(SRCS
                          mbedtls
                        )
 
+target_link_libraries(${COMPONENT_LIB} INTERFACE zcbor)
+
 # Conditionally required components need to be processed after initial registration
 idf_component_optional_requires(PRIVATE ${POUCH_PRIV_REQUIRES})
