@@ -137,7 +137,7 @@ static void pouch_downlink_stream_push(struct pouch_bufview *v,
         POUCH_LOG_DBG("content_type %s (%d)",
                       entry_content_format_str(content_type),
                       (int) content_type);
-        POUCH_LOG_DBG("path_len %zu", path_len);
+        POUCH_LOG_DBG("path_len %u", path_len);
 
         path = pouch_bufview_read(v, path_len);
 

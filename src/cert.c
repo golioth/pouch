@@ -195,7 +195,7 @@ int cert_server_set(const struct pouch_cert *certbuf)
 
     if (cert_chain.serial.len > sizeof(server_cert.serial.data))
     {
-        POUCH_LOG_ERR("Unexpected server certificate serial number size: %u",
+        POUCH_LOG_ERR("Unexpected server certificate serial number size: %zu",
                       cert_chain.serial.len);
         goto exit;
     }

@@ -143,7 +143,7 @@ psa_key_id_t session_key_generate(const struct session_id *id,
     ssize_t info_len = session_key_info_build(id, algorithm, max_block_size_log, (char *) info);
     if (info_len < 0)
     {
-        POUCH_LOG_ERR("Failed session key build: %d", info_len);
+        POUCH_LOG_ERR("Failed session key build: %zd", info_len);
         goto exit;
     }
 
@@ -217,7 +217,7 @@ struct pouch_buf *session_encrypt_block(struct session *session, struct pouch_bu
     size_t plaintext_len = pouch_bufview_read_be16(&plaintext);
     if (plaintext_len != pouch_bufview_available(&plaintext))
     {
-        POUCH_LOG_ERR("Invalid plaintext length: %u", plaintext_len);
+        POUCH_LOG_ERR("Invalid plaintext length: %zu", plaintext_len);
         buf_free(encrypted);
         return NULL;
     }
@@ -278,7 +278,7 @@ int session_decrypt_block(struct session *session,
     size_t ciphertext_len = pouch_bufview_read_be16(&ciphertext);
     if (ciphertext_len <= AUTH_TAG_LEN || ciphertext_len != pouch_bufview_available(&ciphertext))
     {
-        POUCH_LOG_ERR("Invalid ciphertext length: %u", ciphertext_len);
+        POUCH_LOG_ERR("Invalid ciphertext length: %zu", ciphertext_len);
         return -EINVAL;
     }
 
