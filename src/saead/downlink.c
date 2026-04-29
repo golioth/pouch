@@ -57,7 +57,7 @@ static bool is_valid_downlink(const struct session_id *id, psa_algorithm_t algor
         // number.
         if (id->type == SESSION_ID_TYPE_SEQUENTIAL && id->value.sequential.seqnum <= server.seqnum)
         {
-            POUCH_LOG_ERR("Old seqnum: %llu (was %llu)",
+            POUCH_LOG_ERR("Old seqnum: %" PRIu64 " (was %" PRIu64 ")",
                           id->value.sequential.seqnum,
                           server.seqnum);
             return false;
