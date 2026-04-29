@@ -7,8 +7,10 @@
 #include <esp_log.h>
 #define TAG "http_client"
 
+#include <errno.h>
 #include <esp_http_client.h>
 #include <esp_tls.h>
+#include <string.h>
 
 #include <pouch/port.h>
 #include <pouch/transport/certificate.h>
