@@ -28,6 +28,10 @@ jobs:
     name: Run Twister
     uses: ./.github/workflows/test-twister.yml
     secrets: inherit
+  trigger-esp-idf:
+    name: Run ESP-IDF Unit Test
+    uses: ./.github/workflows/test-esp-idf.yml
+    secrets: inherit
   trigger-nsim:
     name: Run Native Simulator and BabbleSim Tests
     uses: ./.github/workflows/test-nsim.yml
