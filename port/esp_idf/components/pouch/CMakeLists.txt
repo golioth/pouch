@@ -209,7 +209,9 @@ endif()
 # ESP-IDF Component
 #########################
 
-add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../zcbor)
+if(NOT CMAKE_BUILD_EARLY_EXPANSION)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../zcbor)
+endif()
 
 idf_component_register(SRCS
                         ${POUCH_CORE_SRCS}
