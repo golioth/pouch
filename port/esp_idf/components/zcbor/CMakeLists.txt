@@ -23,7 +23,3 @@ endif(CONFIG_ZCBOR_STOP_ON_ERROR)
 if(CONFIG_ZCBOR_BIG_ENDIAN)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE ZCBOR_BIG_ENDIAN)
 endif(CONFIG_ZCBOR_BIG_ENDIAN)
-
-component_compile_options(
-    "-Wno-unused-but-set-variable"
-)
