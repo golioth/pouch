@@ -50,6 +50,9 @@ void test_pouch_work_init_and_submit(void)
     }
 
     TEST_ASSERT_EQUAL_INT(2, pouch_atomic_get_value(&work_counter));
+
+    /* basic_workq is about to go out of scope, delete tasks */
+    vTaskDelete(basic_workq.handle);
 }
 
 pouch_work_q_t dupe_workq;
@@ -100,6 +103,9 @@ void test_pouch_work_submit_twice(void)
     TEST_ASSERT_EQUAL_INT(0, pouch_work_submit_to_queue(&dupe_workq, &work));
     vTaskDelay(pdMS_TO_TICKS(20));
     TEST_ASSERT_EQUAL_INT(3, pouch_atomic_get_value(&work_counter));
+
+    /* dupe_workq is about to go out of scope, delete tasks */
+    vTaskDelete(dupe_workq.handle);
 }
 
 pouch_work_q_t multi_workq1, multi_workq2;

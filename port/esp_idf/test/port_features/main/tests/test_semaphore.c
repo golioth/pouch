@@ -55,6 +55,7 @@ void test_sem_reset(void)
 void test_sem_static_define(void)
 {
     int ret;
+    TEST_ASSERT_NOT_NULL(&static_sem);
 
     // Give to increment count from 0 to 1
     pouch_sem_give(&static_sem);
