@@ -190,7 +190,7 @@ pouch_timeout_t pouch_timepoint_timeout(pouch_timepoint_t tp)
     if (tp > 0)
     {
         uint32_t now = xTaskGetTickCount();
-        if (now <= tp)
+        if (tp <= now)
         {
             return 0;
         }
