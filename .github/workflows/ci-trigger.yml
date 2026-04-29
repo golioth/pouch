@@ -44,6 +44,7 @@ jobs:
     name: Publish JUnit Summaries
     if: success() || failure()
     needs:
+      - trigger-esp-idf
       - trigger-twister
       - trigger-nsim
     runs-on: ubuntu-24.04
