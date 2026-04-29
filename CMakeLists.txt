@@ -2,6 +2,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+if(ESP_PLATFORM)
+  include (${COMPONENT_DIR}/esp-idf/pouch/CMakeLists.txt)
+  return()
+endif()
+
 if(CONFIG_POUCH)
     target_include_directories(pouch PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
 
