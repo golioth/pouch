@@ -209,6 +209,8 @@ endif()
 # zcbor
 #########################
 
+if(NOT CMAKE_BUILD_EARLY_EXPANSION)
+
 add_library(zcbor)
 
 set(ZCBOR_DIR ${CMAKE_CURRENT_LIST_DIR}/../zcbor/zcbor)
@@ -245,6 +247,8 @@ endif(CONFIG_ZCBOR_BIG_ENDIAN)
 target_compile_options(zcbor
     "-Wno-unused-but-set-variable"
 )
+
+endif()
 
 #########################
 # ESP-IDF Components
