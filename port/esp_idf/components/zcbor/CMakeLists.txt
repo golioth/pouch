@@ -1,13 +1,14 @@
 set(ZCBOR_DIR ${CMAKE_CURRENT_LIST_DIR}/zcbor)
 
-idf_component_register(
-    INCLUDE_DIRS
-        "${ZCBOR_DIR}/include"
-    SRCS
-        "${ZCBOR_DIR}/src/zcbor_common.c"
-        "${ZCBOR_DIR}/src/zcbor_decode.c"
-        "${ZCBOR_DIR}/src/zcbor_encode.c"
+list(APPEND ZCBOR_SRCS
+    ${ZCBOR_DIR}/src/zcbor_common.c
+    ${ZCBOR_DIR}/src/zcbor_decode.c
+    ${ZCBOR_DIR}/src/zcbor_encode.c
 )
+
+add_library(zcbor ${ZCBOR_SRCS})
+
+target_include_directories(zcbor PUBLIC ${ZCBOR_DIR}/include)
 
 # These mappings adapted from the Zephyr-centric approach:
 # https://github.com/zephyrproject-rtos/zephyr/blob/v4.3.0/modules/zcbor/CMakeLists.txt
