@@ -15,17 +15,11 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
+#include "credentials_nvs.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
-/* The examples use WiFi configuration that you can set via project configuration menu
-
-   If you'd rather not, just change the below entries to strings with
-   the config you want - ie #define EXAMPLE_WIFI_SSID "mywifissid"
-*/
-#define EXAMPLE_ESP_WIFI_SSID CONFIG_ESP_WIFI_SSID
-#define EXAMPLE_ESP_WIFI_PASS CONFIG_ESP_WIFI_PASSWORD
 #define EXAMPLE_ESP_MAXIMUM_RETRY CONFIG_ESP_MAXIMUM_RETRY
 
 #if CONFIG_ESP_WPA3_SAE_PWE_HUNT_AND_PECK
@@ -102,6 +96,26 @@ static void event_handler(void *arg,
     }
 }
 
+static int populate_credentials(wifi_sta_config_t *sta_config)
+{
+    const char *ssid = cred_get_wifi_ssid();
+    const char *psk = cred_get_wifi_psk();
+
+    if ((NULL == ssid) || (NULL == psk))
+    {
+        return -ENOENT;
+    }
+
+    if ((strlen(ssid) >= sizeof(sta_config->ssid)) || (strlen(psk) >= sizeof(sta_config->password)))
+    {
+        return -ENOMEM;
+    }
+
+    strncpy((char *) sta_config->ssid, ssid, sizeof(sta_config->ssid));
+    strncpy((char *) sta_config->password, psk, sizeof(sta_config->password));
+    return 0;
+}
+
 void wifi_init_sta(void)
 {
     s_wifi_event_group = xEventGroupCreate();
@@ -130,8 +144,6 @@ void wifi_init_sta(void)
     wifi_config_t wifi_config = {
         .sta =
             {
-                .ssid = EXAMPLE_ESP_WIFI_SSID,
-                .password = EXAMPLE_ESP_WIFI_PASS,
                 /* Authmode threshold resets to WPA2 as default if password matches WPA2 standards
                  * (password len => 8). If you want to connect the device to deprecated WEP/WPA
                  * networks, Please set the threshold value to WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK and
@@ -143,6 +155,14 @@ void wifi_init_sta(void)
                 .sae_h2e_identifier = EXAMPLE_H2E_IDENTIFIER,
             },
     };
+
+    int err = populate_credentials(&wifi_config.sta);
+    if (0 != err)
+    {
+        ESP_LOGE(TAG, "Failed to populate WiFi credentials: %d", err);
+        return;
+    }
+
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
@@ -162,11 +182,11 @@ void wifi_init_sta(void)
      * event actually happened. */
     if (bits & WIFI_CONNECTED_BIT)
     {
-        ESP_LOGI(TAG, "connected to ap SSID:%s", EXAMPLE_ESP_WIFI_SSID);
+        ESP_LOGI(TAG, "connected to ap SSID:%s", wifi_config.sta.ssid);
     }
     else if (bits & WIFI_FAIL_BIT)
     {
-        ESP_LOGI(TAG, "Failed to connect to SSID:%s", EXAMPLE_ESP_WIFI_SSID);
+        ESP_LOGI(TAG, "Failed to connect to SSID:%s", wifi_config.sta.ssid);
     }
     else
     {

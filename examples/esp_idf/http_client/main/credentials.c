@@ -14,12 +14,9 @@
 #include "mbedtls/pem.h"
 #include "mbedtls/psa_util.h"
 #include "mbedtls/x509_crt.h"
+#include "credentials_nvs.h"
 
 #define TAG "credentials"
-extern const char device_crt_der_start[] asm("_binary_device_crt_der_start");
-extern const char device_crt_der_end[] asm("_binary_device_crt_der_end");
-extern const char device_key_der_start[] asm("_binary_device_key_der_start");
-extern const char device_key_der_end[] asm("_binary_device_key_der_end");
 
 /* Server CA Cert in PEM format for mTLS */
 extern const char server_ca_cert_pem_start[] asm("_binary_server_ca_cert_pem_start");
@@ -27,12 +24,17 @@ extern const char server_ca_cert_pem_end[] asm("_binary_server_ca_cert_pem_end")
 
 static mbedtls_svc_key_id_t _device_key_id = PSA_KEY_ID_NULL;
 
+int credentials_init(void)
+{
+    /* Load all credentials from NVS */
+    return cred_nvs_load_all();
+}
+
 static int get_device_cert(struct pouch_cert *cert)
 {
-    cert->buffer = (uint8_t *) device_crt_der_start;
-    cert->size = device_crt_der_end - device_crt_der_start;
+    cert->buffer = cred_get_device_crt_der(&cert->size);
 
-    return 0;
+    return (NULL == cert->buffer) ? -ENOENT : 0;
 }
 
 static int load_device_pk(mbedtls_svc_key_id_t *key_id)
@@ -46,9 +48,16 @@ static int load_device_pk(mbedtls_svc_key_id_t *key_id)
     mbedtls_pk_context pk;
     mbedtls_pk_init(&pk);
 
+    struct pouch_cert key_der;
+    key_der.buffer = cred_get_device_key_der(&key_der.size);
+    if (NULL == key_der.buffer)
+    {
+        return -ENOENT;
+    }
+
     int err = mbedtls_pk_parse_key(&pk,
-                                   (unsigned char *) device_key_der_start,
-                                   device_key_der_end - device_key_der_start,
+                                   (unsigned char *) key_der.buffer,
+                                   key_der.size,
                                    NULL,
                                    0,
                                    mbedtls_psa_get_random,
@@ -116,9 +125,16 @@ static int convert_device_pk_der_to_pem(char *pem_buf, size_t pem_buf_len)
     mbedtls_pk_context pk;
     mbedtls_pk_init(&pk);
 
+    struct pouch_cert key_der;
+    key_der.buffer = cred_get_device_key_der(&key_der.size);
+    if (NULL == key_der.buffer)
+    {
+        return -ENOENT;
+    }
+
     int err = mbedtls_pk_parse_key(&pk,
-                                   (unsigned char *) device_key_der_start,
-                                   device_key_der_end - device_key_der_start,
+                                   (unsigned char *) key_der.buffer,
+                                   key_der.size,
                                    NULL,
                                    0,
                                    mbedtls_psa_get_random,
@@ -152,9 +168,14 @@ static int convert_device_cert_der_to_pem(char *pem_buf, size_t pem_buf_len)
     mbedtls_x509_crt crt;
     mbedtls_x509_crt_init(&crt);
 
-    int err = mbedtls_x509_crt_parse_der(&crt,
-                                         (unsigned char *) device_crt_der_start,
-                                         device_key_der_end - device_crt_der_start);
+    struct pouch_cert crt_der;
+    if (0 != get_device_cert(&crt_der))
+    {
+        ESP_LOGE(TAG, "Failed to load device cert");
+        return -ENOENT;
+    }
+
+    int err = mbedtls_x509_crt_parse_der(&crt, (unsigned char *) crt_der.buffer, crt_der.size);
     if (0 != err)
     {
         ESP_LOGE(TAG, "Failed to parse device.crt.der: %d", err);
@@ -208,20 +229,28 @@ int fill_mtls_credentials(struct mtls_credentials *creds)
     /* Get size including null terminator */
     creds->client_key_pem_len = strlen(device_key_pem) + 1;
 
-    creds->client_key_der = device_key_der_start;
-    creds->client_key_der_len = device_key_der_end - device_key_der_start;
+    creds->client_key_der = (const char *) cred_get_device_crt_der(&creds->client_key_der_len);
+    if (NULL == creds->client_key_der)
+    {
+        return -ENOENT;
+    }
 
     err = convert_device_cert_der_to_pem(device_crt_pem, sizeof(device_crt_pem));
     if (0 != err)
     {
+        ESP_LOGE(TAG, "Failed to load device key");
         return err;
     }
     creds->client_cert_pem = device_crt_pem;
     /* Get size including null terminator */
     creds->client_cert_pem_len = strlen(device_crt_pem) + 1;
 
-    creds->client_cert_der = device_crt_der_start;
-    creds->client_cert_der_len = device_crt_der_end - device_crt_der_start;
+    creds->client_cert_der = (const char *) cred_get_device_crt_der(&creds->client_cert_der_len);
+    if (NULL == creds->client_cert_der)
+    {
+        ESP_LOGE(TAG, "Failed to load device cert");
+        return -ENOENT;
+    }
 
     return 0;
 }
