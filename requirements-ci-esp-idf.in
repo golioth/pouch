@@ -1,0 +1,3 @@
+pytest-embedded-idf==2.7.0
+
+-r requirements.txt
