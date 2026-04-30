@@ -39,9 +39,9 @@ jobs:
           . $IDF_PATH/export.sh
 
           # Python Dependencies
-          uv pip install                  \
-            --python $IDF_PYTHON_ENV_PATH \
-            -r requirements-ci.txt        \
+          uv pip install                   \
+            --python $IDF_PYTHON_ENV_PATH  \
+            -r requirements-ci-esp-idf.txt \
             --require-hashes
 
           # Set target
