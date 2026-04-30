@@ -12,6 +12,7 @@
 #include <pouch/uplink.h>
 #include <string.h>
 
+#include "console.h"
 #include "credentials.h"
 #include "nvs_flash.h"
 #include "wifi.h"
@@ -60,6 +61,14 @@ void app_main(void)
         return;
     }
 
+    console_init();
+
+    int err = credentials_init();
+    if (0 != err)
+    {
+        return;
+    }
+
     ESP_LOGI(TAG, "Initializing WiFi");
     wifi_init_sta();
 
@@ -68,7 +77,7 @@ void app_main(void)
     http_client_transport_init(&mtls_creds);
 
     struct pouch_config config = {0};
-    int err = fill_pouch_config(&config);
+    err = fill_pouch_config(&config);
     if (0 != err)
     {
         ESP_LOGE(TAG, "Failed to fill config");
