@@ -35,7 +35,7 @@ jobs:
             -r zephyr/scripts/requirements-run-test.txt
 
           uv pip install \
-            -r pouch/requirements-ci.txt \
+            -r pouch/requirements-ci-zephyr.txt \
             --require-hashes
 
       - name: Run tests

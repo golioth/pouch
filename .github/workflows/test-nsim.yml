@@ -76,7 +76,7 @@ jobs:
             git+https://github.com/golioth/python-golioth-tools@v0.7.0
 
           uv pip install \
-            -r pouch/requirements-ci.txt \
+            -r pouch/requirements-ci-zephyr.txt \
             --require-hashes
 
       - name: Build and run

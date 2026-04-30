@@ -25,7 +25,7 @@ jobs:
             -r zephyr/scripts/requirements-base.txt
 
           uv pip install \
-            -r pouch/requirements-ci.txt \
+            -r pouch/requirements-ci-zephyr.txt \
             --require-hashes
 
       - name: Coverity build
