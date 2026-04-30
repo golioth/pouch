@@ -77,7 +77,7 @@ void atomic_worker_task(void *pvParameters)
 void test_atomic_concurrency(void)
 {
 #ifdef linux
-    TEST_IGNORE();
+    TEST_IGNORE_MESSAGE("Skipped: not supported by Linux");
 #endif
 
     pouch_atomic_t counter;
