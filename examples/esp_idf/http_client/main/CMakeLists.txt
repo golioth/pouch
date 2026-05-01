@@ -33,8 +33,6 @@ idf_component_register(SRCS
                        PRIV_REQUIRES
                          console
                          esp_driver_tsens
-
-                       REQUIRES
                          esp_wifi
                          nvs_flash
                          pouch
