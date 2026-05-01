@@ -8,6 +8,7 @@ list(APPEND EXAMPLE_SRCS
         "credentials_nvs.c"
         "fw_update.c"
         "main.c"
+        "temperature.c"
         "wifi.c"
 )
 
@@ -31,6 +32,7 @@ idf_component_register(SRCS
 
                        PRIV_REQUIRES
                          console
+                         esp_driver_tsens
 
                        REQUIRES
                          esp_wifi

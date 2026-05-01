@@ -24,9 +24,13 @@
 #include <pouch/uplink.h>
 #include <string.h>
 
+#include "temperature.h"
+
 static void do_uplink(void)
 {
-    const char *payload = "{\"temp\":22}";
+    char payload[32];
+    snprintf(payload, sizeof(payload), "{\"temp\":%f}", read_temperature());
+
     pouch_uplink_entry_write(".s/sensor",
                              POUCH_CONTENT_TYPE_JSON,
                              payload,
