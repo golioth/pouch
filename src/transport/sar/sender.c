@@ -10,6 +10,8 @@
 #include "sender.h"
 #include "packet.h"
 
+#define SEQ(seq) ((uint8_t) ((seq) & POUCH_SAR_SEQ_MASK))
+
 POUCH_LOG_REGISTER(pouch_sender, CONFIG_POUCH_TRANSPORT_LOG_LEVEL);
 
 enum state
@@ -123,6 +125,11 @@ static void push_fragments(struct pouch_sender *sender)
 
 int pouch_sender_open(struct pouch_sender *sender, struct pouch_bearer *bearer)
 {
+    if (bearer->maxlen <= POUCH_SAR_TX_PKT_HEADER_LEN)
+    {
+        return -EINVAL;
+    }
+
     sender->bearer = bearer;
     sender->seq = 0;
     sender->window = 0;
@@ -182,7 +189,28 @@ int pouch_sender_recv(struct pouch_sender *sender, const uint8_t *buf, size_t le
         return -EINVAL;
     }
 
-    sender->window = ack.seq + ack.window + 1;
+    uint8_t last_sent = (sender->seq - 1) & POUCH_SAR_SEQ_MASK;
+    uint8_t new_target = ack.seq + ack.window + 1;
+
+    // If the acked sequence number is out of bounds, abort
+    if (((last_sent - ack.seq) & POUCH_SAR_SEQ_MASK) > POUCH_SAR_WINDOW_MAX)
+    {
+        POUCH_LOG_ERR("Out of order seq (%u, last sent: %u)", ack.seq, last_sent);
+        sender->state = STATE_IDLE;
+        end(sender, false);
+        return -EINVAL;
+    }
+
+    // If the new target is lower than the current target, we're moving backwards, and should abort
+    if (((new_target - sender->window) & POUCH_SAR_SEQ_MASK) > POUCH_SAR_WINDOW_MAX)
+    {
+        POUCH_LOG_ERR("Unexpected window");
+        sender->state = STATE_IDLE;
+        end(sender, false);
+        return -EINVAL;
+    }
+
+    sender->window = new_target;
 
     POUCH_LOG_DBG("Received ack (%x window: %u. New target seq: %x)",
                   ack.seq,
@@ -193,7 +221,7 @@ int pouch_sender_recv(struct pouch_sender *sender, const uint8_t *buf, size_t le
     {
         push_fragments(sender);
     }
-    else if (((ack.seq + 1) & POUCH_SAR_SEQ_MASK) == sender->seq)
+    else if (ack.seq == last_sent)
     {
         bool already_ended = (sender->state == STATE_IDLE);
         send_fin(sender);
@@ -220,8 +248,11 @@ void pouch_sender_close(struct pouch_sender *sender)
         end(sender, false);
     }
 
-    sender->state = STATE_IDLE;
-    free(sender->buf);
-    sender->buf = NULL;
-    sender->bearer = NULL;
+    if (sender->state != STATE_IDLE)
+    {
+        sender->state = STATE_IDLE;
+        free(sender->buf);
+        sender->buf = NULL;
+        sender->bearer = NULL;
+    }
 }

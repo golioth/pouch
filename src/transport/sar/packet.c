@@ -7,6 +7,16 @@
 #include "packet.h"
 #include <errno.h>
 
+#define TX_PKT_OFFSET_FLAGS 0
+#define TX_PKT_OFFSET_SEQ 1
+#define TX_PKT_OFFSET_FIN_CODE 1
+#define TX_PKT_OFFSET_DATA 2
+
+#define RX_PKT_OFFSET_CODE 0
+#define RX_PKT_OFFSET_SEQ 1
+#define RX_PKT_OFFSET_WINDOW 2
+
+
 #define POUCH_SAR_TX_PKT_FLAG_MASK \
     (POUCH_SAR_TX_PKT_FLAG_FIRST | POUCH_SAR_TX_PKT_FLAG_LAST | POUCH_SAR_TX_PKT_FLAG_FIN)
 
@@ -18,10 +28,16 @@ int pouch_sar_tx_pkt_decode(const void *buf, size_t buf_len, struct pouch_sar_tx
     }
 
     const uint8_t *bytes = buf;
-    pkt->flags = bytes[0] & POUCH_SAR_TX_PKT_FLAG_MASK;  // ignoring any undocumented flags
+    pkt->flags =
+        bytes[TX_PKT_OFFSET_FLAGS] & POUCH_SAR_TX_PKT_FLAG_MASK;  // ignoring any undocumented flags
     if (pkt->flags & POUCH_SAR_TX_PKT_FLAG_FIN)
     {
         if (pkt->flags != POUCH_SAR_TX_PKT_FLAG_FIN || buf_len != POUCH_SAR_TX_PKT_HEADER_LEN)
+        {
+            return -EINVAL;
+        }
+
+        if (buf_len != POUCH_SAR_TX_PKT_HEADER_LEN)
         {
             return -EINVAL;
         }
@@ -30,8 +46,7 @@ int pouch_sar_tx_pkt_decode(const void *buf, size_t buf_len, struct pouch_sar_tx
         pkt->len = 0;
         pkt->data = NULL;
 
-        // the ack code is placed in the seq byte:
-        if (bytes[1] != POUCH_RECEIVER_CODE_ACK)
+        if (bytes[TX_PKT_OFFSET_FIN_CODE] != POUCH_RECEIVER_CODE_ACK)
         {
             // Using the flags field to communicate idle state.
             // Note that this is different from the encoded data format.
@@ -41,8 +56,15 @@ int pouch_sar_tx_pkt_decode(const void *buf, size_t buf_len, struct pouch_sar_tx
         return 0;
     }
 
-    pkt->seq = bytes[1];
-    pkt->data = &bytes[2];
+    pkt->seq = bytes[TX_PKT_OFFSET_SEQ];
+    if (buf_len == POUCH_SAR_TX_PKT_HEADER_LEN)
+    {
+        pkt->data = NULL;
+        pkt->len = 0;
+        return 0;
+    }
+
+    pkt->data = &bytes[POUCH_SAR_TX_PKT_HEADER_LEN];
     pkt->len = buf_len - POUCH_SAR_TX_PKT_HEADER_LEN;
     return 0;
 }
@@ -55,9 +77,9 @@ int pouch_sar_rx_pkt_decode(const void *buf, size_t buf_len, struct pouch_sar_rx
     }
 
     const uint8_t *bytes = buf;
-    pkt->code = bytes[0];
-    pkt->seq = bytes[1];
-    pkt->window = bytes[2];
+    pkt->code = bytes[RX_PKT_OFFSET_CODE];
+    pkt->seq = bytes[RX_PKT_OFFSET_SEQ];
+    pkt->window = bytes[RX_PKT_OFFSET_WINDOW];
 
     return 0;
 }
@@ -70,7 +92,7 @@ int pouch_sar_tx_pkt_encode(const struct pouch_sar_tx_pkt *pkt, void *dst, size_
     }
 
     uint8_t *bytes = dst;
-    bytes[0] = pkt->flags & POUCH_SAR_TX_PKT_FLAG_MASK;
+    bytes[TX_PKT_OFFSET_FLAGS] = pkt->flags & POUCH_SAR_TX_PKT_FLAG_MASK;
     if (pkt->flags & POUCH_SAR_TX_PKT_FLAG_FIN)
     {
         if (*len < POUCH_SAR_TX_PKT_HEADER_LEN)
@@ -78,8 +100,10 @@ int pouch_sar_tx_pkt_encode(const struct pouch_sar_tx_pkt *pkt, void *dst, size_
             return -EINVAL;
         }
 
-        bytes[1] = pkt->flags & POUCH_SAR_TX_PKT_FLAG_IDLE ? POUCH_RECEIVER_CODE_NACK_IDLE
-                                                           : POUCH_RECEIVER_CODE_ACK;
+        bytes[TX_PKT_OFFSET_FIN_CODE] = (pkt->flags & POUCH_SAR_TX_PKT_FLAG_IDLE)
+            ? POUCH_RECEIVER_CODE_NACK_IDLE
+            : POUCH_RECEIVER_CODE_ACK;
+
         *len = POUCH_SAR_TX_PKT_HEADER_LEN;
         return 0;
     }
@@ -89,20 +113,20 @@ int pouch_sar_tx_pkt_encode(const struct pouch_sar_tx_pkt *pkt, void *dst, size_
         return -EINVAL;
     }
 
-    bytes[1] = pkt->seq;
-    if (pkt->data != &bytes[2])
+    bytes[TX_PKT_OFFSET_SEQ] = pkt->seq;
+    if (pkt->data != &bytes[TX_PKT_OFFSET_DATA])
     {
-        memcpy(&bytes[2], pkt->data, pkt->len);
+        memcpy(&bytes[TX_PKT_OFFSET_DATA], pkt->data, pkt->len);
     }
 
-    *len = POUCH_SAR_TX_PKT_HEADER_LEN + pkt->len;
+    *len = TX_PKT_OFFSET_DATA + pkt->len;
 
     return 0;
 }
 
 void pouch_sar_rx_pkt_encode(const struct pouch_sar_rx_pkt *pkt, uint8_t dst[POUCH_SAR_RX_PKT_LEN])
 {
-    dst[0] = pkt->code;
-    dst[1] = pkt->seq;
-    dst[2] = pkt->window;
+    dst[RX_PKT_OFFSET_CODE] = pkt->code;
+    dst[RX_PKT_OFFSET_SEQ] = pkt->seq;
+    dst[RX_PKT_OFFSET_WINDOW] = pkt->window;
 }
