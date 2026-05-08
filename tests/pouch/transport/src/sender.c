@@ -5,7 +5,6 @@
 #include <zephyr/sys/byteorder.h>
 #include <zcbor_decode.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include "transport/endpoints/endpoint.h"
 #include "transport/bearer.h"
 #include "transport/sar/sender.h"
@@ -14,82 +13,7 @@
 #include <pouch/uplink.h>
 #include <pouch/pouch.h>
 
-
-/////////////
-// Endpoint
-/////////////
-
-enum endpoint_flags
-{
-    ENDPOINT_CLOSED,
-    ENDPOINT_STARTED,
-    ENDPOINT_ENDED,
-    ENDPOINT_FAILED,
-    ENDPOINT_EXPECT_START,
-    ENDPOINT_EXPECT_DATA_REQ,
-    ENDPOINT_EXPECT_END,
-};
-
-static struct
-{
-    size_t available_data;
-    atomic_t send_calls;
-    atomic_t flags;
-} test_endpoint;
-
-static int start(struct pouch_bearer *bearer)
-{
-    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START));
-    zassert_false(atomic_test_bit(&test_endpoint.flags, ENDPOINT_STARTED));
-
-    atomic_set_bit(&test_endpoint.flags, ENDPOINT_STARTED);
-    return 0;
-}
-
-static enum pouch_result send(struct pouch_bearer *bearer, void *buf, size_t *len)
-{
-    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_EXPECT_DATA_REQ));
-    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_STARTED));
-    zassert_false(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
-
-    atomic_inc(&test_endpoint.send_calls);
-
-    if (atomic_test_bit(&test_endpoint.flags, ENDPOINT_FAILED))
-    {
-        return POUCH_ERROR;
-    }
-
-    if (*len > test_endpoint.available_data)
-    {
-        *len = test_endpoint.available_data;
-    }
-
-    test_endpoint.available_data -= *len;
-
-    uint8_t *b = buf;
-    for (int i = 0; i < *len; i++)
-    {
-        b[i] = i;
-    }
-
-    return atomic_test_bit(&test_endpoint.flags, ENDPOINT_CLOSED) ? POUCH_NO_MORE_DATA
-                                                                  : POUCH_MORE_DATA;
-}
-
-static void end(struct pouch_bearer *bearer, bool success)
-{
-    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END));
-    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_STARTED));
-    zassert_false(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
-
-    atomic_set_bit(&test_endpoint.flags, ENDPOINT_ENDED);
-}
-
-static const struct pouch_endpoint endpoint = {
-    .start = start,
-    .send = send,
-    .end = end,
-};
+#include "mock.h"
 
 ///////////
 // Bearer
@@ -139,6 +63,7 @@ static int bearer_send(struct pouch_bearer *bearer, const uint8_t *buf, size_t l
     }
 
     test_bearer.sent_data += pkt.len;
+
     return 0;
 }
 
@@ -154,6 +79,13 @@ static struct pouch_bearer bearer = {
     .close = bearer_close,
 };
 
+static void reset_mocks(void)
+{
+    memset(&test_endpoint, 0, sizeof(test_endpoint));
+    memset(&test_bearer, 0, sizeof(test_bearer));
+    bearer.maxlen = 10;
+}
+
 
 static struct pouch_sender sender = {
     .endpoint = &endpoint,
@@ -161,9 +93,7 @@ static struct pouch_sender sender = {
 
 static void reset(void *unused)
 {
-    memset(&test_endpoint, 0, sizeof(test_endpoint));
-    memset(&test_bearer, 0, sizeof(test_bearer));
-    bearer.maxlen = 10;
+    reset_mocks();
 
     sender = (struct pouch_sender){
         .endpoint = &endpoint,

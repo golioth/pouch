@@ -66,6 +66,16 @@ static void send_ack(struct k_work *work)
 
 int pouch_receiver_open(struct pouch_receiver *recv, struct pouch_bearer *bearer, uint8_t window)
 {
+    if (bearer->maxlen < POUCH_SAR_RX_PKT_LEN)
+    {
+        return -EINVAL;
+    }
+
+    if (window > POUCH_SAR_WINDOW_MAX)
+    {
+        return -EINVAL;
+    }
+
     POUCH_LOG_DBG("Starting transfer %p", recv);
 
     recv->bearer = bearer;
