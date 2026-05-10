@@ -157,3 +157,414 @@ ZTEST(transport_sar_receiver, test_repeat_first_ack)
     zassert_equal(test_bearer.ack_window, 4);
     zassert_equal(test_bearer.acks, 2);
 }
+
+ZTEST(transport_sar_receiver, test_invalid_packet_too_short)
+{
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_SEND);
+
+    zassert_ok(pouch_receiver_open(&receiver, &bearer, 4));
+
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(1)));
+
+    uint8_t buf[1] = {0};
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+    zassert_not_ok(pouch_receiver_recv(&receiver, buf, sizeof(buf)));
+
+    zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_CLOSED));
+    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
+}
+
+ZTEST(transport_sar_receiver, test_invalid_packet_not_first)
+{
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_SEND);
+
+    zassert_ok(pouch_receiver_open(&receiver, &bearer, 4));
+
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(1)));
+
+    uint8_t buf[2] = {0};
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+    zassert_not_ok(pouch_receiver_recv(&receiver, buf, sizeof(buf)));
+
+    zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_CLOSED));
+    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
+}
+
+ZTEST(transport_sar_receiver, test_invalid_duplicate_first_packet)
+{
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_SEND);
+
+    zassert_ok(pouch_receiver_open(&receiver, &bearer, 4));
+
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(1)));
+
+    uint8_t buf[2] = {POUCH_SAR_TX_PKT_FLAG_FIRST};
+    zassert_ok(pouch_receiver_recv(&receiver, buf, sizeof(buf)));
+
+    // FIRST again
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+    zassert_not_ok(pouch_receiver_recv(&receiver, buf, sizeof(buf)));
+
+    zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_CLOSED));
+    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
+}
+
+ZTEST(transport_sar_receiver, test_rx_single_packet_transfer)
+{
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_SEND);
+
+    zassert_ok(pouch_receiver_open(&receiver, &bearer, 4));
+
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(1)));
+
+    uint8_t data = 0xaa;
+    uint8_t buf[3];
+    size_t len = sizeof(buf);
+    struct pouch_sar_tx_pkt pkt = {
+        // this is both the first and the last packet
+        .flags = POUCH_SAR_TX_PKT_FLAG_FIRST | POUCH_SAR_TX_PKT_FLAG_LAST,
+        .data = &data,
+        .len = sizeof(data),
+    };
+    zassert_ok(pouch_sar_tx_pkt_encode(&pkt, buf, &len));
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_RECV);
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    zassert_equal(test_endpoint.received_data, 1);
+
+    struct pouch_sar_tx_pkt fin = {
+        .flags = POUCH_SAR_TX_PKT_FLAG_FIN | POUCH_SAR_TX_PKT_FLAG_IDLE,
+    };
+    len = sizeof(buf);
+    zassert_ok(pouch_sar_tx_pkt_encode(&fin, buf, &len));
+
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    zassert_equal(test_endpoint.recv_calls, 1);
+    zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_CLOSED));
+    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
+}
+
+ZTEST(transport_sar_receiver, test_rx_multi_packet_transfer)
+{
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_SEND);
+
+    zassert_ok(pouch_receiver_open(&receiver, &bearer, 4));
+
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(1)));
+
+    uint8_t data = 0xaa;
+    uint8_t buf[3];
+    size_t len = sizeof(buf);
+    struct pouch_sar_tx_pkt pkt = {
+        .flags = POUCH_SAR_TX_PKT_FLAG_FIRST,
+        .data = &data,
+        .len = sizeof(data),
+    };
+    zassert_ok(pouch_sar_tx_pkt_encode(&pkt, buf, &len));
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_RECV);
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    zassert_equal(test_endpoint.received_data, 1);
+
+    pkt.flags = 0;
+    pkt.seq++;
+    zassert_ok(pouch_sar_tx_pkt_encode(&pkt, buf, &len));
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_RECV);
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    zassert_equal(test_endpoint.received_data, 2);
+
+    pkt.flags = POUCH_SAR_TX_PKT_FLAG_LAST;
+    pkt.seq++;
+    zassert_ok(pouch_sar_tx_pkt_encode(&pkt, buf, &len));
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_RECV);
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    zassert_equal(test_endpoint.received_data, 3);
+
+    struct pouch_sar_tx_pkt fin = {
+        .flags = POUCH_SAR_TX_PKT_FLAG_FIN | POUCH_SAR_TX_PKT_FLAG_IDLE,
+    };
+    len = sizeof(buf);
+    zassert_ok(pouch_sar_tx_pkt_encode(&fin, buf, &len));
+
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    zassert_equal(test_endpoint.recv_calls, 3);
+    zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_CLOSED));
+    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
+}
+
+ZTEST(transport_sar_receiver, test_rx_fail_duplicate_last)
+{
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_SEND);
+
+    zassert_ok(pouch_receiver_open(&receiver, &bearer, 4));
+
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(1)));
+
+    uint8_t data = 0xaa;
+    uint8_t buf[3];
+    size_t len = sizeof(buf);
+    struct pouch_sar_tx_pkt pkt = {
+        .flags = POUCH_SAR_TX_PKT_FLAG_FIRST,
+        .data = &data,
+        .len = sizeof(data),
+    };
+    zassert_ok(pouch_sar_tx_pkt_encode(&pkt, buf, &len));
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_RECV);
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    zassert_equal(test_endpoint.received_data, 1);
+
+    // send last:
+    pkt.flags = POUCH_SAR_TX_PKT_FLAG_LAST;
+    pkt.seq++;
+    zassert_ok(pouch_sar_tx_pkt_encode(&pkt, buf, &len));
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_RECV);
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    zassert_equal(test_endpoint.received_data, 2);
+
+    // do it again:
+    pkt.seq++;
+    zassert_ok(pouch_sar_tx_pkt_encode(&pkt, buf, &len));
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+    zassert_not_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    zassert_equal(test_endpoint.recv_calls, 2);
+    zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_CLOSED));
+    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
+}
+
+ZTEST(transport_sar_receiver, test_invalid_fin_too_long)
+{
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_SEND);
+
+    zassert_ok(pouch_receiver_open(&receiver, &bearer, 4));
+
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(1)));
+
+    uint8_t data = 0xaa;
+    uint8_t buf[3];
+    size_t len = sizeof(buf);
+    struct pouch_sar_tx_pkt pkt = {
+        // this is both the first and the last packet
+        .flags = POUCH_SAR_TX_PKT_FLAG_FIRST | POUCH_SAR_TX_PKT_FLAG_LAST,
+        .data = &data,
+        .len = sizeof(data),
+    };
+    zassert_ok(pouch_sar_tx_pkt_encode(&pkt, buf, &len));
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_RECV);
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    zassert_equal(test_endpoint.received_data, 1);
+
+    struct pouch_sar_tx_pkt fin = {
+        .flags = POUCH_SAR_TX_PKT_FLAG_FIN | POUCH_SAR_TX_PKT_FLAG_IDLE,
+    };
+    len = sizeof(buf);
+    zassert_ok(pouch_sar_tx_pkt_encode(&fin, buf, &len));
+    // corrupt the length:
+    len = sizeof(buf);
+
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+    zassert_not_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    zassert_equal(test_endpoint.recv_calls, 1);
+    zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_CLOSED));
+    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
+}
+
+
+ZTEST(transport_sar_receiver, test_invalid_fin_too_short)
+{
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_SEND);
+
+    zassert_ok(pouch_receiver_open(&receiver, &bearer, 4));
+
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(1)));
+
+    uint8_t data = 0xaa;
+    uint8_t buf[3];
+    size_t len = sizeof(buf);
+    struct pouch_sar_tx_pkt pkt = {
+        // this is both the first and the last packet
+        .flags = POUCH_SAR_TX_PKT_FLAG_FIRST | POUCH_SAR_TX_PKT_FLAG_LAST,
+        .data = &data,
+        .len = sizeof(data),
+    };
+    zassert_ok(pouch_sar_tx_pkt_encode(&pkt, buf, &len));
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_RECV);
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    zassert_equal(test_endpoint.received_data, 1);
+
+    struct pouch_sar_tx_pkt fin = {
+        .flags = POUCH_SAR_TX_PKT_FLAG_FIN | POUCH_SAR_TX_PKT_FLAG_IDLE,
+    };
+    len = sizeof(buf);
+    zassert_ok(pouch_sar_tx_pkt_encode(&fin, buf, &len));
+    // corrupt the length:
+    len = 1;
+
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+    zassert_not_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    zassert_equal(test_endpoint.recv_calls, 1);
+    zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_CLOSED));
+    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
+}
+
+ZTEST(transport_sar_receiver, test_fin_abrupt)
+{
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_SEND);
+
+    zassert_ok(pouch_receiver_open(&receiver, &bearer, 4));
+
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(1)));
+
+    uint8_t data = 0xaa;
+    uint8_t buf[3];
+    size_t len = sizeof(buf);
+    struct pouch_sar_tx_pkt pkt = {
+        .flags = POUCH_SAR_TX_PKT_FLAG_FIRST,
+        .data = &data,
+        .len = sizeof(data),
+    };
+    zassert_ok(pouch_sar_tx_pkt_encode(&pkt, buf, &len));
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_RECV);
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    zassert_equal(test_endpoint.received_data, 1);
+
+    struct pouch_sar_tx_pkt fin = {
+        .flags = POUCH_SAR_TX_PKT_FLAG_FIN | POUCH_SAR_TX_PKT_FLAG_IDLE,
+    };
+    len = sizeof(buf);
+    zassert_ok(pouch_sar_tx_pkt_encode(&fin, buf, &len));
+
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+    // not expecting FIN before last packet:
+    zassert_not_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    zassert_equal(test_endpoint.recv_calls, 1);
+    zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_CLOSED));
+    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
+}
+
+ZTEST(transport_sar_receiver, test_fin_unexpected)
+{
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_SEND);
+
+    zassert_ok(pouch_receiver_open(&receiver, &bearer, 4));
+
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(1)));
+
+    struct pouch_sar_tx_pkt fin = {
+        .flags = POUCH_SAR_TX_PKT_FLAG_FIN | POUCH_SAR_TX_PKT_FLAG_IDLE,
+    };
+    uint8_t buf[3];
+    size_t len = sizeof(buf);
+    zassert_ok(pouch_sar_tx_pkt_encode(&fin, buf, &len));
+
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+    // not expecting FIN before any packets:
+    zassert_not_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    zassert_equal(test_endpoint.recv_calls, 0);
+    zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_CLOSED));
+    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
+}
+
+ZTEST(transport_sar_receiver, test_fin_repeated)
+{
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_SEND);
+
+    zassert_ok(pouch_receiver_open(&receiver, &bearer, 4));
+
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(1)));
+
+    uint8_t data = 0xaa;
+    uint8_t buf[3];
+    size_t len = sizeof(buf);
+    struct pouch_sar_tx_pkt pkt = {
+        // this is both the first and the last packet
+        .flags = POUCH_SAR_TX_PKT_FLAG_FIRST | POUCH_SAR_TX_PKT_FLAG_LAST,
+        .data = &data,
+        .len = sizeof(data),
+    };
+    zassert_ok(pouch_sar_tx_pkt_encode(&pkt, buf, &len));
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_RECV);
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    zassert_equal(test_endpoint.received_data, 1);
+
+    struct pouch_sar_tx_pkt fin = {
+        .flags = POUCH_SAR_TX_PKT_FLAG_FIN | POUCH_SAR_TX_PKT_FLAG_IDLE,
+    };
+    len = sizeof(buf);
+    zassert_ok(pouch_sar_tx_pkt_encode(&fin, buf, &len));
+
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    // FIN again:
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+    zassert_not_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    zassert_equal(test_endpoint.recv_calls, 1);
+    zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_CLOSED));
+    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
+}
+
+ZTEST(transport_sar_receiver, test_fin_without_first_packet)
+{
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_SEND);
+
+    zassert_ok(pouch_receiver_open(&receiver, &bearer, 4));
+
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(1)));
+
+    // Send FIN directly without first packet
+    struct pouch_sar_tx_pkt fin = {
+        .flags = POUCH_SAR_TX_PKT_FLAG_FIN | POUCH_SAR_TX_PKT_FLAG_IDLE,
+    };
+    uint8_t buf[3];
+    size_t len = sizeof(buf);
+    zassert_ok(pouch_sar_tx_pkt_encode(&fin, buf, &len));
+
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+    zassert_not_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_CLOSED));
+    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
+}

@@ -26,7 +26,9 @@ enum endpoint_flags
     ENDPOINT_STARTED,
     ENDPOINT_ENDED,
     ENDPOINT_FAILED,
+    ENDPOINT_FAIL_RECV,
     ENDPOINT_EXPECT_START,
+    ENDPOINT_EXPECT_RECV,
     ENDPOINT_EXPECT_DATA_REQ,
     ENDPOINT_EXPECT_END,
 };
@@ -34,7 +36,9 @@ enum endpoint_flags
 static struct
 {
     size_t available_data;
+    size_t received_data;
     atomic_t send_calls;
+    atomic_t recv_calls;
     atomic_t flags;
 } test_endpoint;
 
@@ -86,8 +90,21 @@ static void end(struct pouch_bearer *bearer, bool success)
     atomic_set_bit(&test_endpoint.flags, ENDPOINT_ENDED);
 }
 
+static int recv(struct pouch_bearer *bearer, const void *buf, size_t len)
+{
+    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_EXPECT_RECV));
+    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_STARTED));
+    zassert_false(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
+
+    test_endpoint.received_data += len;
+    atomic_inc(&test_endpoint.recv_calls);
+
+    return atomic_test_bit(&test_endpoint.flags, ENDPOINT_FAIL_RECV) ? -EINVAL : 0;
+}
+
 static const struct pouch_endpoint endpoint = {
     .start = start,
     .send = send,
+    .recv = recv,
     .end = end,
 };
