@@ -5,7 +5,7 @@
  */
 
 #include <pouch/port.h>
-POUCH_LOG_REGISTER(settings, CONFIG_GOLIOTH_LOG_LEVEL);
+POUCH_LOG_REGISTER(golioth_settings, CONFIG_GOLIOTH_LOG_LEVEL);
 
 #include <errno.h>
 #include <pouch/types.h>
