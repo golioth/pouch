@@ -23,7 +23,7 @@ config EXAMPLE_HTTP_CLIENT_TLS_CREDENTIALS
     default 515765868
 
 config EXAMPLE_HTTP_CLIENT_TLS_LOAD_CA_FROM_FILESYSTEM
-    bool "Load the cerver CA cert from LFS"
+    bool "Load the server CA cert from LFS"
     default n
     help
         Optionally load the CA certificate used for TLS/mTLS from EXAMPLE_CREDENTIALS_DIR/ca.der. If
