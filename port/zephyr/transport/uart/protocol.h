@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
+#include <zephyr/device.h>
 #include <stdlib.h>
 #include <stdbool.h>
 
@@ -32,6 +33,9 @@ enum serial_cmd
 typedef int (*serial_recv_data_t)(enum serial_channel ch, const void *buf, size_t len);
 typedef int (*serial_recv_cmd_t)(enum serial_channel ch, enum serial_cmd cmd);
 
-int serial_init(enum serial_channel ch, serial_recv_data_t recv_data, serial_recv_cmd_t recv_cmd);
+int serial_init(const struct device *device);
+int serial_ch_init(enum serial_channel ch,
+                   serial_recv_data_t recv_data,
+                   serial_recv_cmd_t recv_cmd);
 int serial_send_data(enum serial_channel ch, const void *data, size_t len);
 int serial_send_cmd(enum serial_channel ch, enum serial_cmd);
