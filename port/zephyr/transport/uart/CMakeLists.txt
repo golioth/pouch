@@ -6,7 +6,7 @@ zephyr_library()
 
 zephyr_library_link_libraries(pouch)
 
-zephyr_library_sources(protocol.c)
+zephyr_library_sources(protocol.c channels.c)
 zephyr_library_sources_ifdef(CONFIG_POUCH, device.c)
 zephyr_library_sources_ifdef(CONFIG_POUCH_GATEWAY, broker.c)
 
