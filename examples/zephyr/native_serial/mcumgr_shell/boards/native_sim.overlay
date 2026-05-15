@@ -1,0 +1,21 @@
+/*
+ * Copyright (c) 2026 Golioth, Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/* Point MCUmgr at uart1 (separate from console on uart0). */
+/ {
+	chosen {
+		zephyr,uart-mcumgr = &uart1;
+	};
+};
+
+/* serial_link_0 is documentation only; native_parallel_serial_link()
+ * matches by domain + UART node name, not by label.
+ */
+serial_link_0: &uart1 {
+	status = "okay";
+	compatible = "zephyr,native-tty-uart";
+	current-speed = <115200>;
+};
