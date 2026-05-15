@@ -26,8 +26,9 @@ enum serial_cmd
 {
     SERIAL_CMD_OPEN,
     SERIAL_CMD_CLOSE,
-    SERIAL_CMD_ACK,
-    SERIAL_CMD_NACK,
+    SERIAL_CMD_REQ_LINK,
+    // SERIAL_CMD_ACK,
+    // SERIAL_CMD_NACK,
 };
 
 typedef int (*serial_recv_data_t)(enum serial_channel ch, const void *buf, size_t len);
