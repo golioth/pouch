@@ -14,6 +14,9 @@ enum serial_channel
     SERIAL_CH_DEVICE_CERT,
     SERIAL_CH_UPLINK,
     SERIAL_CH_DOWNLINK,
+
+    SERIAL_CHANNELS,
+
     SERIAL_CH_ACK = 0xf,
 };
 
