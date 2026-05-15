@@ -1,0 +1,13 @@
+# Copyright (c) 2026 Golioth, Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+sample:
+  name: MCUmgr Echo over Serial
+
+tests:
+  pouch.mcumgr_echo:
+    sysbuild: true
+    platform_allow:
+      - native_sim
+    harness: pytest
+    tags: mcumgr serial uart smp
