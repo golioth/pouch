@@ -96,7 +96,7 @@ int landscape_register(const struct landscape *ls, const struct landscape_device
         return -ENOMEM;
     }
 
-    err = pouch_uplink_entry_write("register",
+    err = pouch_uplink_entry_write("message-system",
                                    POUCH_CONTENT_TYPE_OCTET_STREAM,
                                    buf.data,
                                    buf.len,
