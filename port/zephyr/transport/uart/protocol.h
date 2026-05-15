@@ -16,12 +16,19 @@ enum serial_channel
     SERIAL_CH_DOWNLINK,
 
     SERIAL_CHANNELS,
-
-    SERIAL_CH_ACK = 0xf,
 };
 
-typedef int (*serial_recv_t)(const void *buf, size_t len);
+enum serial_cmd
+{
+    SERIAL_CMD_OPEN,
+    SERIAL_CMD_CLOSE,
+    SERIAL_CMD_ACK,
+    SERIAL_CMD_NACK,
+};
 
-int serial_init(enum serial_channel ch, serial_recv_t callback);
-int serial_send(enum serial_channel ch, const void *data, size_t len);
-int serial_ack(bool success);
+typedef int (*serial_recv_data_t)(enum serial_channel ch, const void *buf, size_t len);
+typedef int (*serial_recv_cmd_t)(enum serial_channel ch, enum serial_cmd cmd);
+
+int serial_init(enum serial_channel ch, serial_recv_data_t recv_data, serial_recv_cmd_t recv_cmd);
+int serial_send_data(enum serial_channel ch, const void *data, size_t len);
+int serial_send_cmd(enum serial_channel ch, enum serial_cmd);
