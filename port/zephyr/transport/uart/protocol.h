@@ -7,6 +7,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+/** Max data length (limited to 12 bits) */
+#define SERIAL_DATA_MAXLEN (0xfff)
+
 enum serial_channel
 {
     SERIAL_CH_INFO,
