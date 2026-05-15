@@ -9,12 +9,12 @@
 
 enum serial_channel
 {
-    SERIAL_CH_ACK,
+    SERIAL_CH_INFO,
     SERIAL_CH_SERVER_CERT,
     SERIAL_CH_DEVICE_CERT,
     SERIAL_CH_UPLINK,
     SERIAL_CH_DOWNLINK,
-    SERIAL_CH_INFO,
+    SERIAL_CH_ACK = 0xf,
 };
 
 typedef int (*serial_recv_t)(const void *buf, size_t len);
