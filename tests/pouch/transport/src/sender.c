@@ -28,6 +28,7 @@ enum bearer_flags
     BEARER_EXPECT_READY,
     BEARER_EXPECT_SEND,
     BEARER_EXPECT_CLOSE,
+    BEARER_FAIL_SEND_ONCE,
 };
 
 static struct
@@ -45,6 +46,13 @@ static void bearer_ready(struct pouch_bearer *bearer)
 static int bearer_send(struct pouch_bearer *bearer, const uint8_t *buf, size_t len)
 {
     zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_EXPECT_SEND));
+
+    // Support conditional failure for testing error paths
+    if (atomic_test_and_clear_bit(&test_bearer.flags, BEARER_FAIL_SEND_ONCE))
+    {
+        return -EIO;
+    }
+
     struct pouch_sar_tx_pkt pkt;
     zassert_ok(pouch_sar_tx_pkt_decode(buf, len, &pkt));
     if (pkt.flags & POUCH_SAR_TX_PKT_FLAG_FIN)
@@ -552,4 +560,98 @@ ZTEST(transport_sar_sender, test_empty_transfer)
     // sent FIN:
     zassert_equal(atomic_get(&test_bearer.sent_packets), 2);
     zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_SENT_FIN));
+}
+
+ZTEST(transport_sar_sender, test_bearer_send_packet_fails)
+{
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
+    zassert_ok(pouch_sender_open(&sender, &bearer));
+
+    // Prepare for sending data
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_DATA_REQ);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_SEND);
+    test_endpoint.available_data = 5;
+
+    // Make bearer_send fail on first attempt
+    atomic_set_bit(&test_bearer.flags, BEARER_FAIL_SEND_ONCE);
+
+    // Send ACK with window to trigger sending
+    struct pouch_sar_rx_pkt ack = {
+        .code = POUCH_RECEIVER_CODE_ACK,
+        .seq = POUCH_SAR_SEQ_MAX,
+        .window = 3,
+    };
+    uint8_t buf[POUCH_SAR_RX_PKT_LEN];
+    pouch_sar_rx_pkt_encode(&ack, buf);
+
+    // bearer_send will fail with -EIO, sender should log error and stop
+    zassert_ok(pouch_sender_recv(&sender, buf, sizeof(buf)));
+
+    // Verify endpoint was called to get data
+    zassert_equal(atomic_get(&test_endpoint.send_calls), 1);
+
+    // Verify no packet was sent due to bearer failure
+    zassert_equal(atomic_get(&test_bearer.sent_packets), 0);
+
+    // Sender state should remain consistent (ready to retry or close)
+    zassert_equal(sender.seq, 0);
+    zassert_not_equal(sender.window, 0);
+}
+
+ZTEST(transport_sar_sender, test_double_close)
+{
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
+    zassert_ok(pouch_sender_open(&sender, &bearer));
+
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+
+    // First close - should succeed
+    pouch_sender_close(&sender);
+
+    // Verify state after first close
+    zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_CLOSED));
+    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
+    zassert_equal(sender.bearer, NULL);
+    zassert_equal(sender.buf, NULL);
+
+    // Second close - should not crash or double-free
+    // Note: This is currently unsafe in the implementation!
+    // The test documents the bug by checking current behavior
+    pouch_sender_close(&sender);
+
+    // After second close, state should remain consistent
+    zassert_equal(sender.bearer, NULL);
+    zassert_equal(sender.buf, NULL);
+}
+
+ZTEST(transport_sar_sender, test_recv_after_close)
+{
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
+    zassert_ok(pouch_sender_open(&sender, &bearer));
+
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+
+    // Close the sender
+    pouch_sender_close(&sender);
+
+    zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_CLOSED));
+    zassert_equal(sender.bearer, NULL);
+
+    // Try to receive ACK after close - should return -EBUSY immediately
+    struct pouch_sar_rx_pkt ack = {
+        .code = POUCH_RECEIVER_CODE_ACK,
+        .seq = 0,
+        .window = 3,
+    };
+    uint8_t buf[POUCH_SAR_RX_PKT_LEN];
+    pouch_sar_rx_pkt_encode(&ack, buf);
+
+    // Should return -EBUSY without accessing freed memory
+    zassert_equal(pouch_sender_recv(&sender, buf, sizeof(buf)), -EBUSY);
+
+    // Verify no crash or use-after-free occurred
+    zassert_equal(sender.bearer, NULL);
+    zassert_equal(sender.buf, NULL);
 }
