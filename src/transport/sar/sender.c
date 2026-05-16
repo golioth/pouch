@@ -248,8 +248,11 @@ void pouch_sender_close(struct pouch_sender *sender)
         end(sender, false);
     }
 
-    sender->state = STATE_IDLE;
-    free(sender->buf);
-    sender->buf = NULL;
-    sender->bearer = NULL;
+    if (sender->state != STATE_IDLE)
+    {
+        sender->state = STATE_IDLE;
+        free(sender->buf);
+        sender->buf = NULL;
+        sender->bearer = NULL;
+    }
 }
