@@ -16,7 +16,7 @@ int saead_uplink_session_start(psa_algorithm_t algorithm, psa_key_id_t private_k
 void saead_uplink_session_end(void);
 
 /** Get the session info associated with the ongoing uplink session */
-int saead_uplink_header_get(struct saead_info *info);
+int saead_uplink_header_get(struct encryption_info *info);
 
 /** Start a new pouch in the ongoing uplink session, and allocate a unique pouch ID for it. */
 int saead_uplink_pouch_start(void);

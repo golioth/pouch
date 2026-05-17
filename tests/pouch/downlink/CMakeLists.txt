@@ -39,3 +39,5 @@ pouch_gen_lorem(100 5)
 pouch_gen_lorem(200 5)
 pouch_gen_lorem(500 5)
 pouch_gen_lorem(1024 5)
+
+add_subdirectory(../common common)

@@ -4,20 +4,9 @@ pouch_header = [
 ]
 
 encryption_info = [
-    plaintext_info //
-    saead_info
-]
-
-plaintext_info = (
-    encryption_type: 0,
-    id: tstr,
-)
-
-saead_info = (
-    encryption_type: 1,
     session: session_info,
     pouch_id: uint .size 2,
-)
+]
 
 session_info = [
     id: session_id_random / session_id_sequential,

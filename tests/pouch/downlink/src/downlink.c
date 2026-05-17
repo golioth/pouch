@@ -7,6 +7,7 @@
 #include <pouch/port.h>
 #include <pouch/pouch.h>
 #include <zephyr/ztest.h>
+#include "mocks/crypto.h"
 
 POUCH_LOG_REGISTER(downlink_test, POUCH_LOG_LEVEL_DBG);
 
@@ -38,13 +39,9 @@ struct downlink_api_context
 
 static struct downlink_api_context downlink_api;
 
-static const struct pouch_config pouch_config = {
-    .device_id = CONFIG_POUCH_DEVICE_NAME,
-};
-
 static void *init_pouch(void)
 {
-    pouch_init(&pouch_config);
+    pouch_init(setup_credentials());
     return NULL;
 }
 

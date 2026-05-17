@@ -16,21 +16,12 @@ if(CONFIG_POUCH)
       src/entry.c
       src/stream.c
       src/downlink.c
+      src/crypto_saead.c
+      src/cert.c
+      src/saead/session.c
+      src/saead/uplink.c
+      src/saead/downlink.c
     )
-
-    if (CONFIG_POUCH_ENCRYPTION_NONE)
-        list(APPEND pouch_source_files src/crypto_none.c)
-    endif (CONFIG_POUCH_ENCRYPTION_NONE)
-
-    if (CONFIG_POUCH_ENCRYPTION_SAEAD)
-        list(APPEND pouch_source_files
-            src/crypto_saead.c
-            src/cert.c
-            src/saead/session.c
-            src/saead/uplink.c
-            src/saead/downlink.c
-        )
-    endif (CONFIG_POUCH_ENCRYPTION_SAEAD)
 
     target_sources(pouch PRIVATE ${pouch_source_files})
 

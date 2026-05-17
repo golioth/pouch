@@ -40,6 +40,10 @@ void transport_reset(void *unused)
     if (!uplink)
     {
         uplink = pouch_uplink_start();
+        if (uplink == NULL)
+        {
+            return;
+        }
     }
 
     pouch_uplink_close(K_NO_WAIT);
