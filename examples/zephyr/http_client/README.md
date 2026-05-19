@@ -3,17 +3,44 @@
 The Pouch HTTP client example demonstrates how to create a Pouch application
 based on the HTTP client transport.
 
-## Building
+## Building and Flashing the Example
 
 The example should be built with west:
 
 ```bash
 west build -p -b <board> --sysbuild
+west flash
 ```
 
 The `<board>` should be the Zephyr board ID of your board. The example is
 primarily developed and tested on the `frdm_rw612` board, but any Zephyr
 board with HTTP, PSA, MbedTLS and LittleFS support should work.
+
+### Building frdm_rw612 with WiFi Support
+
+By default, the frdm_rw612 board will build for Ethernet but you may use
+WiFi by including the extra config file in the `boards` directory.
+
+<details>
+<summary>Click to unfold: WiFi with the frdm_rw612</summary>
+
+Build and flash the binary:
+
+```
+west build -p -b frdm_rw612 examples/zephyr/http_client -- -DEXTRA_CONF_FILE=boards/frdm_rw612_wifi.conf
+west flash
+```
+
+Save your WiFi AP credentials
+
+```
+uart:~$ wifi cred add -s my_wifi_ap -p my_wifi_password -k 1
+uart:~$ wifi cred list
+  network ssid: "my_wifi_ap", ssid_len: 10, type: WPA2-PSK, password: "my_wifi_password", password_len: 16, MFP_OPTIONAL
+uart:~$ kernel reboot
+```
+
+</details>
 
 ## Authentication
 
