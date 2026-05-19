@@ -4,6 +4,8 @@
 
 source "$ZEPHYR_BASE/Kconfig"
 
+menu "Example: Pouch HTTP Client"
+
 config EXAMPLE_HTTP_CLIENT_LOG_LEVEL
     int "HTTP client example log level"
     default 4
@@ -62,3 +64,4 @@ config EXAMPLE_FW_UPDATE_SHA256_VERIFY
         to flash. The resulting hash is logged to the console for verification.
 
 endchoice
+endmenu # Example: Pouch HTTP Client
