@@ -18,6 +18,11 @@ elseif(CONFIG_EXAMPLE_FW_UPDATE_FLASH)
     target_sources(app PRIVATE src/fw_update.c)
 endif()
 
+if(CONFIG_WIFI)
+    target_sources(app PRIVATE src/wifi.c)
+endif()
+
+
 if (NOT CONFIG_EXAMPLE_HTTP_CLIENT_TLS_LOAD_CA_FROM_FILESYSTEM)
     generate_inc_file_for_target(app src/isrgrootx1.der
         ${ZEPHYR_BINARY_DIR}/include/generated/pouch-ca-crt.inc)
