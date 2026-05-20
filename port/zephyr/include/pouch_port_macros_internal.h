@@ -143,3 +143,19 @@ typedef struct k_work_q pouch_work_q_internal_t;
 typedef struct k_work pouch_work_internal_t;
 
 #define POUCH_THREAD_STACK_DEFINE_INTERNAL(name, size) K_THREAD_STACK_DEFINE(name, size)
+
+/*--------------------------------------------------
+ * Delayable Work
+ *------------------------------------------------*/
+
+typedef struct pouch_zephyr_work_delayable pouch_work_delayable_internal_t;
+
+/* Forward declaration to avoid circular dependency with port.h */
+typedef pouch_work_delayable_internal_t pouch_work_delayable_t;
+typedef void (*pouch_work_delayable_handler_t)(pouch_work_delayable_t *dwork);
+
+struct pouch_zephyr_work_delayable
+{
+    struct k_work_delayable dwork;
+    pouch_work_delayable_handler_t handler;
+};

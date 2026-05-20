@@ -268,3 +268,42 @@ int pouch_work_submit_to_queue(pouch_work_q_t *queue, pouch_work_t *work)
      */
     return (0 <= ret) ? 0 : ret;
 }
+
+/*--------------------------------------------------
+ * Delayable Work
+ *------------------------------------------------*/
+
+static void delayable_work_zephyr_handler(struct k_work *work)
+{
+    struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+    pouch_work_delayable_t *pdwork = CONTAINER_OF(dwork, pouch_work_delayable_t, dwork);
+
+    if (NULL != pdwork->handler)
+    {
+        pdwork->handler(pdwork);
+    }
+}
+
+void pouch_work_delayable_init(pouch_work_delayable_t *dwork,
+                               pouch_work_delayable_handler_t handler)
+{
+    dwork->handler = handler;
+    k_work_init_delayable(&dwork->dwork, delayable_work_zephyr_handler);
+}
+
+int pouch_work_schedule(pouch_work_delayable_t *dwork, pouch_timeout_t delay)
+{
+    int ret = k_work_schedule(&dwork->dwork, delay);
+    return (ret >= 0) ? 0 : ret;
+}
+
+int pouch_work_reschedule(pouch_work_delayable_t *dwork, pouch_timeout_t delay)
+{
+    int ret = k_work_reschedule(&dwork->dwork, delay);
+    return (ret >= 0) ? 0 : ret;
+}
+
+void pouch_work_cancel_delayable(pouch_work_delayable_t *dwork)
+{
+    k_work_cancel_delayable(&dwork->dwork);
+}

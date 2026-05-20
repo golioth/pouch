@@ -718,3 +718,62 @@ void pouch_work_queue_start(pouch_work_q_t *queue,
  * @return Negative number on failure
  */
 int pouch_work_submit_to_queue(pouch_work_q_t *queue, pouch_work_t *work);
+
+/*--------------------------------------------------
+ * Delayable Work
+ *------------------------------------------------*/
+
+/** @brief Type to use for delayable work items */
+typedef pouch_work_delayable_internal_t pouch_work_delayable_t;
+
+/**
+ * @brief Delayable work handler callback function prototype
+ *
+ * @param dwork Pointer to the delayable work item passed to the callback function
+ */
+typedef void (*pouch_work_delayable_handler_t)(pouch_work_delayable_t *dwork);
+
+/**
+ * @brief Initialize a delayable work item
+ *
+ * @param dwork Pointer to the delayable work item to initialize
+ * @param handler Callback function to run when work is processed
+ */
+void pouch_work_delayable_init(pouch_work_delayable_t *dwork,
+                               pouch_work_delayable_handler_t handler);
+
+/**
+ * @brief Schedule a delayable work item
+ *
+ * Submits the work item for execution after the specified delay. If the work is already
+ * scheduled, this function does nothing.
+ *
+ * @param dwork Pointer to the delayable work item
+ * @param delay Delay before execution (use POUCH_NO_WAIT for immediate, POUCH_MSEC(ms) for timed)
+ *
+ * @return 0 on success, negative error code on failure
+ */
+int pouch_work_schedule(pouch_work_delayable_t *dwork, pouch_timeout_t delay);
+
+/**
+ * @brief Reschedule a delayable work item
+ *
+ * Cancels any pending execution and reschedules the work item with the new delay.
+ * Unlike pouch_work_schedule(), this always resets the timer even if work is already pending.
+ *
+ * @param dwork Pointer to the delayable work item
+ * @param delay Delay before execution (use POUCH_NO_WAIT for immediate, POUCH_MSEC(ms) for timed)
+ *
+ * @return 0 on success, negative error code on failure
+ */
+int pouch_work_reschedule(pouch_work_delayable_t *dwork, pouch_timeout_t delay);
+
+/**
+ * @brief Cancel a pending delayable work item
+ *
+ * Cancels any pending scheduled execution of the work item. If the work is currently
+ * executing, this function returns immediately without waiting for it to complete.
+ *
+ * @param dwork Pointer to the delayable work item to cancel
+ */
+void pouch_work_cancel_delayable(pouch_work_delayable_t *dwork);
