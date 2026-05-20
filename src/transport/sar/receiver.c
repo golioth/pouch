@@ -8,7 +8,6 @@
 #include "receiver.h"
 #include "packet.h"
 #include <pouch/port.h>
-#include <zephyr/kernel.h>
 
 POUCH_LOG_REGISTER(pouch_receiver, CONFIG_POUCH_TRANSPORT_LOG_LEVEL);
 
@@ -35,13 +34,12 @@ static void end(struct pouch_receiver *p, bool success)
 
 static void schedule_ack(struct pouch_receiver *p)
 {
-    k_work_schedule(&p->work, K_MSEC(CONFIG_POUCH_TRANSPORT_ACK_TIMEOUT_MS));
+    pouch_work_schedule(&p->work, POUCH_MSEC(CONFIG_POUCH_TRANSPORT_ACK_TIMEOUT_MS));
 }
 
-static void send_ack(struct k_work *work)
+static void send_ack(pouch_work_delayable_t *dwork)
 {
-    struct pouch_receiver *p =
-        CONTAINER_OF(k_work_delayable_from_work(work), struct pouch_receiver, work);
+    struct pouch_receiver *p = CONTAINER_OF(dwork, struct pouch_receiver, work);
     uint8_t buf[POUCH_SAR_RX_PKT_LEN];
     struct pouch_sar_rx_pkt ack = {
         .code =
@@ -94,7 +92,7 @@ int pouch_receiver_open(struct pouch_receiver *recv, struct pouch_bearer *bearer
     recv->window = window;
     recv->seq = POUCH_SAR_SEQ_MAX;
     recv->state = STATE_READY;
-    k_work_init_delayable(&recv->work, send_ack);
+    pouch_work_delayable_init(&recv->work, send_ack);
 
     if (recv->endpoint->start != NULL)
     {
@@ -107,7 +105,7 @@ int pouch_receiver_open(struct pouch_receiver *recv, struct pouch_bearer *bearer
         }
     }
 
-    k_work_schedule(&recv->work, K_NO_WAIT);
+    pouch_work_schedule(&recv->work, POUCH_NO_WAIT);
 
     return 0;
 }
@@ -194,7 +192,7 @@ int pouch_receiver_recv(struct pouch_receiver *recv, const uint8_t *buf, size_t 
     {
         POUCH_LOG_WRN("OoO RX: %x (last: %x)", pkt.seq, recv->seq);
         // out of order packet - should be ignored
-        k_work_reschedule(&recv->work, K_NO_WAIT);  // ack last received packet instead
+        pouch_work_reschedule(&recv->work, POUCH_NO_WAIT);  // ack last received packet instead
         return 0;
     }
 
@@ -205,7 +203,7 @@ int pouch_receiver_recv(struct pouch_receiver *recv, const uint8_t *buf, size_t 
         {
             POUCH_LOG_ERR("RX callback failed: %d", err);
             end(recv, false);
-            k_work_reschedule(&recv->work, K_NO_WAIT);  // NACK
+            pouch_work_reschedule(&recv->work, POUCH_NO_WAIT);  // NACK
             return err;
         }
     }
@@ -213,21 +211,21 @@ int pouch_receiver_recv(struct pouch_receiver *recv, const uint8_t *buf, size_t 
     recv->seq = pkt.seq;
 
     // send ack right away:
-    k_work_reschedule(&recv->work, K_NO_WAIT);
+    pouch_work_reschedule(&recv->work, POUCH_NO_WAIT);
 
     return 0;
 }
 
 void pouch_receiver_ready(struct pouch_receiver *recv)
 {
-    k_work_reschedule(&recv->work, K_NO_WAIT);
+    pouch_work_reschedule(&recv->work, POUCH_NO_WAIT);
 }
 
 void pouch_receiver_close(struct pouch_receiver *recv)
 {
     POUCH_LOG_DBG("Finished transfer %p", recv);
 
-    k_work_cancel_delayable(&recv->work);
+    pouch_work_cancel_delayable(&recv->work);
 
     if (recv->state == STATE_ACTIVE || recv->state == STATE_READY)
     {

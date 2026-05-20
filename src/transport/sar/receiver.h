@@ -5,7 +5,7 @@
  */
 
 #pragma once
-#include <zephyr/kernel.h>
+#include <pouch/port.h>
 #include "../bearer.h"
 #include "../endpoints/endpoint.h"
 
@@ -19,7 +19,7 @@ struct pouch_receiver
     uint8_t window;
     uint8_t state;
 
-    struct k_work_delayable work;
+    pouch_work_delayable_t work;
 };
 
 int pouch_receiver_open(struct pouch_receiver *recv, struct pouch_bearer *bearer, uint8_t window);
