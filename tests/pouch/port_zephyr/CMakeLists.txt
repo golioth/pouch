@@ -8,6 +8,7 @@ project(port_zephyr_test)
 target_sources(app PRIVATE
   src/test_atomic.c
   src/test_semaphore.c
+  src/test_delayable_work.c
 )
 
 add_subdirectory(../common common)
