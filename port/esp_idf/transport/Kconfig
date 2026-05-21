@@ -16,6 +16,21 @@ config POUCH_TRANSPORT_HTTP_CLIENT
   help
     HTTP transport for Pouch
 
+config POUCH_TRANSPORT_BLE_GATT
+  bool "BLE GATT"
+  help
+    BLE GATT peripheral transport for Pouch.
+    The device exposes a GATT service that a gateway
+    can connect to for transferring Pouch data.
+
 endchoice
 
+config POUCH_TRANSPORT_ACK_TIMEOUT_MS
+    int "Pouch Transport ACK timeout (ms)"
+    default 1000
+    help
+        The timeout, in milliseconds, that a receiver will wait
+        for new packets before retransmitting an acknowledgement
+
 rsource "http/Kconfig"
+rsource "gatt/Kconfig"
