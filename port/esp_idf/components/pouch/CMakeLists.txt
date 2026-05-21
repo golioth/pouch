@@ -121,9 +121,9 @@ endif()
 if("${CONFIG_POUCH_TRANSPORT_BLE_GATT}" STREQUAL "y")
 
     list(APPEND POUCH_TRANSPORT_SRCS
-        ${POUCH_TRANSPORT_COMMON}/endpoints/info.c
-        ${POUCH_TRANSPORT_COMMON}/endpoints/uplink.c
-        ${POUCH_TRANSPORT_COMMON}/endpoints/downlink.c
+        ${POUCH_TRANSPORT_COMMON}/endpoints/device/info.c
+        ${POUCH_TRANSPORT_COMMON}/endpoints/device/uplink.c
+        ${POUCH_TRANSPORT_COMMON}/endpoints/device/downlink.c
         ${POUCH_TRANSPORT_COMMON}/sar/sender.c
         ${POUCH_TRANSPORT_COMMON}/sar/receiver.c
         ${POUCH_TRANSPORT_COMMON}/sar/packet.c
@@ -132,10 +132,16 @@ if("${CONFIG_POUCH_TRANSPORT_BLE_GATT}" STREQUAL "y")
 
     if ("${CONFIG_POUCH_ENCRYPTION_SAEAD}" STREQUAL "y")
         list(APPEND POUCH_TRANSPORT_SRCS
-            ${POUCH_TRANSPORT_COMMON}/endpoints/device_cert.c
-            ${POUCH_TRANSPORT_COMMON}/endpoints/server_cert.c
+            ${POUCH_TRANSPORT_COMMON}/endpoints/device/device_cert.c
+            ${POUCH_TRANSPORT_COMMON}/endpoints/device/server_cert.c
         )
     endif()
+
+    list(APPEND POUCH_TRANSPORT_INC_DIRS
+        ${POUCH_ROOT}/src
+        ${POUCH_TRANSPORT_COMMON}
+        ${CMAKE_CURRENT_BINARY_DIR}/include
+    )
 
     if(NOT CMAKE_BUILD_EARLY_EXPANSION)
 
@@ -148,11 +154,6 @@ if("${CONFIG_POUCH_TRANSPORT_BLE_GATT}" STREQUAL "y")
             BYPRODUCTS include/cddl/info_encode.h include/cddl/info_encode_types.h
 
             DEPENDS ${POUCH_TRANSPORT_COMMON}/info.cddl)
-
-        list(APPEND POUCH_TRANSPORT_INC_DIRS
-            ${POUCH_TRANSPORT_COMMON}
-            ${CMAKE_CURRENT_BINARY_DIR}/include
-        )
 
     endif()
 
@@ -167,6 +168,13 @@ if("${CONFIG_POUCH_TRANSPORT_HTTP_CLIENT}" STREQUAL "y")
     list(APPEND POUCH_PRIV_REQUIRES
         esp_http_client
         esp-tls
+    )
+endif()
+
+if("${CONFIG_POUCH_TRANSPORT_BLE_GATT}" STREQUAL "y")
+    list(APPEND POUCH_TRANSPORT_SRCS ${POUCH_PORT}/esp_idf/transport/gatt/peripheral.c)
+    list(APPEND POUCH_PRIV_REQUIRES
+        bt
     )
 endif()
 
