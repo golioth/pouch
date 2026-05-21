@@ -19,7 +19,7 @@
 LOG_MODULE_REGISTER(pouch_gatt, CONFIG_POUCH_GATT_LOG_LEVEL);
 
 
-#define CHAR_INIT_RECVEIVER(_endpoint)                                   \
+#define CHAR_INIT_RECEIVER(_endpoint)                                    \
     {                                                                    \
         .bearer =                                                        \
             {                                                            \
@@ -219,13 +219,13 @@ static void ccc_changed(const struct bt_gatt_attr *ccc_attr, uint16_t value)
  * Pouch characteristics contexts:
  **************************************************/
 
-static struct pouch_characteristic downlink = CHAR_INIT_RECVEIVER(&pouch_device_endpoint_downlink);
+static struct pouch_characteristic downlink = CHAR_INIT_RECEIVER(&pouch_device_endpoint_downlink);
 static struct pouch_characteristic uplink = CHAR_INIT_SENDER(&pouch_device_endpoint_uplink);
 static struct pouch_characteristic info = CHAR_INIT_SENDER(&pouch_device_endpoint_info);
 
 #if IS_ENABLED(CONFIG_POUCH_ENCRYPTION_SAEAD)
 static struct pouch_characteristic server_cert =
-    CHAR_INIT_RECVEIVER(&pouch_device_endpoint_server_cert);
+    CHAR_INIT_RECEIVER(&pouch_device_endpoint_server_cert);
 static struct pouch_characteristic device_cert =
     CHAR_INIT_SENDER(&pouch_device_endpoint_device_cert);
 #endif
