@@ -118,3 +118,22 @@ struct pouch_freertos_work
 
 #define POUCH_THREAD_STACK_DEFINE_INTERNAL(name, size) \
     StackType_t name[DIV_ROUND_UP(size, sizeof(StackType_t))]
+
+/*--------------------------------------------------
+ * Delayable Work
+ *------------------------------------------------*/
+
+#include "freertos/timers.h"
+
+typedef struct pouch_freertos_work_delayable pouch_work_delayable_internal_t;
+
+/* Forward declaration to avoid circular dependency */
+typedef pouch_work_delayable_internal_t pouch_work_delayable_t;
+typedef void (*pouch_work_delayable_handler_t)(pouch_work_delayable_t *dwork);
+
+struct pouch_freertos_work_delayable
+{
+    pouch_work_delayable_handler_t handler;
+    TimerHandle_t timer;
+    StaticTimer_t timer_buf;
+};

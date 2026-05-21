@@ -85,6 +85,39 @@ config POUCH_FREERTOS_WORK_Q_SIZE
         pouch_work_submit_to_queue() will return an error code until a
         work item is processed and removed from the queue.
 
+config POUCH_DELAYABLE_WORK
+    bool "Delayable work support"
+    default y if POUCH_TRANSPORT_BLE_GATT
+    help
+        Enable the dedicated delayable work thread (pouch_dwork).
+        This is required by transports that use the SAR receiver,
+        such as the BLE GATT transport.
+
+if POUCH_DELAYABLE_WORK
+
+config POUCH_DELAYABLE_WORK_STACK_SIZE
+    int "Delayable work thread stack size"
+    default 1024
+    help
+        Stack size for the dedicated delayable work thread (pouch_dwork).
+        This thread executes delayed work handlers such as SAR ACK
+        retransmissions.
+
+config POUCH_DELAYABLE_WORK_Q_SIZE
+    int "Delayable work queue depth"
+    default 8
+    help
+        Maximum number of delayable work items that can be pending
+        execution at one time.
+
+config POUCH_DELAYABLE_WORK_PRIORITY
+    int "Delayable work thread priority"
+    default 5
+    help
+        The priority of the dedicated delayable work thread (pouch_dwork).
+
+endif # POUCH_DELAYABLE_WORK
+
 # Libraries and SDK
 rsource "../../Kconfig"
 

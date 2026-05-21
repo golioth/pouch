@@ -421,3 +421,134 @@ int pouch_work_submit_to_queue(pouch_work_q_t *queue, pouch_work_t *work)
     pouch_atomic_clear_bit(&work->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED);
     return -ENOMEM;
 }
+
+/*--------------------------------------------------
+ * Delayable Work
+ *------------------------------------------------*/
+
+#if defined(CONFIG_POUCH_DELAYABLE_WORK)
+
+static StackType_t dwork_stack[CONFIG_POUCH_DELAYABLE_WORK_STACK_SIZE / sizeof(StackType_t)];
+static StaticTask_t dwork_task_buf;
+static TaskHandle_t dwork_task_handle;
+static QueueHandle_t dwork_queue;
+static StaticQueue_t dwork_queue_buf;
+static uint8_t
+    dwork_queue_storage[CONFIG_POUCH_DELAYABLE_WORK_Q_SIZE * sizeof(pouch_work_delayable_t *)];
+
+static void dwork_task_fn(void *param)
+{
+    pouch_work_delayable_t *dwork;
+
+    while (true)
+    {
+        if (pdTRUE == xQueueReceive(dwork_queue, &dwork, portMAX_DELAY))
+        {
+            if ((NULL != dwork) && (NULL != dwork->handler))
+            {
+                dwork->handler(dwork);
+            }
+        }
+    }
+}
+
+static void dwork_queue_init(void)
+{
+    if (NULL != dwork_task_handle)
+    {
+        return;
+    }
+
+    dwork_queue = xQueueCreateStatic(CONFIG_POUCH_DELAYABLE_WORK_Q_SIZE,
+                                     sizeof(pouch_work_delayable_t *),
+                                     dwork_queue_storage,
+                                     &dwork_queue_buf);
+    configASSERT(NULL != dwork_queue);
+
+    dwork_task_handle =
+        xTaskCreateStatic(dwork_task_fn,
+                          "pouch_dwork",
+                          CONFIG_POUCH_DELAYABLE_WORK_STACK_SIZE / sizeof(StackType_t),
+                          NULL,
+                          CONFIG_POUCH_DELAYABLE_WORK_PRIORITY,
+                          dwork_stack,
+                          &dwork_task_buf);
+    configASSERT(NULL != dwork_task_handle);
+}
+
+static void delayable_work_timer_cb(TimerHandle_t timer)
+{
+    pouch_work_delayable_t *dwork = (pouch_work_delayable_t *) pvTimerGetTimerID(timer);
+
+    if (NULL != dwork)
+    {
+        xQueueSend(dwork_queue, &dwork, portMAX_DELAY);
+    }
+}
+
+void pouch_work_delayable_init(pouch_work_delayable_t *dwork,
+                               pouch_work_delayable_handler_t handler)
+{
+    dwork->handler = handler;
+    dwork->timer = xTimerCreateStatic("pouch_dwork",
+                                      1,       /* dummy period, changed on schedule */
+                                      pdFALSE, /* one-shot */
+                                      dwork,   /* timer ID = dwork pointer */
+                                      delayable_work_timer_cb,
+                                      &dwork->timer_buf);
+    configASSERT(NULL != dwork->timer);
+
+    dwork_queue_init();
+}
+
+static int do_work_schedule(pouch_work_delayable_t *dwork, pouch_timeout_t delay)
+{
+    if (POUCH_NO_WAIT == delay)
+    {
+        /* Submit to work queue for immediate processing */
+        xQueueSend(dwork_queue, &dwork, portMAX_DELAY);
+        return 0;
+    }
+
+    TickType_t ticks = pdMS_TO_TICKS(delay);
+    if (ticks == 0)
+    {
+        ticks = 1; /* Minimum 1 tick */
+    }
+
+    xTimerChangePeriod(dwork->timer, ticks, portMAX_DELAY);
+    xTimerStart(dwork->timer, portMAX_DELAY);
+    return 0;
+}
+
+int pouch_work_schedule(pouch_work_delayable_t *dwork, pouch_timeout_t delay)
+{
+    if (xTimerIsTimerActive(dwork->timer))
+    {
+        /* Already scheduled, do nothing */
+        return 0;
+    }
+
+    return do_work_schedule(dwork, delay);
+}
+
+int pouch_work_reschedule(pouch_work_delayable_t *dwork, pouch_timeout_t delay)
+{
+    xTimerStop(dwork->timer, portMAX_DELAY);
+    return do_work_schedule(dwork, delay);
+}
+
+/*
+ * Note: Unlike Zephyr's k_work_cancel_delayable() which also removes work from
+ * the queue if it has been submitted but not yet executed, this implementation
+ * only cancels the pending timer. If the timer has already fired and the work
+ * item is sitting in the queue awaiting execution, it will still run. In
+ * practice this means a handler may execute once after cancel in the narrow
+ * window between timer expiry and task processing.
+ */
+void pouch_work_cancel_delayable(pouch_work_delayable_t *dwork)
+{
+    xTimerStop(dwork->timer, portMAX_DELAY);
+}
+
+#endif /* CONFIG_POUCH_DELAYABLE_WORK */
