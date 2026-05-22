@@ -7,6 +7,7 @@ idf_component_register(SRCS
                          "ble_peripheral.c"
                          "console.c"
                          "credentials.c"
+                         "fw_update.c"
 
                        INCLUDE_DIRS
                          "."
@@ -20,3 +21,6 @@ idf_component_register(SRCS
                          nvs_flash
                          pouch
                        )
+
+# fw_update.c has no global references, use WHOLE_ARCHIVE to ensure it gets processed by the linker
+idf_component_set_property(${COMPONENT_NAME} WHOLE_ARCHIVE TRUE)
