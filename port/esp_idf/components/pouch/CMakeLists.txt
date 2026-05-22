@@ -32,12 +32,12 @@ list(APPEND POUCH_PORT_SRCS
 # Pouch Core
 #########################
 
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../include)
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/include)
 list(APPEND POUCH_CORE_INC_DIRS
       ${POUCH_ROOT}/include
 
       # Generated Headers
-      ${CMAKE_CURRENT_BINARY_DIR}/../include
+      ${CMAKE_CURRENT_BINARY_DIR}/include
 )
 
 list(APPEND POUCH_CORE_SRCS
@@ -81,7 +81,7 @@ if(NOT CMAKE_BUILD_EARLY_EXPANSION)
             ${CMAKE_CURRENT_BINARY_DIR}/header_decode.c
             ${CMAKE_CURRENT_BINARY_DIR}/header_encode.c
         COMMAND zcbor code -c ${POUCH_ROOT}/src/header.cddl -t pouch_header -sde
-            --include-prefix cddl/ --oc header.c --oh ../include/cddl/header.h
+            --include-prefix cddl/ --oc header.c --oh include/cddl/header.h
         BYPRODUCTS
             ${CMAKE_CURRENT_BINARY_DIR}/include/cddl/header_decode.h
             ${CMAKE_CURRENT_BINARY_DIR}/include/cddl/header_encode.h
