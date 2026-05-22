@@ -46,7 +46,7 @@ int pouch_sar_tx_pkt_decode(const void *buf, size_t buf_len, struct pouch_sar_tx
         pkt->len = 0;
         pkt->data = NULL;
 
-        if (bytes[TX_PKT_OFFSET_FIN_CODE] != POUCH_RECEIVER_CODE_ACK)
+        if (bytes[TX_PKT_OFFSET_FIN_CODE] == POUCH_RECEIVER_CODE_ACK)
         {
             // Using the flags field to communicate idle state.
             // Note that this is different from the encoded data format.
