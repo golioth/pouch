@@ -30,6 +30,14 @@ static void end(struct pouch_sender *sender, bool success)
     }
 
     pouch_bearer_close(sender->bearer, success);
+
+    sender->seq = 0;
+    sender->window = 0;
+    sender->state = STATE_IDLE;
+
+    free(sender->buf);
+    sender->buf = NULL;
+    sender->bearer = NULL;
 }
 
 static void send_fin(struct pouch_sender *p)
@@ -176,7 +184,6 @@ int pouch_sender_recv(struct pouch_sender *sender, const uint8_t *buf, size_t le
     if (ack.code != POUCH_RECEIVER_CODE_ACK)
     {
         POUCH_LOG_ERR("Received NACK");
-        sender->state = STATE_IDLE;
         end(sender, false);
         return -EIO;
     }
@@ -184,7 +191,6 @@ int pouch_sender_recv(struct pouch_sender *sender, const uint8_t *buf, size_t le
     if (ack.window > POUCH_SAR_WINDOW_MAX)
     {
         POUCH_LOG_ERR("Invalid window");
-        sender->state = STATE_IDLE;
         end(sender, false);
         return -EINVAL;
     }
@@ -196,7 +202,6 @@ int pouch_sender_recv(struct pouch_sender *sender, const uint8_t *buf, size_t le
     if (((last_sent - ack.seq) & POUCH_SAR_SEQ_MASK) > POUCH_SAR_WINDOW_MAX)
     {
         POUCH_LOG_ERR("Out of order seq (%u, last sent: %u)", ack.seq, last_sent);
-        sender->state = STATE_IDLE;
         end(sender, false);
         return -EINVAL;
     }
@@ -204,8 +209,7 @@ int pouch_sender_recv(struct pouch_sender *sender, const uint8_t *buf, size_t le
     // If the new target is lower than the current target, we're moving backwards, and should abort
     if (((new_target - sender->window) & POUCH_SAR_SEQ_MASK) > POUCH_SAR_WINDOW_MAX)
     {
-        POUCH_LOG_ERR("Unexpected window");
-        sender->state = STATE_IDLE;
+        POUCH_LOG_ERR("Unexpected window (%u, current: %u)", new_target, sender->window);
         end(sender, false);
         return -EINVAL;
     }
@@ -241,18 +245,19 @@ void pouch_sender_ready(struct pouch_sender *sender)
 
 void pouch_sender_close(struct pouch_sender *sender)
 {
-    if (sender->state == STATE_ACTIVE || sender->state == STATE_READY)
+    POUCH_LOG_DBG("%p bearer %p", sender, sender->bearer);
+    switch ((enum state) sender->state)
     {
-        // aborted without reaching the end of the transfer
-        POUCH_LOG_WRN("Closed before receiving FIN");
-        end(sender, false);
-    }
-
-    if (sender->state != STATE_IDLE)
-    {
-        sender->state = STATE_IDLE;
-        free(sender->buf);
-        sender->buf = NULL;
-        sender->bearer = NULL;
+        case STATE_ACTIVE:
+        case STATE_READY:
+            POUCH_LOG_WRN("Closed before receiving FIN");
+            end(sender, false);
+            break;
+        case STATE_FIN:
+            end(sender, true);
+            break;
+        case STATE_IDLE:
+            POUCH_LOG_DBG("Closed while idle");
+            break;
     }
 }
