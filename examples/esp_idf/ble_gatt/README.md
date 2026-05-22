@@ -46,3 +46,29 @@ command line tools. For example:
 $ base64 --wrap=0 device.key.der
 MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgttpz/RWMuZZlhTeb6RqpFmXPf3ZyE9iR4OxQtw9mpGyhRANCAAQCtBI3OltVfxyZ7l6CmwAP/jvybEmR9HW2gRebtRoVi0MT7o/NOcuxMCR6o00nfcYA3BZWKmpicLE2MZPCs9P6
 ```
+
+## Settings
+
+The Golioth Settings service is enabled in this example. A boolean
+setting named `LED` is registered. When updated from the [Golioth
+console](https://console.golioth.io), the new value will be logged to
+the serial monitor. You can extend the `led_setting_cb` function in
+`main.c` to control actual hardware.
+
+## OTA Firmware Update
+
+Over-the-Air (OTA) firmware update is enabled in this example. To
+generate an update binary:
+
+1. Change the application version number
+    - Option 1: Using menuconfig: `idf.py menuconfig` Application manager ->
+      Project version
+    - Option 2: Update the value in `sdkconfig.defaults`, then delete `sdkconfig` before rebuilding.
+2. Rebuild the project: `idf.py build`
+3. Upload `build/pouch_ble_gatt_example.bin` to Golioth using the
+   same package name (default: `main`) and version number as the build.
+
+Ensure your device is part of a Cohort and roll out a new deployment to
+that cohort that contains this updated package. See the [Golioth
+docs](https://docs.golioth.io/device-management/ota/) for more
+information.
