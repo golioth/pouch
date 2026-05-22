@@ -12,8 +12,10 @@ idf_component_register(SRCS
                          "."
 
                        PRIV_REQUIRES
+                         app_update
                          bt
                          console
+                         golioth_sdk
                          mbedtls
                          nvs_flash
                          pouch

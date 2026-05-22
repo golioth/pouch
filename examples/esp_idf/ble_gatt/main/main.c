@@ -9,9 +9,9 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 
+#include <pouch/golioth/settings_callbacks.h>
 #include <pouch/pouch.h>
 #include <pouch/uplink.h>
-#include <pouch/downlink.h>
 
 #include "ble_peripheral.h"
 #include "console.h"
@@ -35,28 +35,16 @@ static void do_uplink(void)
 POUCH_UPLINK_HANDLER(do_uplink);
 
 /**
- * Receive downlink data from the cloud (hexdump only, no processing).
+ * Receive settings from the cloud.
  */
-static void downlink_start(unsigned int stream_id, const char *path, uint16_t content_type)
+static int led_setting_cb(bool new_value)
 {
-    ESP_LOGI(TAG,
-             "Downlink start: path=%s content_type=%u stream_id=%u",
-             path,
-             content_type,
-             stream_id);
+    ESP_LOGI(TAG, "Received LED setting: %d", (int) new_value);
+
+    return 0;
 }
 
-static void downlink_data(unsigned int stream_id, const void *data, size_t len, bool is_last)
-{
-    ESP_LOGI(TAG,
-             "Downlink data: len=%u stream_id=%u is_last=%d",
-             (unsigned) len,
-             stream_id,
-             (int) is_last);
-    ESP_LOG_BUFFER_HEXDUMP(TAG, data, len, ESP_LOG_INFO);
-}
-
-POUCH_DOWNLINK_HANDLER(downlink_start, downlink_data);
+GOLIOTH_SETTINGS_HANDLER(LED, led_setting_cb);
 
 void app_main(void)
 {
