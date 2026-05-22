@@ -1,0 +1,16 @@
+# Copyright (c) 2026 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+config EXAMPLE_BT_DEVICE_NAME
+    string "Device name to use when advertising"
+    default "Golioth"
+    help
+      Name that will be advertised to other Bluetooth devices.
+
+config EXAMPLE_SYNC_PERIOD_S
+    int "Sync Period"
+    default 20
+    help
+      The time, in seconds, after a sync to wait before requesting a
+      sync from a gateway.
