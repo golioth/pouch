@@ -97,7 +97,7 @@ if POUCH_DELAYABLE_WORK
 
 config POUCH_DELAYABLE_WORK_STACK_SIZE
     int "Delayable work thread stack size"
-    default 1024
+    default 2048
     help
         Stack size for the dedicated delayable work thread (pouch_dwork).
         This thread executes delayed work handlers such as SAR ACK
