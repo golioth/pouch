@@ -5,6 +5,7 @@
 idf_component_register(SRCS
                          "main.c"
                          "ble_peripheral.c"
+                         "console.c"
                          "credentials.c"
 
                        INCLUDE_DIRS
@@ -12,11 +13,8 @@ idf_component_register(SRCS
 
                        PRIV_REQUIRES
                          bt
+                         console
                          mbedtls
                          nvs_flash
                          pouch
                        )
-
-# Embed device certificate and private key (DER format)
-target_add_binary_data(${COMPONENT_LIB} "device.crt.der" BINARY)
-target_add_binary_data(${COMPONENT_LIB} "device.key.der" BINARY)

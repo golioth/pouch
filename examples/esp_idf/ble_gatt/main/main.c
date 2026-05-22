@@ -14,6 +14,7 @@
 #include <pouch/downlink.h>
 
 #include "ble_peripheral.h"
+#include "console.h"
 #include "credentials.h"
 
 static const char *TAG = "ble_gatt_example";
@@ -61,7 +62,7 @@ void app_main(void)
 {
     ESP_LOGI(TAG, "Pouch BLE GATT Example");
 
-    /* Initialize NVS — required by BT stack */
+    /* Initialize NVS — required by BT stack and credential storage */
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
@@ -70,21 +71,24 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
-    /* Initialize BLE and register pouch GATT service */
-    int err = ble_peripheral_init();
+    /* Start console for credential provisioning */
+    console_init();
+
+    /* Load credentials from NVS */
+    struct pouch_config config = {0};
+
+    int err = credentials_init(&config);
     if (err)
     {
-        ESP_LOGE(TAG, "BLE init failed");
+        ESP_LOGW(TAG, "Credentials not provisioned. Use console to set crt/key, then reset.");
         return;
     }
 
-    /* Initialize Pouch with device credentials */
-    struct pouch_config config = {0};
-
-    err = credentials_init(&config);
+    /* Initialize BLE and register pouch GATT service */
+    err = ble_peripheral_init();
     if (err)
     {
-        ESP_LOGE(TAG, "Failed to load credentials: %d", err);
+        ESP_LOGE(TAG, "BLE init failed");
         return;
     }
 

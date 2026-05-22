@@ -8,13 +8,21 @@
 
 #include <pouch/pouch.h>
 
+typedef int (*cred_set_fn_t)(const char *buf);
+
 /**
- * Fill the pouch config with device certificate and private key.
+ * Store device certificate (base64-encoded DER) to NVS.
+ */
+int cred_set_device_crt(const char *b64_der);
+
+/**
+ * Store device private key (base64-encoded DER) to NVS.
+ */
+int cred_set_device_key(const char *b64_der);
+
+/**
+ * Load credentials from NVS and fill the Pouch config.
  *
- * The certificate and key are embedded at build time from DER files
- * in the project directory.
- *
- * @param config Pouch configuration to populate.
- * @return 0 on success, negative on failure.
+ * @return 0 on success, negative errno if credentials are missing or invalid.
  */
 int credentials_init(struct pouch_config *config);
