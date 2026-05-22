@@ -3,10 +3,14 @@
  */
 #pragma once
 
-#include <zephyr/toolchain.h>
 #include <pouch/types.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+
+#ifndef __packed
+#define __packed __attribute__((packed))
+#endif
 
 #define POUCH_GATT_VERSION 1
 
