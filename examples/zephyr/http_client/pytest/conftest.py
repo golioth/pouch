@@ -5,6 +5,7 @@
 #
 
 import logging
+import secrets
 import sys
 from pathlib import Path
 
@@ -40,9 +41,20 @@ async def setup(project, device, creds):
 
 
 @pytest.fixture(scope="module")
-async def cohort(project, device):
-    """Create a per-device cohort so OTA deployments target only this device."""
-    cohort_name = device.name.lower().replace("-", "_")
+def test_id():
+    """Unique random slug for this test module's cloud resources.
+
+    Generated freshly per pytest module so that parallel CI pipelines,
+    sequential retries, and concurrent local runs never collide on
+    shared Golioth resources (cohorts, deployments, OTA artifacts).
+    """
+    return secrets.token_hex(8)
+
+
+@pytest.fixture(scope="module")
+async def cohort(project, device, test_id):
+    """Create a per-device, per-test cohort so OTA deployments are isolated."""
+    cohort_name = f"{device.name.lower().replace('-', '_')}_{test_id}"
     logging.info("Creating cohort '%s' for device '%s'", cohort_name, device.name)
     cohort = await project.cohorts.create(cohort_name)
     await device.update_cohort(cohort.id)
@@ -57,28 +69,14 @@ async def cohort(project, device):
 
 
 @pytest.fixture(scope="module")
-async def ota_firmware(project, device, cohort, tmp_path_factory):
+async def ota_firmware(project, device, cohort, test_id, tmp_path_factory):
     """Generate a random firmware image, upload as artifact, deploy to cohort."""
     import hashlib
     import os
 
-    # Use a device-specific version to avoid collisions with parallel runs
-    version = f"2.0.0-{device.name}"
-
-    # Clean up stale artifact from a previous failed run
-    logging.info("Cleaning up any existing artifact with version '%s'", version)
-    artifacts = await project.artifacts.get_all()
-    for artifact in artifacts:
-        if artifact.package == "main" and artifact.version == version:
-            logging.info("Deleting existing artifact: %s", artifact.id)
-            try:
-                await project.artifacts.delete(artifact.id)
-            except Exception:
-                logging.warning(
-                    "Could not delete stale artifact %s (may still be "
-                    "referenced by a deployment)",
-                    artifact.id,
-                )
+    # Version includes test_id (a random slug) so parallel pipelines,
+    # retries, and concurrent local runs never collide on this artifact.
+    version = f"2.0.0-{device.name}-{test_id}"
 
     image_size = 400 * 1024
     image_data = os.urandom(image_size)
@@ -100,7 +98,7 @@ async def ota_firmware(project, device, cohort, tmp_path_factory):
 
     logging.info("Creating deployment on cohort '%s'", cohort.name)
 
-    await cohort.deployments.create(f"ota-test-{device.name}", [artifact.id])
+    await cohort.deployments.create(f"ota-test-{device.name}-{test_id}", [artifact.id])
 
     yield expected_sha256
 
@@ -109,7 +107,8 @@ async def ota_firmware(project, device, cohort, tmp_path_factory):
     try:
         await project.artifacts.delete(artifact.id)
     except Exception:
-        logging.info(
-            "Artifact deletion deferred (still referenced by deployment); "
-            "will be cleaned up on next run"
+        logging.warning(
+            "Artifact %s could not be deleted (likely still referenced by "
+            "a deployment); it may need to be cleaned up manually",
+            artifact.id,
         )
