@@ -95,8 +95,14 @@ static struct pouch_receiver receiver = {
 static void reset(void *unused)
 {
     reset_mocks();
-    struct k_work_sync sync;
-    k_work_cancel_delayable_sync(&receiver.work, &sync);
+    pouch_work_cancel_delayable(&receiver.work);
+
+    /*
+     * Brief delay to allow any in-flight work to complete.
+     * pouch_work_cancel_delayable() is asynchronous - it cancels
+     * pending timers but work already queued may still execute once.
+     */
+    k_sleep(K_MSEC(1));
 
     receiver = (struct pouch_receiver){
         .endpoint = &endpoint,
