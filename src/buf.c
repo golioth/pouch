@@ -65,14 +65,19 @@ size_t buf_size_get(const struct pouch_buf *buf)
     return buf->bytes;
 }
 
+void buf_init(struct pouch_buf *buf)
+{
+    buf->bytes = POUCH_BUF_STATE_INITIAL;
+    pouch_slist_node_init(&buf->node);
+}
+
 struct pouch_buf *buf_alloc(size_t size)
 {
     struct pouch_buf *buf = malloc(sizeof(struct pouch_buf) + size);
     if (buf != NULL)
     {
         pouch_atomic_inc(&bufs);
-        buf->bytes = 0;
-        pouch_slist_node_init(&buf->node);
+        buf_init(buf);
     }
 
     return buf;

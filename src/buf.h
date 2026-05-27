@@ -31,6 +31,9 @@ typedef pouch_slist_t pouch_buf_queue_t;
 
 struct pouch_buf *buf_alloc(size_t size);
 
+/** Initialize a pre-allocated pouch buffer object */
+void buf_init(struct pouch_buf *buf);
+
 void buf_free(struct pouch_buf *buf);
 
 /**
