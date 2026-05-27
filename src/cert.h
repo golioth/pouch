@@ -6,10 +6,8 @@
 
 #pragma once
 
-#include <pouch/certificate.h>
 #include <pouch/types.h>
 #include <stdbool.h>
-#include <mbedtls/x509_crt.h>
 #include "pouch.h"
 
 #define CERT_REF_HASH_ALG PSA_ALG_SHA_256

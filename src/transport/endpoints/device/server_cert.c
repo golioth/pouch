@@ -9,7 +9,6 @@
 #include <string.h>
 
 #include <pouch/types.h>
-#include <pouch/certificate.h>
 #include <pouch/transport/certificate.h>
 #include "endpoints.h"
 
