@@ -54,6 +54,12 @@ static void send_ack(pouch_work_delayable_t *dwork)
     int err = pouch_bearer_send(p->bearer, buf, sizeof(buf));
     if (err)
     {
+        if (err == -ENOTCONN)
+        {
+            POUCH_LOG_DBG("TX skipped (%d), not connected", err);
+            return;
+        }
+
         // try again later:
         POUCH_LOG_ERR("TX failed (%d)", err);
         schedule_ack(p);
