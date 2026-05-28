@@ -96,6 +96,7 @@ static void device_found(const bt_addr_le_t *addr,
 {
     char addr_str[BT_ADDR_LE_STR_LEN];
     struct tf_data tf = {
+        .addr = addr,
         .is_tf = false,
     };
     int err;
