@@ -27,7 +27,11 @@ struct pouch_bufview
 typedef size_t pouch_buf_state_t;
 
 /** Buffer queue */
-typedef pouch_slist_t pouch_buf_queue_t;
+typedef struct pouch_buf_queue
+{
+    pouch_slist_t slist;
+    pouch_mutex_t lock;
+} pouch_buf_queue_t;
 
 struct pouch_buf *buf_alloc(size_t size);
 
