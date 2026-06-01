@@ -32,6 +32,15 @@ jobs:
     name: Run ESP-IDF Unit Test
     uses: ./.github/workflows/test-esp-idf.yml
     secrets: inherit
+  trigger-esp-idf-hil:
+    name: Run ESP-IDF HTTP Client HIL
+    uses: ./.github/workflows/test-esp-idf-hil.yml
+    with:
+      hil_board: esp32s3_devkitc
+      idf_target: esp32s3
+      api_url: https://api.golioth.io
+      api_key_id: PROD_CI_PROJECT_API_KEY
+    secrets: inherit
   trigger-nsim:
     name: Run Native Simulator and BabbleSim Tests
     uses: ./.github/workflows/test-nsim.yml
@@ -45,6 +54,7 @@ jobs:
     if: success() || failure()
     needs:
       - trigger-esp-idf
+      - trigger-esp-idf-hil
       - trigger-twister
       - trigger-nsim
     runs-on: ubuntu-24.04
