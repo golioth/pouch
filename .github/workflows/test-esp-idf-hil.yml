@@ -1,0 +1,231 @@
+name: ESP-IDF HTTP Client HIL
+
+on:
+  workflow_dispatch:
+    inputs:
+      hil_board:
+        description: Self-hosted runner label for HIL board
+        required: true
+        type: string
+      idf_target:
+        description: ESP-IDF target (for example esp32s3)
+        required: true
+        type: string
+      api_url:
+        description: API gateway URL for Golioth backend services
+        required: true
+        type: string
+      api_key_id:
+        description: Name of GitHub secret containing project API key
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      hil_board:
+        description: Self-hosted runner label for HIL board
+        required: true
+        type: string
+      idf_target:
+        description: ESP-IDF target (for example esp32s3)
+        required: true
+        type: string
+      api_url:
+        description: API gateway URL for Golioth backend services
+        required: true
+        type: string
+      api_key_id:
+        description: Name of GitHub secret containing project API key
+        required: true
+        type: string
+
+jobs:
+  prepare-matrix:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Set sample matrix
+        id: set-matrix
+        run: |
+          echo 'matrix={"sample":[{"name":"http_client","dir":"examples/esp_idf/http_client"}]}' >> "$GITHUB_OUTPUT"
+
+  build:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    needs: prepare-matrix
+    strategy:
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+    container: espressif/idf@sha256:9b8c4b573f6eb7aa65be6b34817590ad85b4f7176273522094a2bf465dc9263f
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Build firmware and merged image
+        shell: bash
+        run: |
+          . "$IDF_PATH/export.sh"
+
+          # Install Pouch dependencies
+          pip install -r requirements-ci-esp-idf.txt --require-hashes
+
+          idf.py -C "${{ matrix.sample.dir }}" set-target "${{ inputs.idf_target }}"
+          idf.py -C "${{ matrix.sample.dir }}" build
+          idf.py -C "${{ matrix.sample.dir }}" merge-bin -o merged.bin
+
+          cd "${{ matrix.sample.dir }}"
+          shopt -s globstar nullglob
+
+          artifact_files=(
+            build/flasher_args.json
+            build/**/*.bin
+            build/*.elf
+          )
+
+          tar -cf build-artifacts.tar "${artifact_files[@]}"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: esp-idf-${{ matrix.sample.name }}-${{ inputs.idf_target }}-build
+          path: ${{ matrix.sample.dir }}/build-artifacts.tar
+
+  hil-test:
+    permissions:
+      contents: read
+
+    needs:
+      - prepare-matrix
+      - build
+
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+
+    runs-on:
+      - is_active
+      - has_${{ inputs.hil_board }}
+
+    container:
+      image: golioth/golioth-hil-base:bda7b71
+      volumes:
+        - /dev:/dev
+        - /home/golioth/credentials:/opt/credentials
+      options: --privileged
+
+    env:
+      HIL_BOARD: ${{ inputs.hil_board }}
+      GOLIOTH_API_URL: ${{ inputs.api_url }}
+      GOLIOTH_API_KEY: ${{ secrets[inputs.api_key_id] }}
+      IDF_TARGET: ${{ inputs.idf_target }}
+      SAMPLE_DIR: ${{ matrix.sample.dir }}
+      UNITY_REPORT_NAME: integration-esp-idf-${{ matrix.sample.name }}-hil.xml
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+
+      - name: Clean stale run assets
+        run: |
+          rm -rf "$SAMPLE_DIR/build"
+          rm -f "$UNITY_REPORT_NAME" "pytest-${{ matrix.sample.name }}-hil.log"
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: esp-idf-${{ matrix.sample.name }}-${{ inputs.idf_target }}-build
+          path: esp-idf-${{ matrix.sample.name }}
+
+      - name: Extract build artifact
+        run: |
+          tar -xf "esp-idf-${{ matrix.sample.name }}/build-artifacts.tar" -C "$SAMPLE_DIR"
+
+      - name: Power On USB Hub
+        run: python3 /opt/golioth-scripts/usb_hub_power.py on
+
+      - name: Install pytest dependencies
+        run: |
+          uv pip install \
+            -r requirements-ci-esp-idf.txt \
+            --require-hashes
+
+          uv pip install \
+            "golioth@git+https://github.com/golioth/python-golioth-tools@v0.8.1"
+
+      - name: Run HTTP client HIL pytest
+        shell: bash
+        run: |
+          # Config so we can use tee to keep a copy of pytest logs
+          set -o pipefail
+
+          source /opt/credentials/runner_env.sh
+          PORT_VAR=CI_${HIL_BOARD^^}_PORT
+          if [ -z "${!PORT_VAR}" ]; then
+            echo "Runner environment variable '$PORT_VAR' is not set"
+            exit 1
+          fi
+
+          pytest -vv -rs -s                  \
+            -c "$SAMPLE_DIR/pytest.ini"      \
+            --rootdir "$SAMPLE_DIR"          \
+            --embedded-services esp,idf      \
+            --target "$IDF_TARGET"           \
+            --port "${!PORT_VAR}"            \
+            --app-path "$SAMPLE_DIR"         \
+            --build-dir build                \
+            --erase-all n                    \
+            --api-url "$GOLIOTH_API_URL"     \
+            --api-key "$GOLIOTH_API_KEY"     \
+            --wifi-ssid "${{ secrets[format('{0}_WIFI_SSID', runner.name)] }}" \
+            --wifi-psk "${{ secrets[format('{0}_WIFI_PSK', runner.name)] }}"   \
+            --generate-certs                 \
+            --junit-xml "$UNITY_REPORT_NAME" \
+            "$SAMPLE_DIR/pytest/test_sample.py" | tee pytest-${{ matrix.sample.name }}-hil.log
+
+      - name: Post-process JUnit XML
+        if: success() || failure()
+        run: |
+          python3 tests/esp_idf/port/junit_post_process.py "$UNITY_REPORT_NAME"
+
+      - name: Upload CI report summary
+        uses: ./.github/actions/safe-upload-artifacts
+        if: success() || failure()
+        with:
+          secrets-json: ${{ toJson(secrets) }}
+          name: ci-summary-integration-esp-idf-${{ matrix.sample.name }}-hil
+          path: ${{ env.UNITY_REPORT_NAME }}
+
+      - name: Upload HIL run artifacts
+        uses: ./.github/actions/safe-upload-artifacts
+        if: success() || failure()
+        with:
+          secrets-json: ${{ toJson(secrets) }}
+          name: esp-idf-${{ matrix.sample.name }}-hil-artifacts
+          path: |
+            pytest-${{ matrix.sample.name }}-hil.log
+            ${{ env.UNITY_REPORT_NAME }}
+
+      - name: Erase flash
+        if: always()
+        shell: bash
+        run: |
+          source /opt/credentials/runner_env.sh
+          PORT_VAR=CI_${HIL_BOARD^^}_PORT
+          if [ -z "${!PORT_VAR}" ]; then
+            echo "Runner environment variable '$PORT_VAR' is not set"
+            exit 1
+          fi
+          esptool.py --port "${!PORT_VAR}" erase_flash
+
+      - name: Power Off USB Hub
+        if: always()
+        run: python3 /opt/golioth-scripts/usb_hub_power.py off
