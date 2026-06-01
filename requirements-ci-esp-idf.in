@@ -1,3 +1,7 @@
-pytest-embedded-idf==2.7.0
+pytest-embedded-idf==1.18.2
+pytest-embedded-serial-esp==1.18.2
+esptool==4.11.0
+pyparsing>=3.1.0,<3.3
+rich<14.3.4
 
 -r requirements.txt
