@@ -6,6 +6,7 @@
 
 import asyncio
 import datetime
+import base64
 import re
 import time
 
@@ -86,6 +87,9 @@ def _wait_for_boot_state(dut) -> bool:
 
 
 def _provision_and_boot(dut, provisioning_creds) -> None:
+    crt_der_b64 = base64.b64encode(provisioning_creds["DEVICE_CRT_DER"]).decode("ascii")
+    key_der_b64 = base64.b64encode(provisioning_creds["DEVICE_KEY_DER"]).decode("ascii")
+
     print("Provisioning WiFi and credentials")
     _send_and_expect_store(
         dut,
@@ -99,12 +103,12 @@ def _provision_and_boot(dut, provisioning_creds) -> None:
     )
     _send_and_expect_store(
         dut,
-        f"crt {provisioning_creds['DEVICE_CRT_DER_B64']}",
+        f"crt {crt_der_b64}",
         r".*Successfully stored Device CRT",
     )
     _send_and_expect_store(
         dut,
-        f"key {provisioning_creds['DEVICE_KEY_DER_B64']}",
+        f"key {key_der_b64}",
         r".*Successfully stored Device KEY",
     )
 
