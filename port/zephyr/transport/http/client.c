@@ -32,8 +32,8 @@ LOG_MODULE_REGISTER(pouch_http);
 #define HTTP_PATH_DEVICE_CERT "/.g/device-cert"
 
 static atomic_t pouch_cert_flags;
-#define SERVER_CERT_DOWNLOADED_BIT BIT(0)
-#define POUCH_CERT_UPLOADED_BIT BIT(1)
+#define SERVER_CERT_DOWNLOADED_BIT 0
+#define POUCH_CERT_UPLOADED_BIT 1
 
 K_EVENT_DEFINE(pouch_http_client_events);
 #define HTTP_CLIENT_CONN_READY BIT(0)
@@ -41,7 +41,7 @@ K_EVENT_DEFINE(pouch_http_client_events);
 static int _sock = -1;
 static sec_tag_t _sec_tag;
 
-#define IN_USE_FLAG BIT(0)
+#define IN_USE_FLAG 0
 
 static struct sync_context
 {
