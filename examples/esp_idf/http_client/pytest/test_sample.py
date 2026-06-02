@@ -86,19 +86,19 @@ def _wait_for_boot_state(dut) -> bool:
     ) from last_exception
 
 
-def _provision_and_boot(dut, provisioning_creds) -> None:
-    crt_der_b64 = base64.b64encode(provisioning_creds["DEVICE_CRT_DER"]).decode("ascii")
-    key_der_b64 = base64.b64encode(provisioning_creds["DEVICE_KEY_DER"]).decode("ascii")
+async def _provision_and_boot(dut, provisioning_creds) -> None:
+    crt_der_b64 = base64.b64encode(provisioning_creds.certs.crt_der).decode("ascii")
+    key_der_b64 = base64.b64encode(provisioning_creds.certs.key_der).decode("ascii")
 
     print("Provisioning WiFi and credentials")
     _send_and_expect_store(
         dut,
-        f"ssid {provisioning_creds['WIFI_SSID']}",
+        f"ssid {provisioning_creds.wifi.ssid}",
         r".*Successfully stored WiFi SSID",
     )
     _send_and_expect_store(
         dut,
-        f"psk {provisioning_creds['WIFI_PSK']}",
+        f"psk {provisioning_creds.wifi.psk}",
         r".*Successfully stored WiFi PSK",
     )
     _send_and_expect_store(

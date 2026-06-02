@@ -47,14 +47,26 @@ export GOLIOTH_API_URL="https://api.golioth.io"
 export GOLIOTH_API_KEY="your_project_api_key"
 export WIFI_SSID="your_wifi_ssid"
 export WIFI_PSK="your_wifi_psk"
+
+# Manual cert mode: provide DER file paths
 export DEVICE_CRT_DER_PATH="/path/to/device.crt.der"
 export DEVICE_KEY_DER_PATH="/path/to/device.key.der"
 
-# Optional override (otherwise derived from DEVICE_CRT_DER_PATH cert CN)
+# Optional override (otherwise derived from cert CN in DEVICE_CRT_DER_PATH)
 export GOLIOTH_DEVICE_NAME="your_device_name"
-# Optional: set if API key can access multiple projects
-export GOLIOTH_PROJECT_ID="your_project_id"
 ```
+
+The test also accepts `python-golioth-tools`/SDK-style pytest flags:
+
+- `--api-key` (fallback: `GOLIOTH_API_KEY`)
+- `--api-url` (fallback: `GOLIOTH_API_URL`, default: `https://api.golioth.io`)
+- `--device-name` (fallback: `GOLIOTH_DEVICE_NAME`)
+- `--wifi-ssid` (fallback: `WIFI_SSID`)
+- `--wifi-psk` (fallback: `WIFI_PSK`)
+
+To generate device certificates automatically during the test run,
+pass `--generate-certs` and omit manual cert inputs
+(`DEVICE_CRT_DER_PATH`/`DEVICE_KEY_DER_PATH`).
 
 Then run from the repository root (`pouch`):
 
@@ -69,9 +81,24 @@ pytest -vv -rs -s \
   --embedded-services esp,idf \
   --target esp32s3 \
   --port /dev/ttyUSB0 \
-  --flash-port /dev/ttyUSB0 \
   --app-path examples/esp_idf/http_client \
   --build-dir build \
   --erase-all n \
+  examples/esp_idf/http_client/pytest/test_sample.py
+```
+
+Example generated-cert run:
+
+```bash
+pytest -vv -rs -s \
+  -c examples/esp_idf/http_client/pytest.ini \
+  --rootdir examples/esp_idf/http_client \
+  --embedded-services esp,idf \
+  --target esp32s3 \
+  --port /dev/ttyUSB0 \
+  --app-path examples/esp_idf/http_client \
+  --build-dir build \
+  --erase-all n \
+  --generate-certs \
   examples/esp_idf/http_client/pytest/test_sample.py
 ```
