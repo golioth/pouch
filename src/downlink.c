@@ -241,3 +241,14 @@ void pouch_downlink_finish(void)
     buf_free(encrypted);
     encrypted = NULL;
 }
+
+void pouch_downlink_flush(void)
+{
+    /*
+     * Block until any in-flight decrypt work has completed. The decrypt work
+     * queue is a single FIFO worker and decrypt_blocks() drains its whole buffer
+     * queue per run, so flushing the queue waits for every block pushed so far to
+     * be decrypted.
+     */
+    pouch_work_queue_flush(decrypt.work_queue);
+}

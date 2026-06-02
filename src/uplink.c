@@ -9,6 +9,7 @@
 #include "entry.h"
 #include "stream.h"
 #include "crypto.h"
+#include "downlink.h"
 
 #include <errno.h>
 #include <pouch/uplink.h>
@@ -99,6 +100,12 @@ static void process_blocks(pouch_work_t *work)
 
 static void end_session(void)
 {
+    /*
+     * Wait for any in-flight downlink decryption to finish before destroying
+     * the crypto session: crypto_session_end() destroys the downlink PSA key,
+     * which the async decrypt worker still needs.
+     */
+    pouch_downlink_flush();
     crypto_session_end();
     pouch_atomic_clear_bit(uplink.flags, SESSION_ACTIVE);
     pouch_event_emit(POUCH_EVENT_SESSION_END);

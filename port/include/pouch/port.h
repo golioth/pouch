@@ -719,6 +719,21 @@ void pouch_work_queue_start(pouch_work_q_t *queue,
  */
 int pouch_work_submit_to_queue(pouch_work_q_t *queue, pouch_work_t *work);
 
+/**
+ * @brief Flush a work queue
+ *
+ * Blocks the calling thread until every work item pending on the queue at the
+ * time of the call has finished executing. New items submitted while this
+ * function is waiting may or may not have run by the time it returns; the queue
+ * is not guaranteed to be empty on return.
+ *
+ * Must not be called from the work queue's own worker thread, or it would
+ * deadlock.
+ *
+ * @param queue The work queue to flush
+ */
+void pouch_work_queue_flush(pouch_work_q_t *queue);
+
 /*--------------------------------------------------
  * Delayable Work
  *------------------------------------------------*/
