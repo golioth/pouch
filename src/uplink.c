@@ -252,8 +252,6 @@ enum pouch_result pouch_uplink_fill(struct pouch_uplink *uplink, uint8_t *dst, s
         return POUCH_MORE_DATA;
     }
 
-    end_session();
-
     return POUCH_NO_MORE_DATA;
 }
 
@@ -282,9 +280,11 @@ void pouch_uplink_finish(struct pouch_uplink *uplink)
     pouch_atomic_inc(&uplink->id);
     if (pouch_atomic_clear(uplink->flags) & BIT(SESSION_ACTIVE))
     {
-        /* The transport didn't pull down all the data, so
-         * we didn't emit the end event, and need to do it
-         * here instead.
+        /* Emit POUCH_EVENT_SESSION_END only after the transport has
+         * declared the uplink session done, so subscribers (e.g. a
+         * modem power manager) see the event after the bytes have
+         * actually been pushed out and acknowledged by the transport
+         * rather than at internal data-exhaustion time.
          */
         end_session();
     }
