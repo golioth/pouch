@@ -52,7 +52,12 @@ def test_id():
 
 
 @pytest.fixture(scope="module")
-async def cohort(project, device, test_id):
+def artifacts_to_cleanup():
+    return []
+
+
+@pytest.fixture(scope="module")
+async def cohort(project, device, test_id, artifacts_to_cleanup):
     """Create a per-device, per-test cohort so OTA deployments are isolated."""
     cohort_name = f"{device.name.lower().replace('-', '_')}_{test_id}"
     logging.info("Creating cohort '%s' for device '%s'", cohort_name, device.name)
@@ -65,11 +70,24 @@ async def cohort(project, device, test_id):
         await device.remove_cohort()
     except Exception:
         pass
-    await project.cohorts.delete(cohort.id)
+
+    try:
+        await project.cohorts.delete(cohort.id)
+    except Exception:
+        logging.warning("Cohort %s could not be deleted", cohort_name)
+        pass
+
+    for artifact_id in artifacts_to_cleanup:
+        try:
+            await project.artifacts.delete(artifact_id)
+        except Exception:
+            logging.warning("Artifact %s could not be deleted", artifact_id)
 
 
 @pytest.fixture(scope="module")
-async def ota_firmware(project, device, cohort, test_id, tmp_path_factory):
+async def ota_firmware(
+    project, device, cohort, test_id, tmp_path_factory, artifacts_to_cleanup
+):
     """Generate a random firmware image, upload as artifact, deploy to cohort."""
     import hashlib
     import os
@@ -96,19 +114,10 @@ async def ota_firmware(project, device, cohort, test_id, tmp_path_factory):
         package="main",
     )
 
+    artifacts_to_cleanup.append(artifact.id)
+
     logging.info("Creating deployment on cohort '%s'", cohort.name)
 
     await cohort.deployments.create(f"ota-test-{device.name}-{test_id}", [artifact.id])
 
     yield expected_sha256
-
-    logging.info("Cleaning up OTA artifact")
-
-    try:
-        await project.artifacts.delete(artifact.id)
-    except Exception:
-        logging.warning(
-            "Artifact %s could not be deleted (likely still referenced by "
-            "a deployment); it may need to be cleaned up manually",
-            artifact.id,
-        )
