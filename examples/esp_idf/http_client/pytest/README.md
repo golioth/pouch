@@ -47,10 +47,10 @@ export GOLIOTH_API_URL="https://api.golioth.io"
 export GOLIOTH_API_KEY="your_project_api_key"
 export WIFI_SSID="your_wifi_ssid"
 export WIFI_PSK="your_wifi_psk"
-export DEVICE_CRT_DER_B64="base64_der_device_certificate"
-export DEVICE_KEY_DER_B64="base64_der_device_private_key"
+export DEVICE_CRT_DER_PATH="/path/to/device.crt.der"
+export DEVICE_KEY_DER_PATH="/path/to/device.key.der"
 
-# Optional override (otherwise derived from DEVICE_CRT_DER_B64 cert CN)
+# Optional override (otherwise derived from DEVICE_CRT_DER_PATH cert CN)
 export GOLIOTH_DEVICE_NAME="your_device_name"
 # Optional: set if API key can access multiple projects
 export GOLIOTH_PROJECT_ID="your_project_id"
