@@ -4,15 +4,17 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-import asyncio
 import datetime
 import base64
+from dataclasses import dataclass
 import re
 import time
 
+import anyio
 import pytest
-from golioth.golioth import Client, Project
 from pexpect.exceptions import TIMEOUT as PexpectTimeout
+
+pytestmark = pytest.mark.anyio
 
 CONNECT_TIMEOUT_S = 20.0
 STORE_TIMEOUT_S = 20.0
@@ -23,12 +25,20 @@ BOOT_STATE_TIMEOUT_S = 90.0
 STREAM_POLL_ATTEMPTS = 24
 STREAM_POLL_DELAY_S = 5.0
 BOOT_INITIALIZED_TEXT = "Pouch successfully initialized"
-BOOT_STATE_PATTERN = (
+BOOT_STATE_PATTERN = re.compile(
     r".*(Failed to load credentials|credentials_nvs: Failed to|"
     r"Failed to read (wifi_ssid|wifi_psk|crt_der|key_der) len|"
     r"Failed to load .* from NVS|Failed to Load|Returned from app_main|"
     r"Pouch successfully initialized)"
 )
+
+
+@dataclass
+class CloudSession:
+    dut: object
+    project: object
+    cloud_device: object
+    initial_led: bool
 
 
 def _match_text(match) -> str:
@@ -38,9 +48,22 @@ def _match_text(match) -> str:
     return str(text)
 
 
-def _send_and_expect_store(dut, command: str, expected_log: str) -> None:
-    dut.write(command)
-    match = dut.expect(
+async def _dut_write(dut, command: str) -> None:
+    await anyio.to_thread.run_sync(dut.write, command)
+
+
+async def _dut_expect(dut, pattern, timeout: float):
+    return await anyio.to_thread.run_sync(lambda: dut.expect(pattern, timeout=timeout))
+
+
+async def _dut_hard_reset(dut) -> None:
+    await anyio.to_thread.run_sync(dut.serial.hard_reset)
+
+
+async def _send_and_expect_store(dut, command: str, expected_log: str) -> None:
+    await _dut_write(dut, command)
+    match = await _dut_expect(
+        dut,
         r".*(Successfully stored .+|Failed to store .+|Failed to set .+|Failed to decode base64.*)",
         timeout=STORE_TIMEOUT_S,
     )
@@ -52,18 +75,20 @@ def _send_and_expect_store(dut, command: str, expected_log: str) -> None:
         )
 
 
-def _detect_boot_state(dut, banner_timeout_s: float) -> bool:
+async def _detect_boot_state(dut, banner_timeout_s: float) -> bool:
     """Return True when boot logs indicate credentials must be provisioned."""
 
-    dut.expect(r".*Pouch HTTP Client Example", timeout=banner_timeout_s)
-    state_match = dut.expect(BOOT_STATE_PATTERN, timeout=BOOT_STATE_TIMEOUT_S)
+    await _dut_expect(dut, r".*Pouch HTTP Client Example", timeout=banner_timeout_s)
+    state_match = await _dut_expect(
+        dut, BOOT_STATE_PATTERN, timeout=BOOT_STATE_TIMEOUT_S
+    )
     if BOOT_INITIALIZED_TEXT not in _match_text(state_match):
         print("Missing credentials detected; provisioning immediately")
         return True
     return False
 
 
-def _wait_for_boot_state(dut) -> bool:
+async def _wait_for_boot_state(dut) -> bool:
     """Return True when provisioning is required; reset once if boot state goes undetected"""
 
     last_exception = None
@@ -74,10 +99,10 @@ def _wait_for_boot_state(dut) -> bool:
     ):
         if do_reset:
             print("Boot state not detected, forcing hard reset")
-            dut.serial.hard_reset()
+            await _dut_hard_reset(dut)
 
         try:
-            return _detect_boot_state(dut, timeout_s)
+            return await _detect_boot_state(dut, timeout_s)
         except (PexpectTimeout, AssertionError) as exc:
             last_exception = exc
 
@@ -91,50 +116,44 @@ async def _provision_and_boot(dut, provisioning_creds) -> None:
     key_der_b64 = base64.b64encode(provisioning_creds.certs.key_der).decode("ascii")
 
     print("Provisioning WiFi and credentials")
-    _send_and_expect_store(
+    await _send_and_expect_store(
         dut,
         f"ssid {provisioning_creds.wifi.ssid}",
         r".*Successfully stored WiFi SSID",
     )
-    _send_and_expect_store(
+    await _send_and_expect_store(
         dut,
         f"psk {provisioning_creds.wifi.psk}",
         r".*Successfully stored WiFi PSK",
     )
-    _send_and_expect_store(
+    await _send_and_expect_store(
         dut,
         f"crt {crt_der_b64}",
         r".*Successfully stored Device CRT",
     )
-    _send_and_expect_store(
+    await _send_and_expect_store(
         dut,
         f"key {key_der_b64}",
         r".*Successfully stored Device KEY",
     )
 
     print("Rebooting after provisioning")
-    dut.write("reset")
-    dut.expect(r".*Pouch HTTP Client Example", timeout=REBOOT_TIMEOUT_S)
-    dut.expect(r".*Pouch successfully initialized", timeout=REBOOT_TIMEOUT_S)
-
-
-def _require_cloud_objects(cloud_config: dict[str, str | None]):
-    client = Client(
-        api_url=cloud_config["api_url"],
-        api_key=cloud_config["api_key"],
+    await _dut_write(dut, "reset")
+    await _dut_expect(dut, r".*Pouch HTTP Client Example", timeout=REBOOT_TIMEOUT_S)
+    await _dut_expect(
+        dut, r".*Pouch successfully initialized", timeout=REBOOT_TIMEOUT_S
     )
 
-    project = asyncio.run(Project.get_by_id(client, cloud_config["project_id"]))
-    device = asyncio.run(project.device_by_name(cloud_config["device_name"]))
 
-    return project, device
+async def _require_cloud_device(project, cloud_config: dict[str, str]):
+    return await project.device_by_name(cloud_config["device_name"])
 
 
 def _iso8601_utc(timestamp: datetime.datetime) -> str:
     return timestamp.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
-def _wait_for_sensor_uplink(device, start_time: datetime.datetime) -> dict:
+async def _wait_for_sensor_uplink(device, start_time: datetime.datetime) -> dict:
     latest_payload = None
     latest_payload_with_temp = None
 
@@ -142,11 +161,9 @@ def _wait_for_sensor_uplink(device, start_time: datetime.datetime) -> dict:
     # gateway to propagate to the server while also filtering values that arrived before the test
     # began.
     for _ in range(STREAM_POLL_ATTEMPTS):
-        response = asyncio.run(
-            device.stream.get(
-                start=_iso8601_utc(start_time),
-                per_page=20,
-            )
+        response = await device.stream.get(
+            start=_iso8601_utc(start_time),
+            per_page=20,
         )
         entries = response.get("list", [])
 
@@ -158,7 +175,7 @@ def _wait_for_sensor_uplink(device, start_time: datetime.datetime) -> dict:
                     latest_payload_with_temp = payload
                     return payload
 
-        time.sleep(STREAM_POLL_DELAY_S)
+        await anyio.sleep(STREAM_POLL_DELAY_S)
 
     assert latest_payload is not None, "No stream entries found in cloud"
     assert latest_payload_with_temp is not None, (
@@ -167,8 +184,9 @@ def _wait_for_sensor_uplink(device, start_time: datetime.datetime) -> dict:
     return latest_payload_with_temp
 
 
-def _wait_for_led_setting(dut, timeout_s: float) -> bool:
-    index = dut.expect(
+async def _wait_for_led_setting(dut, timeout_s: float) -> bool:
+    index = await _dut_expect(
+        dut,
         [
             r".*Received LED setting: 0",
             r".*Received LED setting: 1",
@@ -178,10 +196,10 @@ def _wait_for_led_setting(dut, timeout_s: float) -> bool:
     return bool(index)
 
 
-def _get_device_led_setting(device) -> bool | None:
+async def _get_device_led_setting(device) -> bool | None:
     device_id = str(getattr(device, "id", "") or "")
 
-    settings = asyncio.run(device.settings.get_all())
+    settings = await device.settings.get_all()
     if isinstance(settings, dict):
         settings = settings.get("list", [])
 
@@ -206,37 +224,37 @@ def _get_device_led_setting(device) -> bool | None:
 
 
 @pytest.fixture(scope="function")
-def connected_cloud_session(cloud_config, provisioning_creds, dut):
-    needs_provisioning = _wait_for_boot_state(dut)
+async def connected_cloud_session(cloud_config, provisioning_creds, dut, project):
+    needs_provisioning = await _wait_for_boot_state(dut)
 
     if needs_provisioning:
-        _provision_and_boot(dut, provisioning_creds)
+        await _provision_and_boot(dut, provisioning_creds)
 
-    project, cloud_device = _require_cloud_objects(cloud_config)
-    initial_led = _wait_for_led_setting(dut, timeout_s=SYNC_TIMEOUT_S)
+    cloud_device = await _require_cloud_device(project, cloud_config)
+    initial_led = await _wait_for_led_setting(dut, timeout_s=SYNC_TIMEOUT_S)
 
-    yield {
-        "dut": dut,
-        "project": project,
-        "cloud_device": cloud_device,
-        "initial_led": initial_led,
-    }
+    yield CloudSession(
+        dut=dut,
+        project=project,
+        cloud_device=cloud_device,
+        initial_led=initial_led,
+    )
 
 
-def test_sensor_uplink_contains_temp(connected_cloud_session):
-    cloud_device = connected_cloud_session["cloud_device"]
+async def test_sensor_uplink_contains_temp(connected_cloud_session):
+    cloud_device = connected_cloud_session.cloud_device
     start_time = datetime.datetime.now(datetime.UTC)
 
-    _wait_for_sensor_uplink(cloud_device, start_time)
+    await _wait_for_sensor_uplink(cloud_device, start_time)
 
 
-def test_led_setting_downlink(connected_cloud_session):
-    dut = connected_cloud_session["dut"]
-    cloud_device = connected_cloud_session["cloud_device"]
-    initial_led = connected_cloud_session["initial_led"]
+async def test_led_setting_downlink(connected_cloud_session):
+    dut = connected_cloud_session.dut
+    cloud_device = connected_cloud_session.cloud_device
+    initial_led = connected_cloud_session.initial_led
 
     print(f"Initial LED observed on DUT: {int(initial_led)}")
-    current_led = _get_device_led_setting(cloud_device)
+    current_led = await _get_device_led_setting(cloud_device)
     if current_led is None:
         current_led = initial_led
         print(
@@ -249,10 +267,10 @@ def test_led_setting_downlink(connected_cloud_session):
     next_led = not current_led
     write_start = time.monotonic()
     print(f"Setting device-level LED override to: {int(next_led)}")
-    asyncio.run(cloud_device.settings.set("LED", next_led))
+    await cloud_device.settings.set("LED", next_led)
     expected_pattern = (
         r".*Received LED setting: 1" if next_led else r".*Received LED setting: 0"
     )
-    dut.expect(expected_pattern, timeout=LED_TIMEOUT_S)
+    await _dut_expect(dut, expected_pattern, timeout=LED_TIMEOUT_S)
     elapsed = time.monotonic() - write_start
     print(f"Device received LED setting {int(next_led)} after {elapsed:.1f}s")
