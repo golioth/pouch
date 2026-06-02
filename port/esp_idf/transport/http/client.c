@@ -34,10 +34,10 @@ struct get_server_cert_context
     size_t pos;
 };
 
-#define IN_USE_FLAG BIT(0)
-#define SERVER_CERT_DOWNLOADED_BIT BIT(1)
-#define POUCH_CERT_UPLOADED_BIT BIT(2)
-#define DOWNLINK_IN_PROGRESS BIT(3)
+#define IN_USE_FLAG 0
+#define SERVER_CERT_DOWNLOADED_BIT 1
+#define POUCH_CERT_UPLOADED_BIT 2
+#define DOWNLINK_IN_PROGRESS 3
 
 static struct sync_context
 {
