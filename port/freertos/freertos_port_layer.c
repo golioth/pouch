@@ -422,6 +422,32 @@ int pouch_work_submit_to_queue(pouch_work_q_t *queue, pouch_work_t *work)
     return -ENOMEM;
 }
 
+struct work_flush_sync
+{
+    pouch_work_t work;
+    pouch_sem_t sem;
+};
+
+static void work_flush_sentinel_handler(pouch_work_t *work)
+{
+    struct work_flush_sync *sync = CONTAINER_OF(work, struct work_flush_sync, work);
+
+    pouch_sem_give(&sync->sem);
+}
+
+void pouch_work_queue_flush(pouch_work_q_t *queue)
+{
+    struct work_flush_sync sync;
+
+    pouch_work_init(&sync.work, work_flush_sentinel_handler);
+    pouch_sem_init(&sync.sem, 0, 1);
+
+    if (0 == pouch_work_submit_to_queue(queue, &sync.work))
+    {
+        pouch_sem_take(&sync.sem, POUCH_FOREVER);
+    }
+}
+
 /*--------------------------------------------------
  * Delayable Work
  *------------------------------------------------*/

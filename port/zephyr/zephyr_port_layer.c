@@ -269,6 +269,24 @@ int pouch_work_submit_to_queue(pouch_work_q_t *queue, pouch_work_t *work)
     return (0 <= ret) ? 0 : ret;
 }
 
+static void work_flush_sentinel_handler(pouch_work_t *work)
+{
+    ARG_UNUSED(work);
+}
+
+void pouch_work_queue_flush(pouch_work_q_t *queue)
+{
+    pouch_work_t sentinel;
+    struct k_work_sync sync;
+
+    pouch_work_init(&sentinel, work_flush_sentinel_handler);
+
+    if (0 == pouch_work_submit_to_queue(queue, &sentinel))
+    {
+        k_work_flush(&sentinel, &sync);
+    }
+}
+
 /*--------------------------------------------------
  * Delayable Work
  *------------------------------------------------*/
