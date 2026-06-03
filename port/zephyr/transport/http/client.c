@@ -103,6 +103,12 @@ static int pouch_server_cert_response_callback(struct http_response *rsp,
 
     struct get_server_cert_context *ctx = user_data;
 
+    if (0 == rsp->body_frag_len)
+    {
+        LOG_ERR("No data in chunk");
+        return -EINVAL;
+    }
+
     if (ctx->pos + rsp->body_frag_len > sizeof(ctx->cert_buf))
     {
         LOG_ERR("Server cert too large for buffer");

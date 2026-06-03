@@ -103,7 +103,13 @@ static esp_err_t pouch_server_cert_response_callback(esp_http_client_event_t *ev
     if (!esp_http_client_is_chunked_response(evt->client))
     {
 
-        if (sync->server_cert.pos + evt->data_len > sizeof(sync->server_cert.cert_buf))
+        if (evt->data_len <= 0)
+        {
+            ESP_LOGE(TAG, "No data in chunk");
+            return ESP_ERR_INVALID_SIZE;
+        }
+
+        if (sync->server_cert.pos + (size_t) evt->data_len > sizeof(sync->server_cert.cert_buf))
         {
             ESP_LOGE(TAG, "Server cert too large for buffer");
             return ESP_ERR_NO_MEM;
