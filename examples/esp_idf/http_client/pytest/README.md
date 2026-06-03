@@ -24,6 +24,14 @@ uv pip install --python "$IDF_PYTHON_ENV_PATH" -r requirements-ci-esp-idf.txt --
 uv pip install --python "$IDF_PYTHON_ENV_PATH" "golioth@git+https://github.com/golioth/python-golioth-tools@v0.8.1"
 ```
 
+4. Enable the required Golioth pipeline route for stream validation:
+
+   The stream test (`test_sensor_uplink_contains_temp`) expects JSON data
+   sent on `.s/sensor` to be routed into LightDB Stream. Enable the pipeline
+   from this file in your Golioth project before running the test:
+
+   - `examples/esp_idf/http_client/pytest/json-sensor-path-to-lightdb-stream.txt`
+
 ## Build Firmware
 
 From the repository root (`pouch`):
