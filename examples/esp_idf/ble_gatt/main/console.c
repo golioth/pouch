@@ -48,7 +48,7 @@ static int set_credential(enum cred_type type, int argc, char **argv, char *log_
 
     if (0 != err)
     {
-        ESP_LOGE(TAG, "Failed to store %s: %i", log_msg, err);
+        ESP_LOGE(TAG, "Failed to set %s: %i", log_msg, err);
     }
     else
     {
