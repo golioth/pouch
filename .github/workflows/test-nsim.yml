@@ -101,7 +101,7 @@ jobs:
 
       - name: Safe upload twister artifacts
         if: success() || failure()
-        uses: ./modules/lib/golioth-firmware-sdk/.github/actions/safe-upload-artifacts
+        uses: ./pouch/.github/actions/safe-upload-artifacts
         with:
           secrets-json: ${{ toJson(secrets) }}
           name: twister-run-artifacts-bsim
