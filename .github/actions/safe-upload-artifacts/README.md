@@ -27,7 +27,7 @@ notice.
 
 - The `uses` path may change based on how your workflow checks out the
   repository. (eg: `uses:
-  ./modules/lib/golioth-firmware-sdk/.github/actions/safe-upload-artifacts`).
+  ./pouch/.github/actions/safe-upload-artifacts`).
 - Secrets must be passed as serialized JSON as in the example above.
   This is because actions cannot inherit secrets. Reusable workflows can
   inherit secrets but they cannot be run as steps (only as jobs).
