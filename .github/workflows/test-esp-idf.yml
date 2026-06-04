@@ -9,8 +9,8 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-24.04
-    # ESP-IDF v5.4.1
-    container: espressif/idf@sha256:9b8c4b573f6eb7aa65be6b34817590ad85b4f7176273522094a2bf465dc9263f
+    # ESP-IDF v6.0.1
+    container: espressif/idf@sha256:efc19fae2f52fc6873630c668da26aa834139a063b5fb73a46ebc0dbd217b587
     env:
       UNIT_TEST_APP_PATH: tests/esp_idf/port
       UNITY_REPORT_NAME: unit-test-esp-idf.xml

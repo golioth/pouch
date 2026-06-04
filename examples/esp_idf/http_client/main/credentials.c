@@ -12,7 +12,6 @@
 #include <string.h>
 #include "mbedtls/pk.h"
 #include "mbedtls/pem.h"
-#include "mbedtls/psa_util.h"
 #include "mbedtls/x509_crt.h"
 #include "credentials_nvs.h"
 
@@ -55,13 +54,7 @@ static int load_device_pk(mbedtls_svc_key_id_t *key_id)
         return -ENOENT;
     }
 
-    int err = mbedtls_pk_parse_key(&pk,
-                                   (unsigned char *) key_der.buffer,
-                                   key_der.size,
-                                   NULL,
-                                   0,
-                                   mbedtls_psa_get_random,
-                                   MBEDTLS_PSA_RANDOM_STATE);
+    int err = mbedtls_pk_parse_key(&pk, (unsigned char *) key_der.buffer, key_der.size, NULL, 0);
     if (err)
     {
         ESP_LOGE(TAG, "Failed to parse key: -0x%" PRIx32, (uint32_t) -err);
@@ -132,13 +125,7 @@ static int convert_device_pk_der_to_pem(char *pem_buf, size_t pem_buf_len)
         return -ENOENT;
     }
 
-    int err = mbedtls_pk_parse_key(&pk,
-                                   (unsigned char *) key_der.buffer,
-                                   key_der.size,
-                                   NULL,
-                                   0,
-                                   mbedtls_psa_get_random,
-                                   MBEDTLS_PSA_RANDOM_STATE);
+    int err = mbedtls_pk_parse_key(&pk, (unsigned char *) key_der.buffer, key_der.size, NULL, 0);
 
     if (0 != err)
     {

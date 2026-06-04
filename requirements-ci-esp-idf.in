@@ -1,7 +1,20 @@
-pytest-embedded-idf==1.18.2
-pytest-embedded-serial-esp==1.18.2
-esptool==4.11.0
+pytest-embedded-idf==2.8.0
+pytest-embedded-serial-esp==2.8.0
+esptool==5.3.0
 pyparsing>=3.1.0,<3.3
-rich<14.3.4
+rich<16
+anyio>=4.0.0,<5
+
+# Workaround for anyio dependency:
+# https://github.com/agronholm/anyio/blob/2370032396438b0279bacb3ff2f5c4ae2886f0d0/pyproject.toml#L32
+#
+# When the unit test runs in CI, Python 3.12 is used. This triggers the anyio dependency for
+# typing-extensions. However the requirements-ci-esp-idf.txt was generated on a system using Python
+# >= 3.13, so the package was not pinned.
+#
+# This will throw an error because we use --require-hashes in CI. We explicitly pin the dependency
+# here to ensure the package is hashed. This may be removed once we are using Python >= 3.13 on all
+# of our workflows.
+typing-extensions>=4.5
 
 -r requirements.txt
