@@ -95,6 +95,12 @@ static int pouch_server_cert_response_callback(struct http_response *rsp,
 
     int err = 0;
 
+    if (!IN_RANGE(rsp->http_status_code, 200, 299))
+    {
+        LOG_ERR("Failed to fetch server cert: %u", rsp->http_status_code);
+        return -EIO;
+    }
+
     if (false == rsp->body_found)
     {
         LOG_ERR("Failed to find HTTP body");
@@ -118,7 +124,14 @@ static int pouch_server_cert_response_callback(struct http_response *rsp,
             .buffer = ctx->cert_buf,
             .size = ctx->pos,
         };
-        pouch_server_certificate_set(&cert);
+
+        err = pouch_server_certificate_set(&cert);
+        if (0 != err)
+        {
+            LOG_ERR("Failed to set server certificate: %d", err);
+            return err;
+        }
+
         atomic_set_bit(&pouch_cert_flags, SERVER_CERT_DOWNLOADED_BIT);
     }
 
