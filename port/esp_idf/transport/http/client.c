@@ -145,6 +145,19 @@ static int fetch_server_cert(struct sync_context *sync)
         return err;
     }
 
+    int status_code = esp_http_client_get_status_code(sync->client);
+    if (!IN_RANGE(status_code, 200, 299))
+    {
+        ESP_LOGE(TAG, "Server cert HTTP request failed: status=%d", status_code);
+        return -EIO;
+    }
+
+    if (sync->server_cert.pos == 0)
+    {
+        ESP_LOGE(TAG, "Server cert response body is empty");
+        return -ENODATA;
+    }
+
     struct pouch_cert cert = {
         .buffer = sync->server_cert.cert_buf,
         .size = sync->server_cert.pos,
@@ -204,6 +217,13 @@ static int upload_pouch_cert(struct sync_context *sync)
         ESP_LOGE(TAG, "Error performing http request %s", esp_err_to_name(err));
         err = -(esp_http_client_get_errno(sync->client));
         return err;
+    }
+
+    int status_code = esp_http_client_get_status_code(sync->client);
+    if (!IN_RANGE(status_code, 200, 299))
+    {
+        ESP_LOGE(TAG, "Device cert upload failed: status=%d", status_code);
+        return -EIO;
     }
 
     pouch_atomic_set_bit(&sync->flags, POUCH_CERT_UPLOADED_BIT);
