@@ -29,7 +29,7 @@ BOOT_STATE_PATTERN = re.compile(
     r".*(Failed to load credentials|credentials_nvs: Failed to|"
     r"Failed to read (wifi_ssid|wifi_psk|crt_der|key_der) len|"
     r"Failed to load .* from NVS|Failed to Load|Returned from app_main|"
-    r"Pouch successfully initialized)"
+    rf"{re.escape(BOOT_INITIALIZED_TEXT)})"
 )
 
 
@@ -141,7 +141,7 @@ async def _provision_and_boot(dut, provisioning_creds) -> None:
     await _dut_write(dut, "reset")
     await _dut_expect(dut, r".*Pouch HTTP Client Example", timeout=REBOOT_TIMEOUT_S)
     await _dut_expect(
-        dut, r".*Pouch successfully initialized", timeout=REBOOT_TIMEOUT_S
+        dut, rf".*{re.escape(BOOT_INITIALIZED_TEXT)}", timeout=REBOOT_TIMEOUT_S
     )
 
 
