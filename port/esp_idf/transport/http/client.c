@@ -97,12 +97,8 @@ static esp_err_t pouch_server_cert_response_callback(esp_http_client_event_t *ev
         return ESP_OK;
     }
 
-    ESP_LOGD(TAG, "Received http cert response %d", evt->data_len);
-
-    /* FIXME: Handle event where data is not chunked */
-    if (!esp_http_client_is_chunked_response(evt->client))
+    if (HTTP_EVENT_ON_DATA == evt->event_id)
     {
-
         if (sync->server_cert.pos + evt->data_len > sizeof(sync->server_cert.cert_buf))
         {
             ESP_LOGE(TAG, "Server cert too large for buffer");
@@ -111,7 +107,6 @@ static esp_err_t pouch_server_cert_response_callback(esp_http_client_event_t *ev
 
         memcpy(sync->server_cert.cert_buf + sync->server_cert.pos, evt->data, evt->data_len);
         sync->server_cert.pos += evt->data_len;
-        return ESP_OK;
     }
 
     return ESP_OK;
