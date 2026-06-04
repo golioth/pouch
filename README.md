@@ -80,7 +80,7 @@ how to include them in an application.
 
 **Supported Versions**
 
-- `v5.4.1`
+- `v6.0.1`
 
 ## Service SDKs
 

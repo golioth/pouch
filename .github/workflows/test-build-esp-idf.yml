@@ -16,7 +16,7 @@ jobs:
       - name: Build esp32s3
         uses: espressif/esp-idf-ci-action@e6f5c74232b1ccd4c97ed641f1e48553853f1fd5 # v1.2.0
         with:
-          esp_idf_version: v5.4.1
+          esp_idf_version: v6.0.1
           target: esp32s3
           path: port/esp_idf/test/port_features
 
@@ -33,7 +33,7 @@ jobs:
       - name: Build esp32s3
         uses: espressif/esp-idf-ci-action@e6f5c74232b1ccd4c97ed641f1e48553853f1fd5 # v1.2.0
         with:
-          esp_idf_version: v5.4.1
+          esp_idf_version: v6.0.1
           target: esp32s3
           command: |
             EXAMPLE_APP_PATH=examples/esp_idf/http_client

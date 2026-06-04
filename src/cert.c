@@ -7,10 +7,13 @@
 #include "cert.h"
 #include <errno.h>
 #include <psa/crypto.h>
+#include <mbedtls/pk.h>
+#include <mbedtls/version.h>
 #include <mbedtls/x509_crt.h>
 #include <pouch/port.h>
 #include <pouch/certificate.h>
 #include <pouch/transport/certificate.h>
+#include <stdlib.h>
 #include <string.h>
 
 POUCH_LOG_REGISTER(cert, CONFIG_POUCH_COMMON_LOG_LEVEL);
@@ -130,6 +133,49 @@ static int authenticate_server_cert(mbedtls_x509_crt *cert)
 
 static int extract_pubkey(mbedtls_x509_crt *cert, struct pubkey *out)
 {
+/* Add PK to PSA from mbedtls >=v4, otherwise use legacy EC functions */
+#if defined(MBEDTLS_VERSION_MAJOR) && (MBEDTLS_VERSION_MAJOR >= 4)
+    int err;
+    mbedtls_svc_key_id_t key_id = MBEDTLS_SVC_KEY_ID_INIT;
+    psa_key_attributes_t attrs = PSA_KEY_ATTRIBUTES_INIT;
+
+    /* Use the most conservative usage option available (PSA_KEY_USAGE_VERIFY_HASH) that will return
+     * the stored public key */
+    err = mbedtls_pk_get_psa_attributes(&cert->pk, PSA_KEY_USAGE_VERIFY_HASH, &attrs);
+    if (err != 0)
+    {
+        POUCH_LOG_ERR("Extract PK: failed to get key attributes: 0x%x", -err);
+        return -EIO;
+    }
+
+    err = mbedtls_pk_import_into_psa(&cert->pk, &attrs, &key_id);
+    psa_reset_key_attributes(&attrs);
+
+    if (err)
+    {
+        POUCH_LOG_ERR("Extract PK: failed to import key to PSA: 0x%x", -err);
+        return -EIO;
+    }
+
+    psa_status_t export_status =
+        psa_export_public_key(key_id, out->data, sizeof(out->data), &out->len);
+    psa_status_t destroy_status = psa_destroy_key(key_id);
+
+    if (destroy_status != PSA_SUCCESS)
+    {
+        /* key_id is stored in RAM so we may have leaked some memory but we are not at risk of
+         * filling up persistent key storage slots. Log but do not retry. */
+        POUCH_LOG_ERR("Extract PK: failed to destroy key: %d", (int) destroy_status);
+    }
+
+    if (export_status != PSA_SUCCESS)
+    {
+        POUCH_LOG_ERR("Extract PK: export error %d", (int) export_status);
+        return -EIO;
+    }
+
+    return 0;
+#else
     mbedtls_ecp_keypair *key = mbedtls_pk_ec(cert->pk);
     if (key == NULL)
     {
@@ -149,6 +195,7 @@ static int extract_pubkey(mbedtls_x509_crt *cert, struct pubkey *out)
     }
 
     return 0;
+#endif
 }
 
 int cert_device_set(const struct pouch_cert *cert)

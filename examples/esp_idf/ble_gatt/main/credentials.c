@@ -11,7 +11,6 @@
 #include "esp_log.h"
 #include "mbedtls/base64.h"
 #include "mbedtls/pk.h"
-#include "mbedtls/psa_util.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 
@@ -213,13 +212,7 @@ static int load_private_key(void)
     mbedtls_pk_context pk;
     mbedtls_pk_init(&pk);
 
-    int err = mbedtls_pk_parse_key(&pk,
-                                   key_der_buf,
-                                   key_der_len,
-                                   NULL,
-                                   0,
-                                   mbedtls_psa_get_random,
-                                   MBEDTLS_PSA_RANDOM_STATE);
+    int err = mbedtls_pk_parse_key(&pk, key_der_buf, key_der_len, NULL, 0);
     if (err)
     {
         ESP_LOGE(TAG, "Failed to parse private key: -0x%04x", (unsigned) -err);
