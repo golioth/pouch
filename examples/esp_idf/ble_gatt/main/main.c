@@ -87,7 +87,7 @@ void app_main(void)
         return;
     }
 
-    ESP_LOGI(TAG, "Pouch initialized");
+    ESP_LOGI(TAG, "Pouch successfully initialized");
 
     /* Start advertising */
     err = ble_peripheral_start();
