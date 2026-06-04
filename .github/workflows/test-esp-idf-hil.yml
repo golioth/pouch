@@ -73,6 +73,9 @@ jobs:
           # Install Pouch dependencies
           pip install -r requirements-ci-esp-idf.txt --require-hashes
 
+          # Enable shorter 10s sync delay for Hil testing
+          export SDKCONFIG_DEFAULTS="sdkconfig.defaults;pytest/sdkconfig.pytest.defaults"
+
           idf.py -C "${{ matrix.sample.dir }}" set-target "${{ inputs.idf_target }}"
           idf.py -C "${{ matrix.sample.dir }}" build
           idf.py -C "${{ matrix.sample.dir }}" merge-bin -o merged.bin
