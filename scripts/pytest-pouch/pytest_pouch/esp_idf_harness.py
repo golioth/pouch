@@ -19,9 +19,6 @@ from pathlib import Path
 
 import pytest
 
-# Patch esptool v4.* for underscore/dash conflict with v5.*
-from . import esptool_v4_shim  # noqa: F401
-
 
 @dataclass
 class WifiCreds:
