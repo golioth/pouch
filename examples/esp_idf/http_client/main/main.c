@@ -96,13 +96,13 @@ void app_main(void)
     }
     ESP_LOGI(TAG,
              "Pouch successfully initialized; sync interval: %ds",
-             CONFIG_EXAMPLE_HTTP_CLIENT_SYNC_PERIOD_S);
+             CONFIG_EXAMPLE_SYNC_PERIOD_S);
 
     while (true)
     {
         /* Sync Pouch uplink and downlink */
         http_client_transport_sync();
 
-        vTaskDelay(pdMS_TO_TICKS(CONFIG_EXAMPLE_HTTP_CLIENT_SYNC_PERIOD_S * 1000));
+        vTaskDelay(pdMS_TO_TICKS(CONFIG_EXAMPLE_SYNC_PERIOD_S * 1000));
     }
 }
