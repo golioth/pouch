@@ -11,6 +11,25 @@ import subprocess
 import pytest
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--generate-certs",
+        action="store_true",
+        default=False,
+        help="Generate test PKI credentials during test setup",
+    )
+    parser.addoption(
+        "--wifi-ssid",
+        type=str,
+        help="WiFi SSID",
+    )
+    parser.addoption(
+        "--wifi-psk",
+        type=str,
+        help="WiFi PSK",
+    )
+
+
 @pytest.fixture(scope="session")
 def anyio_backend():
     return "trio"
