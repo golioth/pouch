@@ -108,85 +108,6 @@ int fill_pouch_config(struct pouch_config *config)
     return 0;
 }
 
-/* Buffer and function to convert device key der to pem */
-/* This can be removed after ESP-IDF v6 (includes der support for HTTP client) */
-static char device_crt_pem[768];
-
-static int convert_device_pk_der_to_pem(char *pem_buf, size_t pem_buf_len)
-{
-    psa_crypto_init();
-    mbedtls_pk_context pk;
-    mbedtls_pk_init(&pk);
-
-    struct pouch_cert key_der;
-    key_der.buffer = cred_get_device_key_der(&key_der.size);
-    if (NULL == key_der.buffer)
-    {
-        return -ENOENT;
-    }
-
-    int err = mbedtls_pk_parse_key(&pk, (unsigned char *) key_der.buffer, key_der.size, NULL, 0);
-
-    if (0 != err)
-    {
-        ESP_LOGE(TAG, "Failed to parse device.key.der: %d", err);
-        return err;
-    }
-
-    err = mbedtls_pk_write_key_pem(&pk, (unsigned char *) pem_buf, pem_buf_len);
-    if (0 != err)
-    {
-        ESP_LOGE(TAG, "Failed to convert device.key.der to PEM: %d", err);
-        return err;
-    }
-
-    mbedtls_pk_free(&pk);
-
-    return 0;
-}
-
-/* Buffer and function to convert device crt der to pem */
-/* This can be removed after ESP-IDF v6 (includes der support for HTTP client) */
-static char device_key_pem[310];
-
-static int convert_device_cert_der_to_pem(char *pem_buf, size_t pem_buf_len)
-{
-    psa_crypto_init();
-    mbedtls_x509_crt crt;
-    mbedtls_x509_crt_init(&crt);
-
-    struct pouch_cert crt_der;
-    if (0 != get_device_cert(&crt_der))
-    {
-        ESP_LOGE(TAG, "Failed to load device cert");
-        return -ENOENT;
-    }
-
-    int err = mbedtls_x509_crt_parse_der(&crt, (unsigned char *) crt_der.buffer, crt_der.size);
-    if (0 != err)
-    {
-        ESP_LOGE(TAG, "Failed to parse device.crt.der: %d", err);
-        return err;
-    }
-
-    size_t pem_written = 0;
-    err = mbedtls_pem_write_buffer("-----BEGIN CERTIFICATE-----\n",
-                                   "-----END CERTIFICATE-----\n",
-                                   crt.raw.p,
-                                   crt.raw.len,
-                                   (unsigned char *) pem_buf,
-                                   pem_buf_len,
-                                   &pem_written);
-    if (0 != err)
-    {
-        ESP_LOGE(TAG, "Failed to convert device.crt.der to PEM: %d", err);
-        return err;
-    }
-
-    mbedtls_x509_crt_free(&crt);
-    return 0;
-}
-
 int fill_mtls_credentials(struct mtls_credentials *creds)
 {
     creds->cert_pem = server_ca_cert_pem_start;
@@ -205,32 +126,11 @@ int fill_mtls_credentials(struct mtls_credentials *creds)
         return err;
     }
 
-    /* NOTE: DER support in ESP-IDF HTTP Client wasn't added until v6 */
-    /* Device DER files need to be converted to PEM */
-    err = convert_device_pk_der_to_pem(device_key_pem, sizeof(device_key_pem));
-    if (0 != err)
-    {
-        return err;
-    }
-    creds->client_key_pem = device_key_pem;
-    /* Get size including null terminator */
-    creds->client_key_pem_len = strlen(device_key_pem) + 1;
-
     creds->client_key_der = (const char *) cred_get_device_key_der(&creds->client_key_der_len);
     if (NULL == creds->client_key_der)
     {
         return -ENOENT;
     }
-
-    err = convert_device_cert_der_to_pem(device_crt_pem, sizeof(device_crt_pem));
-    if (0 != err)
-    {
-        ESP_LOGE(TAG, "Failed to load device key");
-        return err;
-    }
-    creds->client_cert_pem = device_crt_pem;
-    /* Get size including null terminator */
-    creds->client_cert_pem_len = strlen(device_crt_pem) + 1;
 
     creds->client_cert_der = (const char *) cred_get_device_crt_der(&creds->client_cert_der_len);
     if (NULL == creds->client_cert_der)
