@@ -3,6 +3,13 @@ Shared ESP-IDF pytest fixtures for pouch examples.
 
 This module is intentionally opt-in: only test suites that include it in
 their local ``pytest_plugins`` list will use these fixtures.
+
+Usage notes:
+- CLI options consumed by this module are registered in ``pytest_pouch.plugin``:
+  ``--generate-certs``, ``--wifi-ssid``, and ``--wifi-psk``.
+- Example-specific behavior is expected to be configured from each example
+  ``conftest.py`` by overriding selected fixtures (for example,
+  ``pouch_device_name_prefix`` and ``pouch_provision_wifi``).
 """
 
 import os
@@ -71,16 +78,39 @@ def _device_name_from_cert_cn(cert_der: bytes | None = None) -> str | None:
 
 @pytest.fixture(scope="module")
 def pouch_device_name_prefix() -> str:
+    """Prefix for generated cloud device names.
+
+    This value is used only when ``--generate-certs`` is enabled and no
+    explicit cloud device name is provided via ``--device-name`` or
+    ``GOLIOTH_DEVICE_NAME``.
+
+    Override this fixture from an example ``conftest.py`` to keep generated
+    cloud device names sample-specific.
+    """
     return "esp-idf"
 
 
 @pytest.fixture(scope="module")
 def pouch_provision_wifi() -> bool:
+    """Control whether Wi-Fi credentials are required for provisioning.
+
+    - ``False``: Wi-Fi credentials are not required and ``wifi_creds`` returns
+      ``None``.
+    - ``True``: Wi-Fi credentials are required from CLI options or env vars.
+
+    Override this fixture from an example ``conftest.py`` when a sample needs
+    Wi-Fi provisioning during the test flow.
+    """
     return False
 
 
 @pytest.fixture(scope="module")
 def wifi_creds(request, pouch_provision_wifi) -> WifiCreds | None:
+    """Resolve Wi-Fi credentials when Wi-Fi provisioning is enabled.
+
+    Inputs are read from ``--wifi-ssid``/``--wifi-psk`` or
+    ``WIFI_SSID``/``WIFI_PSK``.
+    """
     if not pouch_provision_wifi:
         return None
 
@@ -100,6 +130,14 @@ def wifi_creds(request, pouch_provision_wifi) -> WifiCreds | None:
 
 @pytest.fixture(scope="module")
 def device_name(request, pouch_device_name_prefix) -> str:
+    """Resolve cloud device name for this test session.
+
+    Resolution order:
+    1. ``--device-name`` or ``GOLIOTH_DEVICE_NAME``
+    2. generated name (``<pouch_device_name_prefix>-<random>``) when
+       ``--generate-certs`` is enabled
+    3. certificate CN from ``DEVICE_CRT_DER_PATH``
+    """
     configured_device_name = _option_or_env(
         request, "--device-name", "GOLIOTH_DEVICE_NAME"
     )
@@ -156,6 +194,10 @@ def cloud_config(request, device_name) -> dict[str, str]:
 
 @pytest.fixture(scope="module")
 def cert_paths(request, creds_dir):
+    """Return paths to DER certificate material used by tests.
+
+    In generated-cert mode, this fixture triggers ``creds`` generation first.
+    """
     if request.config.getoption("--generate-certs"):
         request.getfixturevalue("creds")
 
@@ -167,6 +209,11 @@ def cert_paths(request, creds_dir):
 
 @pytest.fixture(scope="module")
 def device_cert_bundle(request, cert_paths) -> DeviceCertBundle:
+    """Load device certificate and key DER bytes.
+
+    Generated-cert mode reads files produced in ``creds_dir``. Manual mode
+    reads ``DEVICE_CRT_DER_PATH`` and ``DEVICE_KEY_DER_PATH``.
+    """
     crt_der = b""
     key_der = b""
 
@@ -202,4 +249,8 @@ def device_cert_bundle(request, cert_paths) -> DeviceCertBundle:
 
 @pytest.fixture(scope="module")
 def provisioning_creds(wifi_creds, device_cert_bundle) -> ProvisioningCreds:
+    """Assemble provisioning inputs for shared sample tests.
+
+    ``wifi`` may be ``None`` when ``pouch_provision_wifi`` is ``False``.
+    """
     return ProvisioningCreds(certs=device_cert_bundle, wifi=wifi_creds)
