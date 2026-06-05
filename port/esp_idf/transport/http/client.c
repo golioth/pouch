@@ -7,6 +7,7 @@
 #include <esp_log.h>
 #define TAG "http_client"
 
+#include <assert.h>
 #include <errno.h>
 #include <esp_http_client.h>
 #include <esp_tls.h>
@@ -442,6 +443,17 @@ esp_err_t event_handler_proxy(esp_http_client_event_t *evt)
 
 esp_http_client_handle_t client_initialize(struct sync_context *sync)
 {
+    /* .client_key_pem is a very bad name for the esp_http_client_config_t. As long as a non-zero
+     * length is passed to .client_key_len, a pointer to a DER formatted key may be passed to
+     * .client_key_pem.
+     * https://github.com/espressif/esp-idf/blob/v6.0.1/components/esp_http_client/esp_http_client.c#L956-L962
+     *
+     * The same is true for .client_cert_pem, but a union adds the .client_key_der member:
+     * https://github.com/espressif/esp-idf/blob/v6.0.1/components/esp_http_client/include/esp_http_client.h#L196
+     */
+    assert(sync->mtls_creds->client_cert_der_len > 0);
+    assert(sync->mtls_creds->client_key_der_len > 0);
+
     esp_http_client_config_t config = {
         .path = HTTP_PATH_POUCH,
         .host = CONFIG_POUCH_HTTP_GW_URI,
@@ -450,10 +462,10 @@ esp_http_client_handle_t client_initialize(struct sync_context *sync)
         .event_handler = event_handler_proxy,
         .cert_pem = sync->mtls_creds->cert_pem,
         .cert_len = sync->mtls_creds->cert_pem_len,
-        .client_cert_pem = sync->mtls_creds->client_cert_pem,
-        .client_cert_len = sync->mtls_creds->client_cert_pem_len,
-        .client_key_pem = sync->mtls_creds->client_key_pem,
-        .client_key_len = sync->mtls_creds->client_key_pem_len,
+        .client_cert_der = sync->mtls_creds->client_cert_der,
+        .client_cert_len = sync->mtls_creds->client_cert_der_len,
+        .client_key_pem = sync->mtls_creds->client_key_der,
+        .client_key_len = sync->mtls_creds->client_key_der_len,
         .timeout_ms = HTTP_TIMEOUT_MS,
         .user_data = sync,
     };
