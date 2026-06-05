@@ -8,6 +8,11 @@ choice
   help
     Select the transport protocol that will carry Pouch
 
+config POUCH_TRANSPORT_NONE
+  bool "NONE"
+  help
+    No transport is selected. Useful for unit testing.
+
 config POUCH_TRANSPORT_HTTP_CLIENT
   bool "HTTP"
   imply HTTP_CLIENT
