@@ -208,7 +208,6 @@ idf_component_register(SRCS
 
                        REQUIRES
                          mbedtls
-                         zcbor
 
                        KCONFIG
                         ${POUCH_PORT}/esp_idf/Kconfig
@@ -216,3 +215,7 @@ idf_component_register(SRCS
 
 # Conditionally required components need to be processed after initial registration
 idf_component_optional_requires(PRIVATE ${POUCH_PRIV_REQUIRES})
+
+if(NOT CMAKE_BUILD_EARLY_EXPANSION)
+    add_subdirectory(${POUCH_PORT}/esp_idf/lib/zcbor zcbor)
+endif()
