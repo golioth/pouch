@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+cmake_minimum_required(VERSION 3.20.0)
+
 #########################
 # Path definitions
 #########################
@@ -228,8 +230,18 @@ idf_component_register(SRCS
 
                        REQUIRES
                          mbedtls
-                         zcbor
                        )
 
 # Conditionally required components need to be processed after initial registration
 idf_component_optional_requires(PRIVATE ${POUCH_PRIV_REQUIRES})
+
+#########################
+# ZCBOR
+#########################
+
+if(NOT CMAKE_BUILD_EARLY_EXPANSION)
+    add_subdirectory("${POUCH_PORT}/esp_idf/lib/zcbor" zcbor)
+
+    # target_link_libraries must be called after idf_component_register
+    target_link_libraries(${COMPONENT_LIB} PUBLIC zcbor)
+endif()
