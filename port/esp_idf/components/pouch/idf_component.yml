@@ -1,0 +1,9 @@
+version: "0.1.0"
+description: "Pouch protocol core and ESP-IDF transport integrations"
+license: "Apache-2.0"
+url: "https://github.com/golioth/pouch"
+repository: "https://github.com/golioth/pouch.git"
+repository_info:
+  path: "port/esp_idf/components/pouch"
+dependencies:
+  idf: ">=6.0"

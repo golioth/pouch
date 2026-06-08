@@ -3,6 +3,9 @@
 Run unit tests for the Pouch port functions used by ESP-IDF. This covers
 both the ESP-IDF and FreeRTOS port implementations.
 
+The test app uses ESP-IDF Component Manager for `pouch` via
+`main/idf_component.yml`.
+
 ## Run on ESP32s3
 
 ```

@@ -1,0 +1,6 @@
+dependencies:
+  pouch:
+    version: "*"
+    override_path: "../../../../port/esp_idf/components/pouch"
+  zcbor:
+    path: "../../../../port/esp_idf/components/zcbor"

@@ -2,6 +2,9 @@
 
 ## Build
 
+The example uses ESP-IDF Component Manager for the `pouch` dependency via
+`main/idf_component.yml`.
+
 ### Set Target
 
 ```
