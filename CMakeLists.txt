@@ -2,6 +2,12 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+if(ESP_PLATFORM)
+    include(${CMAKE_CURRENT_LIST_DIR}/port/esp_idf/CMakeLists.txt)
+    # TODO: transitional; this return() will be removed when tree is update to use pure cmake
+    return()
+endif()
+
 if(CONFIG_POUCH)
     target_include_directories(pouch PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
 

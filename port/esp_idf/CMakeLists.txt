@@ -2,11 +2,13 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+cmake_minimum_required(VERSION 3.20.0)
+
 #########################
 # Path definitions
 #########################
 
-set(POUCH_ROOT ${CMAKE_CURRENT_LIST_DIR}/../../../..)
+set(POUCH_ROOT ${CMAKE_CURRENT_LIST_DIR}/../..)
 set(POUCH_PORT ${POUCH_ROOT}/port)
 set(POUCH_TRANSPORT_COMMON ${POUCH_ROOT}/src/transport)
 
@@ -48,7 +50,6 @@ list(APPEND POUCH_CORE_SRCS
       ${POUCH_ROOT}/src/entry.c
       ${POUCH_ROOT}/src/stream.c
       ${POUCH_ROOT}/src/downlink.c
-
       # Generated Sources
       ${CMAKE_CURRENT_BINARY_DIR}/header_decode.c
       ${CMAKE_CURRENT_BINARY_DIR}/header_encode.c
@@ -115,10 +116,7 @@ endif()
 # Transport Common
 #########################
 
-# TODO: Add port-specific transports and include them in the build here
-
 if("${CONFIG_POUCH_TRANSPORT_BLE_GATT}" STREQUAL "y")
-
     list(APPEND POUCH_TRANSPORT_SRCS
         ${POUCH_TRANSPORT_COMMON}/endpoints/device/info.c
         ${POUCH_TRANSPORT_COMMON}/endpoints/device/uplink.c
@@ -143,19 +141,13 @@ if("${CONFIG_POUCH_TRANSPORT_BLE_GATT}" STREQUAL "y")
     )
 
     if(NOT CMAKE_BUILD_EARLY_EXPANSION)
-
         add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/info_encode.c
-
             COMMAND zcbor code -c ${POUCH_TRANSPORT_COMMON}/info.cddl -t pouch_gatt_info -e
             --include-prefix cddl/ --output-c ${CMAKE_CURRENT_BINARY_DIR}/info_encode.c --output-h
             ${CMAKE_CURRENT_BINARY_DIR}/include/cddl/info_encode.h
-
             BYPRODUCTS include/cddl/info_encode.h include/cddl/info_encode_types.h
-
             DEPENDS ${POUCH_TRANSPORT_COMMON}/info.cddl)
-
     endif()
-
 endif()
 
 #########################
@@ -217,6 +209,9 @@ idf_component_register(SRCS
                        REQUIRES
                          mbedtls
                          zcbor
+
+                       KCONFIG
+                        ${POUCH_PORT}/esp_idf/Kconfig
                        )
 
 # Conditionally required components need to be processed after initial registration
