@@ -216,7 +216,7 @@ int fill_mtls_credentials(struct mtls_credentials *creds)
     /* Get size including null terminator */
     creds->client_key_pem_len = strlen(device_key_pem) + 1;
 
-    creds->client_key_der = (const char *) cred_get_device_crt_der(&creds->client_key_der_len);
+    creds->client_key_der = (const char *) cred_get_device_key_der(&creds->client_key_der_len);
     if (NULL == creds->client_key_der)
     {
         return -ENOENT;
