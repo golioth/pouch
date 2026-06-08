@@ -1,6 +1,0 @@
-# Copyright (c) 2026 Golioth, Inc.
-#
-# SPDX-License-Identifier: Apache-2.0
-
-# ESP-IDF Port Kconfig will source all other Pouch Kconfig files
-rsource "../../Kconfig"
