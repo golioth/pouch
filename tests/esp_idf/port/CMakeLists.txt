@@ -3,10 +3,6 @@
 
 cmake_minimum_required(VERSION 3.20.0)
 
-list(APPEND EXTRA_COMPONENT_DIRS
-        ${CMAKE_SOURCE_DIR}/../../../port/esp_idf/components
-    )
-
 if(IDF_TARGET STREQUAL "linux")
     # Ensure we build for linux as a 32-bit application
     # or the atomic port will assert during build
