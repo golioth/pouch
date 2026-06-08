@@ -120,5 +120,6 @@ endif # POUCH_DELAYABLE_WORK
 
 # Libraries and SDK
 rsource "../../Kconfig"
+rsource "../../golioth_sdk/Kconfig"
 
 endmenu # Pouch

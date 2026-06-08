@@ -1,4 +1,4 @@
 dependencies:
   pouch:
     version: "*"
-    override_path: "../../../../port/esp_idf/components/pouch"
+    override_path: "../../../.."
