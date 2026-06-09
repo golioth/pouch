@@ -184,11 +184,6 @@ endif()
 # Libraries
 #########################
 
-if("${CONFIG_ZCBOR_UTILS}" STREQUAL "y")
-    list(APPEND POUCH_LIB_INC_DIRS ${POUCH_LIB}/zcbor_utils/include)
-    list(APPEND POUCH_LIB_SRCS ${POUCH_LIB}/zcbor_utils/zcbor_utils.c)
-endif()
-
 #########################
 # Server CA Cert
 #########################
