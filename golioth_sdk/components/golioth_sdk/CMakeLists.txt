@@ -18,11 +18,15 @@ if ("${CONFIG_GOLIOTH_OTA}" STREQUAL "y")
     list(APPEND GOLIOTH_SDK_LINKER_FILES ${GOLIOTH_SDK_ROOT}/ota.lf)
 endif()
 
+if("${CONFIG_GOLIOTH_SETTINGS}" STREQUAL "y" OR "${CONFIG_GOLIOTH_OTA}" STREQUAL "y")
+    list(APPEND GOLIOTH_SDK_SRCS ${GOLIOTH_SDK_ROOT}/zcbor_utils.c)
+endif()
+
 idf_component_register(SRCS
                         ${GOLIOTH_SDK_SRCS}
 
                        INCLUDE_DIRS
-                        ${GOLIOTH_SDK}
+                        ${GOLIOTH_SDK_ROOT}
 
                        LDFRAGMENTS
                         ${GOLIOTH_SDK_LINKER_FILES}
