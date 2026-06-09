@@ -7,6 +7,7 @@ if(NOT "${CONFIG_POUCH_TRANSPORT_HTTP_CLIENT}" STREQUAL "y")
 endif()
 
 add_library(pouch_transport_http)
+target_link_libraries(${COMPONENT_LIB} PRIVATE pouch_transport_http)
 
 target_sources(pouch_transport_http PRIVATE
     client.c

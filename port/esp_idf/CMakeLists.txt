@@ -6,8 +6,6 @@ cmake_minimum_required(VERSION 3.20.0)
 
 set(POUCH_ROOT ${CMAKE_CURRENT_LIST_DIR}/../..)
 set(POUCH_PORT ${POUCH_ROOT}/port)
-set(POUCH_LIB ${POUCH_ROOT}/lib)
-set(GOLIOTH_SDK_ROOT ${POUCH_ROOT}/golioth_sdk)
 
 include(${POUCH_ROOT}/cmake/pouch_target.cmake)
 
@@ -26,7 +24,6 @@ list(APPEND POUCH_PORT_SRCS
 
 list(APPEND POUCH_CORE_INC_DIRS
     ${POUCH_ROOT}/include
-    ${CMAKE_CURRENT_BINARY_DIR}/include
 )
 
 list(APPEND POUCH_CORE_LINKER_FILES
@@ -35,34 +32,20 @@ list(APPEND POUCH_CORE_LINKER_FILES
     ${POUCH_PORT}/esp_idf/uplink_handlers.lf
 )
 
+set(GOLIOTH_SDK_LINKER_FILES)
+pouch_config_enabled(_pouch_golioth CONFIG_GOLIOTH)
+if(_pouch_golioth)
+    list(APPEND GOLIOTH_SDK_LINKER_FILES ${POUCH_ROOT}/golioth_sdk/dispatch.lf)
 
-if("${CONFIG_ZCBOR_UTILS}" STREQUAL "y")
-    list(APPEND POUCH_LIB_INC_DIRS ${POUCH_LIB}/zcbor_utils/include)
-    list(APPEND POUCH_LIB_SRCS ${POUCH_LIB}/zcbor_utils/zcbor_utils.c)
-endif()
-
-if("${CONFIG_GOLIOTH}" STREQUAL "y")
-    list(APPEND GOLIOTH_SDK_SRCS ${GOLIOTH_SDK_ROOT}/dispatch.c)
-    list(APPEND GOLIOTH_SDK_LINKER_FILES ${GOLIOTH_SDK_ROOT}/dispatch.lf)
-
-    if("${CONFIG_GOLIOTH_SETTINGS}" STREQUAL "y")
-        list(APPEND GOLIOTH_SDK_SRCS
-            ${GOLIOTH_SDK_ROOT}/settings.c
-            ${GOLIOTH_SDK_ROOT}/settings_callbacks.c
-        )
-        list(APPEND GOLIOTH_SDK_LINKER_FILES ${GOLIOTH_SDK_ROOT}/settings_callbacks.lf)
+    pouch_config_enabled(_pouch_golioth_settings CONFIG_GOLIOTH_SETTINGS)
+    if(_pouch_golioth_settings)
+        list(APPEND GOLIOTH_SDK_LINKER_FILES ${POUCH_ROOT}/golioth_sdk/settings_callbacks.lf)
     endif()
 
-    if("${CONFIG_GOLIOTH_OTA}" STREQUAL "y")
-        list(APPEND GOLIOTH_SDK_SRCS
-            ${GOLIOTH_SDK_ROOT}/hex.c
-            ${GOLIOTH_SDK_ROOT}/ota.c
-            ${GOLIOTH_SDK_ROOT}/ota_upper.c
-        )
-        list(APPEND GOLIOTH_SDK_LINKER_FILES ${GOLIOTH_SDK_ROOT}/ota.lf)
+    pouch_config_enabled(_pouch_golioth_ota CONFIG_GOLIOTH_OTA)
+    if(_pouch_golioth_ota)
+        list(APPEND GOLIOTH_SDK_LINKER_FILES ${POUCH_ROOT}/golioth_sdk/ota.lf)
     endif()
-
-    list(APPEND GOLIOTH_SDK_INC_DIRS ${GOLIOTH_SDK_ROOT})
 endif()
 
 if(NOT "${CONFIG_POUCH_CA_CERT_FILENAME}" STREQUAL "")
@@ -79,22 +62,18 @@ if(NOT "${CONFIG_POUCH_CA_CERT_FILENAME}" STREQUAL "")
 endif()
 
 idf_component_register(SRCS
-                        ${POUCH_LIB_SRCS}
                         ${POUCH_PORT_SRCS}
-                        ${GOLIOTH_SDK_SRCS}
 
                        INCLUDE_DIRS
                         ${POUCH_CORE_INC_DIRS}
-                        ${POUCH_LIB_INC_DIRS}
                         ${POUCH_PORT_INC_DIRS}
-                        ${GOLIOTH_SDK_INC_DIRS}
 
                        EMBED_FILES
                         ${CA_CERT_IF_SELECTED}
 
-                       LDFRAGMENTS
-                        ${POUCH_CORE_LINKER_FILES}
-                        ${GOLIOTH_SDK_LINKER_FILES}
+                        LDFRAGMENTS
+                         ${POUCH_CORE_LINKER_FILES}
+                         ${GOLIOTH_SDK_LINKER_FILES}
 
                        REQUIRES
                         mbedtls
@@ -103,19 +82,10 @@ idf_component_register(SRCS
                          ${POUCH_PORT}/esp_idf/Kconfig
                        )
 
-add_subdirectory(${POUCH_ROOT}/src src)
-pouch_src_apply(${COMPONENT_LIB} ${CMAKE_CURRENT_BINARY_DIR})
-pouch_validate_config()
+set(POUCH_ACTIVE_TARGET ${COMPONENT_LIB})
+set(POUCH_ACTIVE_GENERATED_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 add_subdirectory(${POUCH_PORT}/esp_idf/transport transport)
-
-if(TARGET pouch_transport_http)
-    target_link_libraries(${COMPONENT_LIB} PRIVATE pouch_transport_http)
-endif()
-
-if(TARGET pouch_transport_gatt)
-    target_link_libraries(${COMPONENT_LIB} PRIVATE pouch_transport_gatt)
-endif()
 
 if("${CONFIG_GOLIOTH}" STREQUAL "y")
     idf_component_set_property(${COMPONENT_NAME} WHOLE_ARCHIVE TRUE)

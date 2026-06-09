@@ -7,6 +7,7 @@ if(NOT "${CONFIG_POUCH_TRANSPORT_BLE_GATT}" STREQUAL "y")
 endif()
 
 add_library(pouch_transport_gatt)
+target_link_libraries(${COMPONENT_LIB} PRIVATE pouch_transport_gatt)
 
 target_sources(pouch_transport_gatt PRIVATE
     ${POUCH_ROOT}/src/transport/endpoints/device/info.c
