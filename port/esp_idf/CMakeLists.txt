@@ -103,8 +103,8 @@ idf_component_register(SRCS
                          ${POUCH_PORT}/esp_idf/Kconfig
                        )
 
-pouch_target_add_core_sources(${COMPONENT_LIB} ${POUCH_ROOT})
-pouch_target_add_header_codegen(${COMPONENT_LIB} ${POUCH_ROOT} ${CMAKE_CURRENT_BINARY_DIR})
+add_subdirectory(${POUCH_ROOT}/src src)
+pouch_src_apply(${COMPONENT_LIB} ${CMAKE_CURRENT_BINARY_DIR})
 pouch_validate_config()
 
 add_subdirectory(${POUCH_PORT}/esp_idf/transport transport)
