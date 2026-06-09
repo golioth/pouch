@@ -38,3 +38,27 @@ function(pouch_validate_config)
                 " **************************************************")
     endif()
 endfunction()
+
+function(pouch_reset_registered_linker_files)
+    set_property(GLOBAL PROPERTY POUCH_REGISTERED_LINKER_FILES "")
+endfunction()
+
+function(pouch_register_linker_file linker_file)
+    get_property(_pouch_linker_files GLOBAL PROPERTY POUCH_REGISTERED_LINKER_FILES)
+    if(NOT _pouch_linker_files)
+        set(_pouch_linker_files)
+    endif()
+
+    list(APPEND _pouch_linker_files ${linker_file})
+    set_property(GLOBAL PROPERTY POUCH_REGISTERED_LINKER_FILES "${_pouch_linker_files}")
+endfunction()
+
+function(pouch_get_registered_linker_files out_var)
+    get_property(_pouch_linker_files GLOBAL PROPERTY POUCH_REGISTERED_LINKER_FILES)
+    if(NOT _pouch_linker_files)
+        set(${out_var} "" PARENT_SCOPE)
+        return()
+    endif()
+
+    set(${out_var} ${_pouch_linker_files} PARENT_SCOPE)
+endfunction()
