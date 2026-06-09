@@ -30,3 +30,7 @@ zephyr_library_sources_ifdef(CONFIG_GOLIOTH_OTA
                                 ota.c
                             )
 zephyr_linker_sources_ifdef(CONFIG_GOLIOTH_OTA SECTIONS ota.ld)
+
+if(CONFIG_GOLIOTH_SETTINGS OR CONFIG_GOLIOTH_OTA)
+    zephyr_library_sources(zcbor_utils.c)
+endif()

@@ -8,7 +8,7 @@
 POUCH_LOG_REGISTER(zcbor_util, CONFIG_POUCH_COMMON_LOG_LEVEL);
 
 #include <errno.h>
-#include <zcbor_utils.h>
+#include "zcbor_utils.h"
 
 static struct zcbor_map_entry *map_entry_get(struct zcbor_map_entry *entries,
                                              size_t num_entries,

@@ -10,7 +10,6 @@ if GOLIOTH
 
 menuconfig GOLIOTH_SETTINGS
   bool "Golioth Settings service"
-  select ZCBOR_UTILS
   help
     Enables the Golioth Settings service. This allows for syncing
     configuration data from the Golioth service down to the device.
@@ -35,7 +34,6 @@ endif
 
 menuconfig GOLIOTH_OTA
   bool "Golioth OTA service"
-  select ZCBOR_UTILS
   help
     Enables the Golioth OTA service. This service is used to sync
     binary artifacts like firmware updates or AI models to the device.

@@ -13,7 +13,7 @@ POUCH_LOG_REGISTER(ota, CONFIG_GOLIOTH_LOG_LEVEL);
 #include <pouch/types.h>
 #include <pouch/uplink.h>
 
-#include <zcbor_utils.h>
+#include "zcbor_utils.h"
 #include <zcbor_decode.h>
 
 #include "dispatch.h"
