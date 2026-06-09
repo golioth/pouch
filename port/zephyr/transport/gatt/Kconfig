@@ -34,6 +34,12 @@ config POUCH_TRANSPORT_GATT_WINDOW_SIZE
         the device. Larger numbers can increase throughput but will
         use more RAM.
 
+config POUCH_TRANSPORT_ACK_TIMEOUT_MS
+    int "Pouch Transport ACK timeout (ms)"
+    default 1000
+    help
+        The timeout, in milliseconds, that a receiver will wait
+        for new packets before retransmitting an acknowledgement
 
 module = POUCH_GATT
 module-str = Pouch GATT

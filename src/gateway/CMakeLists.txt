@@ -14,6 +14,9 @@ zephyr_library_sources(
     ${ZEPHYR_POUCH_MODULE_DIR}/src/transport/endpoints/broker/downlink.c
     ${ZEPHYR_POUCH_MODULE_DIR}/src/transport/endpoints/broker/device_cert.c
     ${ZEPHYR_POUCH_MODULE_DIR}/src/transport/endpoints/broker/server_cert.c
+)
+
+zephyr_library_sources_ifdef(CONFIG_POUCH_GATEWAY_GATT
     ${ZEPHYR_POUCH_MODULE_DIR}/src/transport/sar/packet.c
     ${ZEPHYR_POUCH_MODULE_DIR}/src/transport/sar/receiver.c
     ${ZEPHYR_POUCH_MODULE_DIR}/src/transport/sar/sender.c
@@ -22,6 +25,14 @@ zephyr_library_sources(
     ${ZEPHYR_POUCH_MODULE_DIR}/port/zephyr/transport/gatt/broker/broker.c
     ${ZEPHYR_POUCH_MODULE_DIR}/port/zephyr/transport/gatt/broker/scan.c
 )
+
+zephyr_library_sources_ifdef(CONFIG_POUCH_TRANSPORT_SERIAL
+    ${ZEPHYR_POUCH_MODULE_DIR}/src/transport/serial/channel.c
+    ${ZEPHYR_POUCH_MODULE_DIR}/src/transport/serial/packet.c
+    ${ZEPHYR_POUCH_MODULE_DIR}/src/transport/serial/serial.c
+    ${ZEPHYR_POUCH_MODULE_DIR}/src/transport/serial/broker.c
+)
+
 zephyr_library_include_directories(${ZEPHYR_POUCH_MODULE_DIR}/src)
 
 zephyr_library_link_libraries(mbedTLS)
