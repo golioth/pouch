@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-function(_pouch_config_enabled out_var config_name)
+function(pouch_config_enabled out_var config_name)
     if(DEFINED ${config_name})
         if(${config_name} OR "${${config_name}}" STREQUAL "y")
             set(${out_var} TRUE PARENT_SCOPE)
@@ -14,12 +14,12 @@ function(_pouch_config_enabled out_var config_name)
 endfunction()
 
 function(pouch_validate_config)
-    _pouch_config_enabled(_pouch_encryption_saead CONFIG_POUCH_ENCRYPTION_SAEAD)
+    pouch_config_enabled(_pouch_encryption_saead CONFIG_POUCH_ENCRYPTION_SAEAD)
     if(NOT _pouch_encryption_saead)
         return()
     endif()
 
-    _pouch_config_enabled(_pouch_validate_cert CONFIG_POUCH_VALIDATE_SERVER_CERT)
+    pouch_config_enabled(_pouch_validate_cert CONFIG_POUCH_VALIDATE_SERVER_CERT)
     if(NOT _pouch_validate_cert)
         message(WARNING " \n"
                 " ************************************************\n"
@@ -28,7 +28,7 @@ function(pouch_validate_config)
                 " ************************************************")
     endif()
 
-    _pouch_config_enabled(_pouch_psa_p256m CONFIG_MBEDTLS_PSA_P256M_DRIVER_ENABLED)
+    pouch_config_enabled(_pouch_psa_p256m CONFIG_MBEDTLS_PSA_P256M_DRIVER_ENABLED)
     if(_pouch_psa_p256m)
         message(FATAL_ERROR " \n"
                 " **************************************************\n"

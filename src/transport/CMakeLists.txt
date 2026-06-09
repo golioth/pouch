@@ -1,30 +1,69 @@
-# Copyright (c) 2025 Golioth, Inc.
+# Copyright (c) 2026 Golioth, Inc.
 #
 # SPDX-License-Identifier: Apache-2.0
 
-zephyr_library()
+if(NOT CONFIG_POUCH)
+    return()
+endif()
 
-zephyr_library_link_libraries(pouch)
+if(NOT DEFINED POUCH_ACTIVE_TARGET)
+    message(FATAL_ERROR "POUCH_ACTIVE_TARGET must be set before adding src/transport")
+endif()
 
-zephyr_library_sources(
-    endpoints/device/info.c
-    endpoints/device/uplink.c
-    endpoints/device/downlink.c
-    sar/sender.c
-    sar/receiver.c
-    sar/packet.c
-    ${CMAKE_CURRENT_BINARY_DIR}/info_encode.c
+if(NOT DEFINED POUCH_ACTIVE_GENERATED_DIR)
+    message(FATAL_ERROR "POUCH_ACTIVE_GENERATED_DIR must be set before adding src/transport")
+endif()
+
+pouch_config_enabled(_pouch_transport_ble_gatt CONFIG_POUCH_TRANSPORT_BLE_GATT)
+if(NOT _pouch_transport_ble_gatt)
+    return()
+endif()
+
+set(_pouch_transport_root ${CMAKE_CURRENT_LIST_DIR})
+set(_pouch_target ${POUCH_ACTIVE_TARGET})
+set(_pouch_generated_dir ${POUCH_ACTIVE_GENERATED_DIR})
+
+target_sources(${_pouch_target} PRIVATE
+    ${_pouch_transport_root}/endpoints/device/info.c
+    ${_pouch_transport_root}/endpoints/device/uplink.c
+    ${_pouch_transport_root}/endpoints/device/downlink.c
+    ${_pouch_transport_root}/sar/sender.c
+    ${_pouch_transport_root}/sar/receiver.c
+    ${_pouch_transport_root}/sar/packet.c
+    ${_pouch_generated_dir}/info_encode.c
 )
-zephyr_library_sources_ifdef(CONFIG_POUCH_ENCRYPTION_SAEAD
-    endpoints/device/device_cert.c
-    endpoints/device/server_cert.c
+
+pouch_config_enabled(_pouch_encryption_saead CONFIG_POUCH_ENCRYPTION_SAEAD)
+if(_pouch_encryption_saead)
+    target_sources(${_pouch_target} PRIVATE
+        ${_pouch_transport_root}/endpoints/device/device_cert.c
+        ${_pouch_transport_root}/endpoints/device/server_cert.c
+    )
+endif()
+
+file(MAKE_DIRECTORY ${_pouch_generated_dir}/include)
+
+target_include_directories(${_pouch_target} PRIVATE
+    ${_pouch_transport_root}
+    ${_pouch_generated_dir}/include
 )
 
-add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/info_encode.c
-    COMMAND zcbor code -c ${CMAKE_CURRENT_LIST_DIR}/info.cddl -t
-    pouch_gatt_info -e --include-prefix cddl/ --output-c ${CMAKE_CURRENT_BINARY_DIR}/info_encode.c --output-h ${CMAKE_CURRENT_BINARY_DIR}/include/cddl/info_encode.h
-    BYPRODUCTS include/cddl/info_encode.h include/cddl/info_encode_types.h
-    DEPENDS info.cddl)
+if(NOT CMAKE_BUILD_EARLY_EXPANSION)
+    add_custom_command(
+        OUTPUT ${_pouch_generated_dir}/info_encode.c
+        COMMAND zcbor code -c ${_pouch_transport_root}/info.cddl -t pouch_gatt_info -e
+            --include-prefix cddl/ --output-c ${_pouch_generated_dir}/info_encode.c
+            --output-h ${_pouch_generated_dir}/include/cddl/info_encode.h
+        BYPRODUCTS
+            ${_pouch_generated_dir}/include/cddl/info_encode.h
+            ${_pouch_generated_dir}/include/cddl/info_encode_types.h
+        DEPENDS ${_pouch_transport_root}/info.cddl
+        WORKING_DIRECTORY ${_pouch_generated_dir}
+    )
 
-zephyr_library_include_directories(${CMAKE_CURRENT_LIST_DIR})
-zephyr_library_include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
+    string(REPLACE "::" "_" _pouch_transport_codegen_target ${_pouch_target})
+    set(_pouch_transport_codegen_target "${_pouch_transport_codegen_target}_generate_transport_info")
+    add_custom_target(${_pouch_transport_codegen_target}
+        DEPENDS ${_pouch_generated_dir}/info_encode.c)
+    add_dependencies(${_pouch_target} ${_pouch_transport_codegen_target})
+endif()
