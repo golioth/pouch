@@ -5,13 +5,10 @@
 choice
   prompt "Pouch transport"
   optional
+  default POUCH_TRANSPORT_SERIAL if POUCH_TRANSPORT_SERIAL_BROKER
+  default POUCH_TRANSPORT_BLE_GATT if BT
   help
     Select the transport protocol that will carry Pouch
-
-config POUCH_TRANSPORT_NONE
-  bool "NONE"
-  help
-    No transport is selected. Useful for unit testing.
 
 config POUCH_TRANSPORT_BLE_GATT
   bool "BLE GATT"
@@ -23,6 +20,7 @@ config POUCH_TRANSPORT_BLE_GATT
 
 config POUCH_TRANSPORT_HTTP_CLIENT
   bool "HTTP"
+  depends on POUCH
   imply HTTP_CLIENT
   select EVENTS
   select NET_CONNECTION_MANAGER
@@ -31,11 +29,18 @@ config POUCH_TRANSPORT_HTTP_CLIENT
 
 config POUCH_TRANSPORT_COAP_CLIENT
   bool "CoAP"
+  depends on POUCH
   select COAP
   select NET_SOCKETS_SOCKOPT_TLS
   select NET_SOCKETS_ENABLE_DTLS
   help
     CoAP/DTLS transport for Pouch
+
+config POUCH_TRANSPORT_SERIAL
+  bool "Serial"
+  help
+    Serial transport for Pouch. Implements the core serial transport,
+    running on top of a serial transport adapter.
 
 endchoice
 
@@ -51,6 +56,7 @@ config POUCH_TRANSPORT_ACK_TIMEOUT_MS
 rsource "gatt/Kconfig"
 rsource "http/Kconfig"
 rsource "coap/Kconfig"
+rsource "serial/Kconfig"
 
 module = POUCH_TRANSPORT
 module-str = Pouch Transport
