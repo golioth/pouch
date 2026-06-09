@@ -5,6 +5,11 @@
 # Helpers
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/pouch_target.cmake)
 
+# SDK discovery
+if(NOT ESP_PLATFORM AND NOT CMAKE_SCRIPT_MODE_FILE)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/golioth_sdk golioth_sdk_discovery)
+endif()
+
 # Platform Specific
 if(ESP_PLATFORM)
     include(${CMAKE_CURRENT_LIST_DIR}/port/esp_idf/CMakeLists.txt)
@@ -27,4 +32,6 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/src src)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib lib_shared)
 
 # SDKs
-add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/golioth_sdk golioth_sdk)
+if(NOT ESP_PLATFORM)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/golioth_sdk golioth_sdk)
+endif()

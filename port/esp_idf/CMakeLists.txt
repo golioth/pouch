@@ -32,22 +32,6 @@ list(APPEND POUCH_CORE_LINKER_FILES
     ${POUCH_PORT}/esp_idf/uplink_handlers.lf
 )
 
-set(GOLIOTH_SDK_LINKER_FILES)
-pouch_config_enabled(_pouch_golioth CONFIG_GOLIOTH)
-if(_pouch_golioth)
-    list(APPEND GOLIOTH_SDK_LINKER_FILES ${POUCH_ROOT}/golioth_sdk/dispatch.lf)
-
-    pouch_config_enabled(_pouch_golioth_settings CONFIG_GOLIOTH_SETTINGS)
-    if(_pouch_golioth_settings)
-        list(APPEND GOLIOTH_SDK_LINKER_FILES ${POUCH_ROOT}/golioth_sdk/settings_callbacks.lf)
-    endif()
-
-    pouch_config_enabled(_pouch_golioth_ota CONFIG_GOLIOTH_OTA)
-    if(_pouch_golioth_ota)
-        list(APPEND GOLIOTH_SDK_LINKER_FILES ${POUCH_ROOT}/golioth_sdk/ota.lf)
-    endif()
-endif()
-
 if(NOT "${CONFIG_POUCH_CA_CERT_FILENAME}" STREQUAL "")
     find_file(ca_cert ${CONFIG_POUCH_CA_CERT_FILENAME}
         PATHS
@@ -72,8 +56,7 @@ idf_component_register(SRCS
                         ${CA_CERT_IF_SELECTED}
 
                         LDFRAGMENTS
-                         ${POUCH_CORE_LINKER_FILES}
-                         ${GOLIOTH_SDK_LINKER_FILES}
+                          ${POUCH_CORE_LINKER_FILES}
 
                        REQUIRES
                         mbedtls
@@ -86,10 +69,6 @@ set(POUCH_ACTIVE_TARGET ${COMPONENT_LIB})
 set(POUCH_ACTIVE_GENERATED_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 add_subdirectory(${POUCH_PORT}/esp_idf/transport transport)
-
-if("${CONFIG_GOLIOTH}" STREQUAL "y")
-    idf_component_set_property(${COMPONENT_NAME} WHOLE_ARCHIVE TRUE)
-endif()
 
 if(NOT CMAKE_BUILD_EARLY_EXPANSION)
     add_subdirectory(${POUCH_PORT}/esp_idf/lib/zcbor zcbor)
