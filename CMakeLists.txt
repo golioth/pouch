@@ -2,23 +2,29 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-if(ESP_PLATFORM)
-    include(${CMAKE_CURRENT_LIST_DIR}/port/esp_idf/CMakeLists.txt)
-    return()
-endif()
-
+# Helpers
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/pouch_target.cmake)
 
-if(CONFIG_POUCH)
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/src src)
-    pouch_src_apply(pouch ${CMAKE_CURRENT_BINARY_DIR})
-    pouch_validate_config()
+# Platform Specific
+if(ESP_PLATFORM)
+    include(${CMAKE_CURRENT_LIST_DIR}/port/esp_idf/CMakeLists.txt)
 
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/golioth_sdk golioth_sdk)
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/src/transport transport)
-
+    # ESP-IDF evaluates component CMake in script mode for dependency discovery.
+    # In that mode, add_subdirectory() is not scriptable, so stop before shared subdirs.
+    if(CMAKE_SCRIPT_MODE_FILE)
+        return()
+    endif()
 endif()
 
-# Libraries
+if(COMMAND zephyr_library_named)
+    include(${CMAKE_CURRENT_LIST_DIR}/port/zephyr/CMakeLists.txt)
+endif()
 
-add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib lib)
+# Core
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/src src)
+
+# Libraries
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib lib_shared)
+
+# SDKs
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/golioth_sdk golioth_sdk)
