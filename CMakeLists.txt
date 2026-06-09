@@ -73,7 +73,3 @@ if(CONFIG_POUCH)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/src/transport transport)
 
 endif()
-
-# Libraries
-
-add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib lib)

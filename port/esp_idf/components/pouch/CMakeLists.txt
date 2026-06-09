@@ -8,7 +8,6 @@
 
 set(POUCH_ROOT ${CMAKE_CURRENT_LIST_DIR}/../../../..)
 set(POUCH_PORT ${POUCH_ROOT}/port)
-set(POUCH_LIB ${POUCH_ROOT}/lib)
 set(POUCH_TRANSPORT_COMMON ${POUCH_ROOT}/src/transport)
 
 #########################
@@ -201,13 +200,11 @@ endif()
 
 idf_component_register(SRCS
                         ${POUCH_CORE_SRCS}
-                        ${POUCH_LIB_SRCS}
                         ${POUCH_PORT_SRCS}
                         ${POUCH_TRANSPORT_SRCS}
 
                        INCLUDE_DIRS
                         ${POUCH_CORE_INC_DIRS}
-                        ${POUCH_LIB_INC_DIRS}
                         ${POUCH_PORT_INC_DIRS}
                         ${POUCH_TRANSPORT_INC_DIRS}
 
