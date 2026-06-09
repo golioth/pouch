@@ -21,21 +21,7 @@
 
 // CBOR array start + version
 #define POUCH_HEADER_OVERHEAD 2
-
-#if defined(CONFIG_POUCH_ENCRYPTION_NONE)
-
-/* CBOR encryption_type + 32 byte string declaration. Assumes that the device ID max length is less
- * than 256 bytes.
- */
-#define POUCH_HEADER_OVERHEAD_ENCRYPTION_NONE 3
-
-#define POUCH_HEADER_MAX_LEN \
-    (POUCH_HEADER_OVERHEAD + POUCH_HEADER_OVERHEAD_ENCRYPTION_NONE + POUCH_DEVICE_ID_MAX_LEN)
-#elif defined(CONFIG_POUCH_ENCRYPTION_SAEAD)
 #define POUCH_HEADER_MAX_LEN (16 + SESSION_ID_LEN + CERT_REF_SHORT_LEN)
-#else
-#error "Unsupported encryption type"
-#endif
 
 static int write_header(struct pouch_buf *buf, size_t maxlen)
 {

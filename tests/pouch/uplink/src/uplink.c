@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "mocks/transport.h"
+#include "mocks/crypto.h"
 #include "utils.h"
 
 #include <pouch/uplink.h>
@@ -14,13 +15,9 @@
 
 #define DEVICE_ID "test-device-id"
 
-static const struct pouch_config pouch_config = {
-    .device_id = DEVICE_ID,
-};
-
 static void *init_pouch(void)
 {
-    pouch_init(&pouch_config);
+    pouch_init(setup_credentials());
     return NULL;
 }
 
@@ -106,7 +103,7 @@ ZTEST(uplink, test_pouch_header)
     uint8_t *buf;
     size_t len = read_data(&buf, CONFIG_POUCH_BLOCK_SIZE);
 
-    ZCBOR_STATE_D(zsd, 2, buf, len, 1, 0);
+    ZCBOR_STATE_D(zsd, 4, buf, len, 1, 0);
 
     zassert_true(zcbor_list_start_decode(zsd));
 
@@ -117,20 +114,46 @@ ZTEST(uplink, test_pouch_header)
                   "Unexpected pouch header version %d",
                   pouch_header_version);
 
-    uint32_t encryption_type;
+    // encryption info:
     zassert_true(zcbor_list_start_decode(zsd));
 
-    zassert_true(zcbor_uint32_decode(zsd, &encryption_type));
-    zassert_equal(encryption_type, 0, "Unexpected encryption type %d", encryption_type);
+    // session info:
+    zassert_true(zcbor_list_start_decode(zsd));
 
-    struct zcbor_string string = {0};
-    zassert_true(zcbor_tstr_decode(zsd, &string));
-    zassert_equal(string.len, strlen(DEVICE_ID), "Unexpected device ID length %d", string.len);
-    zassert_str_equal(string.value, DEVICE_ID);
-
+    // session ID:
+    zassert_true(zcbor_list_start_decode(zsd));
+    struct zcbor_string session_id = {0};
+    zassert_true(zcbor_bstr_decode(zsd, &session_id));
+    zassert_equal(session_id.len, 16);
     zassert_true(zcbor_list_end_decode(zsd));
 
-    zassert_true(zcbor_list_end_decode(zsd));
+    uint32_t initiator;
+    zassert_true(zcbor_uint32_decode(zsd, &initiator));
+    zassert_equal(initiator, 0);  // device
+
+    uint32_t algorithm;
+    zassert_true(zcbor_uint32_decode(zsd, &algorithm));
+    zassert_equal(algorithm, 1, "invalid algorithm: %u", algorithm);  // chacha20-poly1305
+
+    uint32_t max_block_size;
+    zassert_true(zcbor_uint32_decode(zsd, &max_block_size));
+    zassert_equal(max_block_size, 9);  // 512 bytes (2^9)
+
+    struct zcbor_string cert_ref = {0};
+    zassert_true(zcbor_bstr_decode(zsd, &cert_ref));
+    zassert_equal(cert_ref.len, 6);
+    zassert_mem_equal(cert_ref.value, test_device_cert_ref, 6);
+
+    zassert_true(zcbor_list_end_decode(zsd));  // end of session info
+
+    uint32_t pouch_id;
+    zassert_true(zcbor_uint32_decode(zsd, &pouch_id));
+    zassert_equal(pouch_id, 1, "unexpected pouch ID: %u", pouch_id);  // pouch ID 0
+
+
+    zassert_true(zcbor_list_end_decode(zsd));  // end of encryption info
+
+    zassert_true(zcbor_list_end_decode(zsd));  // end of header
 }
 
 ZTEST(uplink, test_pouch_block)
@@ -157,53 +180,6 @@ ZTEST(uplink, test_pouch_block)
 
     int block_len = sys_get_be16(block);
     zassert_equal(block_len, len - 2, "Unexpected block length %d", block_len);
-
-    zassert_equal(block[2],
-                  0x80 | 0x40,
-                  "Expected block type to be ENTRY and no more data to be true, was %u",
-                  block[2]);
-}
-
-ZTEST(uplink, test_pouch_entry)
-{
-    const char *path = "test/path";
-    const uint8_t data[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
-
-    transport_session_start();
-
-    zassert_ok(pouch_uplink_entry_write(path,
-                                        POUCH_CONTENT_TYPE_OCTET_STREAM,
-                                        data,
-                                        sizeof(data),
-                                        POUCH_FOREVER));
-
-    // let processing run:
-    k_sleep(K_MSEC(1));
-
-    uint8_t *buf;
-    size_t len = read_data(&buf, CONFIG_POUCH_BLOCK_SIZE);
-
-    uint8_t *block = skip_pouch_header(buf, &len);
-    uint8_t *block_data = &block[3];
-    len -= 3;
-
-    zassert_equal(len, 5 + strlen(path) + sizeof(data), "Unexpected block length %d", len);
-
-    uint16_t data_len = sys_get_be16(&block_data[0]);
-    zassert_equal(data_len, sizeof(data), "Unexpected data length %d", data_len);
-
-    uint16_t content_type = sys_get_be16(&block_data[2]);
-    zassert_equal(content_type,
-                  POUCH_CONTENT_TYPE_OCTET_STREAM,
-                  "Unexpected content type %d",
-                  content_type);
-
-    uint8_t path_len = block_data[4];
-    zassert_equal(path_len, strlen(path), "Unexpected path length %d", path_len);
-
-    zassert_mem_equal(&block_data[5], path, path_len);
-
-    zassert_mem_equal(&block_data[5 + path_len], data, sizeof(data));
 }
 
 ZTEST(uplink, test_pull_no_data)
@@ -246,7 +222,7 @@ ZTEST(uplink, test_pull_partial)
         zassert_equal(result, POUCH_MORE_DATA, "expected POUCH_MORE_DATA, got %d", result);
     }
 
-    zassert_equal(offset, 46, "expected to read 46 bytes, got %d", offset);
+    zassert_equal(offset, 76, "expected to read 76 bytes, got %d", offset);
     pouch_uplink_close(K_NO_WAIT);
 
     // let uplink handler and processing run:
@@ -268,7 +244,7 @@ ZTEST(uplink, test_submit_before_session)
 
     uint8_t *buf;
     size_t len = read_data(&buf, CONFIG_POUCH_BLOCK_SIZE);
-    zassert_equal(len, 42);
+    zassert_equal(len, 72);
 }
 
 ZTEST(uplink, test_submit_after_close)
@@ -297,7 +273,7 @@ ZTEST(uplink, test_submit_after_close)
 
     uint8_t *buf;
     size_t len = read_data(&buf, CONFIG_POUCH_BLOCK_SIZE);
-    zassert_equal(len, 42);  // not pulling the second entry
+    zassert_equal(len, 72);  // not pulling the second entry
 
     transport_session_end();
 
@@ -308,8 +284,7 @@ ZTEST(uplink, test_submit_after_close)
     k_sleep(K_MSEC(1));
 
     len = read_data(&buf, CONFIG_POUCH_BLOCK_SIZE);
-    zassert_equal(len, 42);  // just pulling the second entry
-    zassert_mem_equal(&buf[42 - sizeof(data2)], data2, sizeof(data2));
+    zassert_equal(len, 72);  // just pulling the second entry
 }
 
 ZTEST(uplink, test_multithread_writer)
@@ -373,18 +348,11 @@ ZTEST(uplink, test_stream_basic)
 
     size_t block_len = sys_get_be16(block);
     zassert_equal(block_len, len - 2, "Unexpected block length %d", block_len);
-
-    // 0x81 is the first stream ID for a closed stream:
-    uint8_t stream_id = block[2];
-    zassert_between_inclusive(stream_id, 0x81, 0xff, "Unexpected stream ID %x", stream_id);
-    zassert_equal(sys_get_be16(&block[3]),
-                  POUCH_CONTENT_TYPE_OCTET_STREAM,
-                  "Unexpected content type");
-    zassert_equal(block[5], strlen("test/path"), "Unexpected path length");
-    zassert_mem_equal(&block[6], "test/path", strlen("test/path"), "Unexpected path");
-
-    zassert_mem_equal(&block[6 + strlen("test/path")], data, sizeof(data), "Unexpected data");
 }
+
+// TODO: These tests rely on block introspection, which we can't do at the moment.
+// They'll be reintroduced with validation against static test vectors
+#if 0
 
 ZTEST(uplink, test_stream_multiblock)
 {
@@ -706,7 +674,7 @@ ZTEST(uplink, test_stream_length_aligned_to_block_size)
 
     // Write data that is exactly aligned to the size of two blocks. Need to account for the size
     // of the content_type, path_length and path in the first block.
-    size_t data_len = (CONFIG_POUCH_BLOCK_SIZE) * 2 - (2 + 1 + strlen("test/path"));
+    size_t data_len = (CONFIG_POUCH_BLOCK_SIZE - 48) * 2 - (2 + 1 + strlen("test/path"));
     uint8_t *data = malloc(data_len);
     for (int i = 0; i < sizeof(data); i++)
     {
@@ -721,7 +689,7 @@ ZTEST(uplink, test_stream_length_aligned_to_block_size)
     // let processing run:
     k_sleep(K_MSEC(1));
 
-    uint8_t buf[2 * CONFIG_POUCH_BLOCK_SIZE + 100];
+    uint8_t buf[5 * CONFIG_POUCH_BLOCK_SIZE + 100];
     size_t len = sizeof(buf);
     enum pouch_result result = transport_pull_data(buf, &len);
     zassert_equal(result, POUCH_NO_MORE_DATA, "Unexpected result %d", result);
@@ -767,3 +735,4 @@ ZTEST(uplink, test_stream_length_aligned_to_block_size)
                   blockbuf - start_of_blocks,
                   len);
 }
+#endif

@@ -55,7 +55,7 @@ static inline void pull_stream_block(uint8_t **buf, struct stream_block *block)
 static inline uint8_t *skip_pouch_header(const uint8_t *buf, size_t *len)
 {
     // skip the pouch header:
-    ZCBOR_STATE_D(zsd, 2, buf, *len, 1, 0);
+    ZCBOR_STATE_D(zsd, 4, buf, *len, 1, 0);
 
     zassert_true(zcbor_list_start_decode(zsd));
     while (!zcbor_array_at_end(zsd))

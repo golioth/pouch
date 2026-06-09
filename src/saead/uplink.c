@@ -60,7 +60,7 @@ int saead_uplink_pouch_start(void)
     return session_pouch_start(&uplink, uplink.pouch.id + 1);
 }
 
-int saead_uplink_header_get(struct saead_info *info)
+int saead_uplink_header_get(struct encryption_info *info)
 {
     if (!pouch_atomic_test_bit(&uplink.flags, SESSION_ACTIVE))
     {

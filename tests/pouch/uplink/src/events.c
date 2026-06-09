@@ -5,19 +5,16 @@
 #include <pouch/events.h>
 #include <pouch/pouch.h>
 #include "mocks/transport.h"
+#include "mocks/crypto.h"
 
 static uint32_t start_events;
 static uint32_t end_events;
 
 #define DEVICE_ID "test-device-id"
 
-static const struct pouch_config pouch_config = {
-    .device_id = DEVICE_ID,
-};
-
 static void *init_pouch(void)
 {
-    pouch_init(&pouch_config);
+    pouch_init(setup_credentials());
     return NULL;
 }
 

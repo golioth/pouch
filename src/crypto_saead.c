@@ -40,12 +40,7 @@ int crypto_init(const struct pouch_config *config)
 
 int crypto_downlink_start(const struct encryption_info *encryption_info)
 {
-    if (encryption_info->Union_choice != encryption_info_union_saead_info_m_c)
-    {
-        return -ENOTSUP;
-    }
-
-    const struct session_info *session = &encryption_info->saead_info_m.session;
+    const struct session_info *session = &encryption_info->session;
 
     struct session_id id = {
         .initiator = session->initiator_choice == session_info_initiator_device_m_c
@@ -88,7 +83,7 @@ int crypto_downlink_start(const struct encryption_info *encryption_info)
         return err;
     }
 
-    return saead_downlink_pouch_start(encryption_info->saead_info_m.pouch_id);
+    return saead_downlink_pouch_start(encryption_info->pouch_id);
 }
 
 int crypto_session_start(void)
@@ -109,8 +104,7 @@ int crypto_pouch_start(void)
 
 int crypto_header_get(struct encryption_info *encryption_info)
 {
-    encryption_info->Union_choice = encryption_info_union_saead_info_m_c;
-    return saead_uplink_header_get(&encryption_info->saead_info_m);
+    return saead_uplink_header_get(encryption_info);
 }
 
 struct pouch_buf *crypto_block_buf_alloc(void)
