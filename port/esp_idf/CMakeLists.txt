@@ -10,6 +10,8 @@ set(POUCH_LIB ${POUCH_ROOT}/lib)
 set(POUCH_TRANSPORT_COMMON ${POUCH_ROOT}/src/transport)
 set(GOLIOTH_SDK_ROOT ${POUCH_ROOT}/golioth_sdk)
 
+include(${POUCH_ROOT}/cmake/pouch_target.cmake)
+
 list(APPEND POUCH_PORT_INC_DIRS
     ${POUCH_PORT}/esp_idf
     ${POUCH_PORT}/esp_idf/include
@@ -23,23 +25,9 @@ list(APPEND POUCH_PORT_SRCS
     ${POUCH_PORT}/esp_idf/blockbuf.c
 )
 
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/include)
 list(APPEND POUCH_CORE_INC_DIRS
     ${POUCH_ROOT}/include
     ${CMAKE_CURRENT_BINARY_DIR}/include
-)
-
-list(APPEND POUCH_CORE_SRCS
-    ${POUCH_ROOT}/src/pouch.c
-    ${POUCH_ROOT}/src/uplink.c
-    ${POUCH_ROOT}/src/header.c
-    ${POUCH_ROOT}/src/buf.c
-    ${POUCH_ROOT}/src/block.c
-    ${POUCH_ROOT}/src/entry.c
-    ${POUCH_ROOT}/src/stream.c
-    ${POUCH_ROOT}/src/downlink.c
-    ${CMAKE_CURRENT_BINARY_DIR}/header_decode.c
-    ${CMAKE_CURRENT_BINARY_DIR}/header_encode.c
 )
 
 list(APPEND POUCH_CORE_LINKER_FILES
@@ -48,56 +36,6 @@ list(APPEND POUCH_CORE_LINKER_FILES
     ${POUCH_PORT}/esp_idf/uplink_handlers.lf
 )
 
-if("${CONFIG_POUCH_ENCRYPTION_NONE}" STREQUAL "y")
-    list(APPEND POUCH_CORE_SRCS ${POUCH_ROOT}/src/crypto_none.c)
-endif()
-
-if("${CONFIG_POUCH_ENCRYPTION_SAEAD}" STREQUAL "y")
-    list(APPEND POUCH_CORE_SRCS
-        ${POUCH_ROOT}/src/crypto_saead.c
-        ${POUCH_ROOT}/src/cert.c
-        ${POUCH_ROOT}/src/saead/session.c
-        ${POUCH_ROOT}/src/saead/uplink.c
-        ${POUCH_ROOT}/src/saead/downlink.c
-    )
-endif()
-
-if(NOT CMAKE_BUILD_EARLY_EXPANSION)
-    add_custom_command(
-        OUTPUT
-            ${CMAKE_CURRENT_BINARY_DIR}/header_decode.c
-            ${CMAKE_CURRENT_BINARY_DIR}/header_encode.c
-        COMMAND zcbor code -c ${POUCH_ROOT}/src/header.cddl -t pouch_header -sde
-            --include-prefix cddl/ --oc header.c --oh include/cddl/header.h
-        BYPRODUCTS
-            ${CMAKE_CURRENT_BINARY_DIR}/include/cddl/header_decode.h
-            ${CMAKE_CURRENT_BINARY_DIR}/include/cddl/header_encode.h
-            ${CMAKE_CURRENT_BINARY_DIR}/include/cddl/header_types.h
-        DEPENDS ${POUCH_ROOT}/src/header.cddl)
-
-    add_custom_target(pouch_generate_headers DEPENDS
-        ${CMAKE_CURRENT_BINARY_DIR}/header_decode.c
-        ${CMAKE_CURRENT_BINARY_DIR}/header_encode.c)
-endif()
-
-if("${CONFIG_POUCH_ENCRYPTION_SAEAD}" STREQUAL "y")
-    if(NOT "${CONFIG_POUCH_VALIDATE_SERVER_CERT}" STREQUAL "y")
-        message(WARNING " \n"
-                " ************************************************\n"
-                " Pouch server certificate validation is disabled.\n"
-                " Do not use this in production.\n"
-                " ************************************************")
-    endif()
-
-    if("${CONFIG_MBEDTLS_PSA_P256M_DRIVER_ENABLED}" STREQUAL "y")
-        message(FATAL_ERROR " \n"
-                " **************************************************\n"
-                " CONFIG_MBEDTLS_PSA_256M_DRIVER_ENABLED breaks\n"
-                " support for the secp384r1 curve, which is required\n"
-                " for Pouch. Disable this option in sdkconfig\n"
-                " **************************************************")
-    endif()
-endif()
 
 if("${CONFIG_POUCH_TRANSPORT_BLE_GATT}" STREQUAL "y")
     list(APPEND POUCH_TRANSPORT_SRCS
@@ -191,7 +129,6 @@ if(NOT "${CONFIG_POUCH_CA_CERT_FILENAME}" STREQUAL "")
 endif()
 
 idf_component_register(SRCS
-                        ${POUCH_CORE_SRCS}
                         ${POUCH_LIB_SRCS}
                         ${POUCH_PORT_SRCS}
                         ${POUCH_TRANSPORT_SRCS}
@@ -214,9 +151,13 @@ idf_component_register(SRCS
                        REQUIRES
                         mbedtls
 
-                       KCONFIG
-                        ${POUCH_PORT}/esp_idf/Kconfig
+                        KCONFIG
+                         ${POUCH_PORT}/esp_idf/Kconfig
                        )
+
+pouch_target_add_core_sources(${COMPONENT_LIB} ${POUCH_ROOT})
+pouch_target_add_header_codegen(${COMPONENT_LIB} ${POUCH_ROOT} ${CMAKE_CURRENT_BINARY_DIR})
+pouch_validate_config()
 
 idf_component_optional_requires(PRIVATE ${POUCH_PRIV_REQUIRES})
 
