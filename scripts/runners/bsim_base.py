@@ -14,6 +14,7 @@ from pathlib import Path
 from domains import Domain, Domains
 
 from runners.core import RunnerCaps, RunnerConfig, ZephyrBinaryRunner
+from signal_utils import interruptible_sigterm
 
 DEFAULT_GDB_PORT = 3333
 
@@ -217,7 +218,7 @@ class BsimBinaryRunnerBase(ZephyrBinaryRunner):
 
         # This is the last domain, so launch all processes now.
 
-        with self.run_background_domains():
+        with interruptible_sigterm(), self.run_background_domains():
             # Run foreground domain
             args, kwargs = self.bsim_cmds[self.foreground_domain]
             self.check_call(args, **kwargs)
