@@ -12,7 +12,7 @@ LOG_MODULE_REGISTER(fw_update_test);
 #include <zephyr/app_version.h>
 #include <psa/crypto.h>
 
-#include <pouch/golioth/ota.h>
+#include <golioth/ota.h>
 
 static void log_sha256(const char *name, const uint8_t hash[32])
 {

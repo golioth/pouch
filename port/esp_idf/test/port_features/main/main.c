@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <pouch/port.h>
-#include <pouch/golioth/settings_types.h>
+#include <golioth/settings_types.h>
 #include "other_test_functions.h"
 #include <errno.h>
 
@@ -10,9 +10,25 @@ POUCH_LOG_REGISTER(main, POUCH_LOG_LEVEL_DBG);
  * Iterable Sections
  *------------------------------------------------*/
 
-#include <pouch/golioth/settings_callbacks.h>
+#include <golioth/settings_callbacks.h>
 #include <string.h>
-#include "../../../../../golioth_sdk/settings.h"
+
+struct test_setting_value
+{
+    const char *key;
+    enum golioth_setting_value_type type;
+    union
+    {
+        bool bool_val;
+        int32_t int_val;
+        double float_val;
+        struct
+        {
+            const char *data;
+            size_t len;
+        } str_val;
+    };
+};
 
 static int led_setting_cb(bool new_value)
 {
@@ -33,7 +49,7 @@ static int log_level_setting_cb(int32_t new_value)
 GOLIOTH_SETTINGS_HANDLER(LOG_LEVEL, log_level_setting_cb);
 
 /* Reimplement golioth_settings_receive_one() for testing purposes */
-int test_settings_callbacks(const struct setting_value *value)
+int test_settings_callbacks(const struct test_setting_value *value)
 {
     POUCH_STRUCT_SECTION_FOREACH(golioth_settings_handler, setting)
     {
@@ -70,7 +86,7 @@ int test_settings_callbacks(const struct setting_value *value)
 
 void test_iterable_sections(void)
 {
-    struct setting_value value;
+    struct test_setting_value value;
     const char led_key_buf[] = "LED";
     const char log_level_key_buf[] = "LOG_LEVEL";
 

@@ -17,7 +17,7 @@
 #include "nvs_flash.h"
 #include "wifi.h"
 
-#include <pouch/golioth/settings_callbacks.h>
+#include <golioth/settings_callbacks.h>
 #include <pouch/pouch.h>
 #include <pouch/pouch_ca_cert.h>
 #include <pouch/transport/http/client.h>
