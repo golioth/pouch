@@ -9,7 +9,7 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 
-#include <pouch/golioth/settings_callbacks.h>
+#include <golioth/settings_callbacks.h>
 #include <pouch/pouch.h>
 #include <pouch/uplink.h>
 

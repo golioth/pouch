@@ -1,0 +1,7 @@
+dependencies:
+  pouch:
+    version: "*"
+    override_path: "../../../../.."
+  golioth_sdk:
+    version: "*"
+    override_path: "../../../../../golioth_sdk"

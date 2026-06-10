@@ -17,7 +17,7 @@
 #include <string.h>
 
 #include <esp_app_desc.h>
-#include <pouch/golioth/ota.h>
+#include <golioth/ota.h>
 
 static esp_ota_handle_t _update_handle;
 static const esp_partition_t *_update_partition = NULL;
