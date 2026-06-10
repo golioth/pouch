@@ -4,6 +4,8 @@
 
 cmake_minimum_required(VERSION 3.20.0)
 
+list(APPEND EXTRA_ZEPHYR_MODULES "${CMAKE_CURRENT_LIST_DIR}/../../../golioth_sdk")
+
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(ble_gatt_example)
 

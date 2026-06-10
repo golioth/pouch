@@ -135,6 +135,3 @@ rsource "../../src/gateway/Kconfig"
 
 # Libraries
 rsource "../../Kconfig"
-
-# Golioth SDK
-rsource "../../golioth_sdk/Kconfig"

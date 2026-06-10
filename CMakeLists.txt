@@ -75,7 +75,6 @@ if(CONFIG_POUCH)
                 " **************************************************")
     endif()
 
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/golioth_sdk golioth_sdk)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/src/transport transport)
 
 endif()

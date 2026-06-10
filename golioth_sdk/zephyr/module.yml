@@ -1,0 +1,7 @@
+name: golioth_sdk
+
+build:
+  cmake: .
+  kconfig: Kconfig
+  depends:
+    - pouch
