@@ -29,7 +29,7 @@ static void log_sha256(const char *name, const uint8_t hash[32])
 static psa_hash_operation_t hash_op;
 static size_t total_received;
 
-static void ota_main_receive(const void *data, size_t offset, size_t len, bool is_last)
+static void ota_fw_receive(const void *data, size_t offset, size_t len, bool is_last)
 {
     psa_status_t status;
 
@@ -69,7 +69,7 @@ static void ota_main_receive(const void *data, size_t offset, size_t len, bool i
         LOG_INF("OTA download complete: %zu bytes", total_received);
         log_sha256("computed", hash);
 
-        golioth_ota_mark_idle("main");
+        golioth_ota_mark_idle(CONFIG_EXAMPLE_FW_UPDATE_COMPONENT);
     }
 }
 
@@ -93,5 +93,5 @@ static void ota_manifest_receive(const struct golioth_ota_manifest_component *co
     }
 }
 
-GOLIOTH_OTA_COMPONENT(main, "main", APP_VERSION_STRING, ota_main_receive);
+GOLIOTH_OTA_COMPONENT(fw, CONFIG_EXAMPLE_FW_UPDATE_COMPONENT, APP_VERSION_STRING, ota_fw_receive);
 GOLIOTH_OTA_MANIFEST_HANDLER(ota_manifest_receive);
