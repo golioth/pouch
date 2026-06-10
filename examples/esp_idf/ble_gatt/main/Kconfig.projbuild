@@ -14,3 +14,9 @@ config EXAMPLE_SYNC_PERIOD_S
     help
       The time, in seconds, after a sync to wait before requesting a
       sync from a gateway.
+
+config EXAMPLE_FW_UPDATE_COMPONENT
+    string "OTA component to use for firmware update"
+    default "ble_gatt_example"
+    help
+      Name of component in OTA manifest to use for firmware update.
