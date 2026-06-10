@@ -132,6 +132,3 @@ endif
 
 # Gateway
 rsource "../../src/gateway/Kconfig"
-
-# Libraries
-rsource "../../Kconfig"
