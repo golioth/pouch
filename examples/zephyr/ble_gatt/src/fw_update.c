@@ -20,7 +20,7 @@ LOG_MODULE_REGISTER(fw_update);
 
 static struct flash_img_context flash_context;
 
-static void ota_main_receive(const void *data, size_t offset, size_t len, bool is_last)
+static void ota_fw_receive(const void *data, size_t offset, size_t len, bool is_last)
 {
     LOG_DBG("Received %d bytes at offset %d", len, offset);
 
@@ -85,5 +85,5 @@ static void ota_manifest_receive(const struct golioth_ota_manifest_component *co
     }
 }
 
-GOLIOTH_OTA_COMPONENT(main, "main", APP_VERSION_STRING, ota_main_receive);
+GOLIOTH_OTA_COMPONENT(fw, CONFIG_EXAMPLE_FW_UPDATE_COMPONENT, APP_VERSION_STRING, ota_fw_receive);
 GOLIOTH_OTA_MANIFEST_HANDLER(ota_manifest_receive);

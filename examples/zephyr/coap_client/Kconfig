@@ -48,6 +48,12 @@ config EXAMPLE_COAP_CLIENT_GW_DEVICE_KEY_FILENAME
       By default this is the same as the filename used for the Pouch device key,
       but may be changed if different credentials are desired.
 
+config EXAMPLE_FW_UPDATE_COMPONENT
+    string "OTA component to use for firmware update"
+    default "coap_client_example"
+    help
+      Name of component in OTA manifest to use for firmware update.
+
 choice EXAMPLE_FW_UPDATE_MODE
     prompt "Firmware update mode"
     depends on GOLIOTH_OTA
