@@ -23,7 +23,7 @@
 static esp_ota_handle_t _update_handle;
 static const esp_partition_t *_update_partition = NULL;
 
-static void ota_main_receive(const void *data, size_t offset, size_t len, bool is_last)
+static void ota_fw_receive(const void *data, size_t offset, size_t len, bool is_last)
 {
     ESP_LOGD(TAG, "Received %zu bytes at offset %zu", len, offset);
 
@@ -94,7 +94,10 @@ static void ota_manifest_receive(const struct golioth_ota_manifest_component *co
     }
 }
 
-GOLIOTH_OTA_COMPONENT(main, "main", CONFIG_APP_PROJECT_VER, ota_main_receive);
+GOLIOTH_OTA_COMPONENT(fw,
+                      CONFIG_EXAMPLE_FW_UPDATE_COMPONENT,
+                      CONFIG_APP_PROJECT_VER,
+                      ota_fw_receive);
 GOLIOTH_OTA_MANIFEST_HANDLER(ota_manifest_receive);
 
 /*
