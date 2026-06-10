@@ -118,7 +118,4 @@ config POUCH_DELAYABLE_WORK_PRIORITY
 
 endif # POUCH_DELAYABLE_WORK
 
-# Libraries and SDK
-rsource "../../Kconfig"
-
 endmenu # Pouch
