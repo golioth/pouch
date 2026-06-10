@@ -111,7 +111,7 @@ async def ota_firmware(
     artifact = await project.artifacts.upload(
         path=image_path,
         version=version,
-        package="main",
+        package="ci_ota_fw",
     )
 
     artifacts_to_cleanup.append(artifact.id)
