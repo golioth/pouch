@@ -517,10 +517,7 @@ int pouch_coap_upload_cert(void)
 
 size_t pouch_coap_server_cert_get(const uint8_t **buf)
 {
-    if (buf != NULL)
-    {
-        *buf = server_cert_buf;
-    }
+    *buf = server_cert_buf;
 
     return atomic_get(&server_cert_len);
 }

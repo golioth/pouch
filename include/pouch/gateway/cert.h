@@ -6,12 +6,12 @@
 
 #pragma once
 
-struct golioth_client;
 struct pouch_gateway_device_cert_context;
 struct pouch_gateway_server_cert_context;
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 /* Max serial number length is 20 bytes according to spec:
  * https://datatracker.ietf.org/doc/html/rfc5280#section-4.1.2.2
@@ -105,8 +105,24 @@ int pouch_gateway_server_cert_get_data(struct pouch_gateway_server_cert_context 
 void pouch_gateway_server_cert_get_serial(void *dst, size_t *dst_len);
 
 /**
- * Callback when connected to Golioth client for certificate module.
+ * Initialize the certificate module.
  *
- * @param client The Golioth client.
+ * Loads the built-in server certificate if configured. The actual
+ * server certificate used for forwarding is set by the pouch CoAP
+ * transport via @ref pouch_gateway_server_cert_set() once the
+ * gateway connects to the cloud.
  */
-void pouch_gateway_cert_module_on_connected(struct golioth_client *client);
+void pouch_gateway_cert_module_init(void);
+
+/**
+ * Set the server certificate from external data.
+ *
+ * Copies @p cert into the gateway forwarding buffer so it can be
+ * written to BLE peripherals. Called by the pouch CoAP transport
+ * after the server certificate has been fetched from the cloud.
+ *
+ * @param cert  DER/PEM certificate data.
+ * @param len   Length of the certificate data.
+ * @return 0 on success, negative on error.
+ */
+int pouch_gateway_server_cert_set(const uint8_t *cert, size_t len);

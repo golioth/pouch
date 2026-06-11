@@ -4,180 +4,194 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <errno.h>
 #include <stdlib.h>
+#include <string.h>
 
-#include <zephyr/sys/atomic_types.h>
-
-#include <golioth/gateway.h>
-#include <golioth/stream.h>
-
-#include <pouch/gateway/downlink.h>
+#include <pouch/blockbuf.h>
+#include <pouch/gateway/cloud.h>
+#include "downlink.h"
 #include <pouch/gateway/uplink.h>
 #include <pouch/port.h>
 
-POUCH_LOG_REGISTER(uplink, CONFIG_POUCH_GATEWAY_LOG_LEVEL);
+#include "../buf.h"
+
+POUCH_LOG_REGISTER(gw_uplink, CONFIG_POUCH_GATEWAY_LOG_LEVEL);
 
 enum pouch_flags
 {
     POUCH_UPLINK_CLOSED,
-    POUCH_UPLINK_SENDING,
-};
-
-struct pouch_block
-{
-    sys_snode_t node;
-    size_t len;
-    uint8_t data[CONFIG_GOLIOTH_BLOCKWISE_UPLOAD_MAX_BLOCK_SIZE];
 };
 
 struct pouch_gateway_uplink
 {
-    struct gateway_uplink *session;
-    uint32_t block_idx;
-    atomic_t flags[1];
-    struct pouch_block *wblock;
-    struct pouch_block *rblock;
-    sys_slist_t queue;
+    struct pouch_gateway_downlink_context *downlink;
+    pouch_atomic_t flags[1];
+    struct pouch_buf *wblock;
+    pouch_buf_queue_t queue;
+    size_t total_len;
+    size_t remaining_len;
+    struct pouch_buf *drain_block;
+    struct pouch_bufview drain_view;
     pouch_gateway_uplink_end_cb end_cb;
     void *end_cb_arg;
 };
 
-static struct golioth_client *client;
-
-static void process_uplink(struct pouch_gateway_uplink *uplink);
-
 static void cleanup_uplink(struct pouch_gateway_uplink *uplink)
 {
-    if (IS_ENABLED(CONFIG_POUCH_GATEWAY_CLOUD))
+    struct pouch_buf *block;
+
+    if (uplink->drain_block != NULL)
     {
-        golioth_gateway_uplink_finish(uplink->session);
+        blockbuf_free(uplink->drain_block);
     }
 
-    sys_snode_t *n;
-    while ((n = sys_slist_get(&uplink->queue)) != NULL)
+    while ((block = buf_queue_get(&uplink->queue)) != NULL)
     {
-        free(CONTAINER_OF(n, struct pouch_block, node));
+        blockbuf_free(block);
     }
 
-    free(uplink->wblock);
-    free(uplink->rblock);
+    if (uplink->wblock != NULL)
+    {
+        blockbuf_free(uplink->wblock);
+    }
+
     free(uplink);
 }
 
-static void block_upload_callback(struct golioth_client *client,
-                                  enum golioth_status status,
-                                  const struct golioth_coap_rsp_code *coap_rsp_code,
-                                  const char *path,
-                                  size_t block_size,
-                                  void *arg)
+static void submit_wblock(struct pouch_gateway_uplink *uplink)
+{
+    POUCH_LOG_DBG("Submitting block of size %zu", buf_size_get(uplink->wblock));
+    uplink->total_len += buf_size_get(uplink->wblock);
+    buf_queue_submit(&uplink->queue, uplink->wblock);
+    uplink->wblock = NULL;
+}
+
+/*
+ * Chunk callback handed to the cloud transport. Streams bytes out of
+ * the queued blocks one CoAP-block at a time; blocks are freed as
+ * soon as they are drained so the pool empties in step with the
+ * uplink.
+ */
+static int uplink_chunk_cb(uint8_t *buf,
+                           size_t buf_size,
+                           size_t *chunk_len,
+                           bool *is_last,
+                           void *arg)
 {
     struct pouch_gateway_uplink *uplink = arg;
+    size_t written = 0;
 
-    if (!atomic_test_and_clear_bit(uplink->flags, POUCH_UPLINK_SENDING))
+    while (written < buf_size && uplink->remaining_len > 0)
     {
-        POUCH_LOG_ERR("Not sending");
-        return;
+        if (uplink->drain_block == NULL)
+        {
+            uplink->drain_block = buf_queue_get(&uplink->queue);
+            if (uplink->drain_block == NULL)
+            {
+                POUCH_LOG_ERR("Uplink drain ran out of blocks with %zu bytes still expected",
+                              uplink->remaining_len);
+                return -EIO;
+            }
+            pouch_bufview_init(&uplink->drain_view, uplink->drain_block);
+        }
+
+        size_t available = pouch_bufview_available(&uplink->drain_view);
+        size_t take = MIN(available, buf_size - written);
+
+        pouch_bufview_memcpy(&uplink->drain_view, buf + written, take);
+        written += take;
+        uplink->remaining_len -= take;
+
+        if (pouch_bufview_available(&uplink->drain_view) == 0)
+        {
+            blockbuf_free(uplink->drain_block);
+            uplink->drain_block = NULL;
+        }
     }
 
-    free(uplink->rblock);
-    uplink->rblock = NULL;
+    *chunk_len = written;
+    *is_last = (uplink->remaining_len == 0);
+    return 0;
+}
 
-    if (status != GOLIOTH_OK)
+/*
+ * Cloud Block2 response callback adapter. Forwards data to the
+ * gateway downlink module.
+ */
+static int cloud_downlink_cb(const uint8_t *data, size_t len, bool is_last, void *arg)
+{
+    struct pouch_gateway_downlink_context *downlink = arg;
+
+    if (downlink == NULL)
     {
-        POUCH_LOG_ERR("Failed to deliver block: %d", status);
-        uplink->end_cb(uplink->end_cb_arg, POUCH_GATEWAY_UPLINK_ERROR_CLOUD);
+        return 0;
+    }
+
+    return pouch_gateway_downlink_block_cb(data, len, is_last, downlink);
+}
+
+/*
+ * Stream all buffered uplink data through the registered cloud
+ * transport and process the downlink response. Called from
+ * pouch_gateway_uplink_close() after all data from the BLE
+ * peripheral has been received.
+ */
+static void send_uplink_via_cloud(struct pouch_gateway_uplink *uplink)
+{
+    int err;
+
+    if (uplink->total_len == 0)
+    {
+        POUCH_LOG_DBG("No uplink data to send");
+        uplink->end_cb(uplink->end_cb_arg, POUCH_GATEWAY_UPLINK_SUCCESS);
         cleanup_uplink(uplink);
         return;
     }
-
-    process_uplink(uplink);
-}
-
-static void process_uplink(struct pouch_gateway_uplink *uplink)
-{
-    enum golioth_status status;
-    if (atomic_test_and_set_bit(uplink->flags, POUCH_UPLINK_SENDING))
-    {
-        POUCH_LOG_DBG("Already processing queue");
-        return;
-    }
-
-    bool closed = atomic_test_bit(uplink->flags, POUCH_UPLINK_CLOSED);
-
-    sys_snode_t *n = sys_slist_get(&uplink->queue);
-    if (n == NULL)
-    {
-        POUCH_LOG_DBG("No blocks to process");
-        if (closed)
-        {
-            uplink->end_cb(uplink->end_cb_arg, POUCH_GATEWAY_UPLINK_SUCCESS);
-            cleanup_uplink(uplink);
-            return;
-        }
-
-        atomic_clear_bit(uplink->flags, POUCH_UPLINK_SENDING);
-        return;
-    }
-
-    uplink->rblock = CONTAINER_OF(n, struct pouch_block, node);
-
-    POUCH_LOG_DBG("Processing block %zu of size %zu", uplink->block_idx, uplink->rblock->len);
 
     if (!IS_ENABLED(CONFIG_POUCH_GATEWAY_CLOUD))
     {
-        free(uplink->rblock);
-        uplink->rblock = NULL;
-        atomic_clear_bit(uplink->flags, POUCH_UPLINK_SENDING);
-
-        return;
-    }
-
-    if (uplink->rblock->len == 0)
-    {
-        POUCH_LOG_WRN("Skipping zero length block");
-
-        free(uplink->rblock);
-        uplink->rblock = NULL;
-        atomic_clear_bit(uplink->flags, POUCH_UPLINK_SENDING);
-
-        return;
-    }
-
-    status = golioth_gateway_uplink_block(uplink->session,
-                                          uplink->block_idx++,
-                                          uplink->rblock->data,
-                                          uplink->rblock->len,
-                                          sys_slist_is_empty(&uplink->queue) && closed,
-                                          block_upload_callback,
-                                          uplink);
-    if (status != GOLIOTH_OK)
-    {
-        POUCH_LOG_ERR("Failed to deliver block: %d", status);
-        uplink->end_cb(uplink->end_cb_arg, POUCH_GATEWAY_UPLINK_ERROR_LOCAL);
+        POUCH_LOG_INF("Cloud disabled, discarding %zu bytes of peripheral data", uplink->total_len);
+        uplink->end_cb(uplink->end_cb_arg, POUCH_GATEWAY_UPLINK_SUCCESS);
         cleanup_uplink(uplink);
+        return;
     }
-}
 
-static struct pouch_block *block_alloc(struct pouch_gateway_uplink *uplink)
-{
-    struct pouch_block *block = malloc(sizeof(struct pouch_block));
-    if (block == NULL)
+    POUCH_LOG_INF("Forwarding %zu bytes of peripheral data to cloud", uplink->total_len);
+
+    uplink->remaining_len = uplink->total_len;
+
+    err = pouch_gateway_cloud_forward_pouch(uplink_chunk_cb,
+                                            uplink,
+                                            uplink->downlink ? cloud_downlink_cb : NULL,
+                                            uplink->downlink);
+    if (err)
     {
-        POUCH_LOG_ERR("Failed to alloc block");
-        return NULL;
+        POUCH_LOG_ERR("Cloud forward failed: %d", err);
+        if (uplink->downlink)
+        {
+            pouch_gateway_downlink_end_cb(err, uplink->downlink);
+        }
+        uplink->end_cb(uplink->end_cb_arg, POUCH_GATEWAY_UPLINK_ERROR_CLOUD);
+    }
+    else
+    {
+        if (uplink->downlink)
+        {
+            pouch_gateway_downlink_end_cb(0, uplink->downlink);
+        }
+        uplink->end_cb(uplink->end_cb_arg, POUCH_GATEWAY_UPLINK_SUCCESS);
     }
 
-    block->len = 0;
-
-    return block;
+    cleanup_uplink(uplink);
 }
 
-static void submit_block(struct pouch_gateway_uplink *uplink)
-{
-    POUCH_LOG_DBG("Submitting block of size %zu", uplink->wblock->len);
-    sys_slist_append(&uplink->queue, &uplink->wblock->node);
-    uplink->wblock = NULL;
-}
+/*
+ * Max bytes per gateway block.  Each pouch_buf slot holds at least
+ * CONFIG_POUCH_BLOCK_SIZE bytes; we conservatively use that as the
+ * per-block capacity.
+ */
+#define GW_BLOCK_MAX_BYTES CONFIG_POUCH_BLOCK_SIZE
 
 int pouch_gateway_uplink_write(struct pouch_gateway_uplink *uplink,
                                const uint8_t *payload,
@@ -185,14 +199,14 @@ int pouch_gateway_uplink_write(struct pouch_gateway_uplink *uplink,
 {
     while (len)
     {
-        if (uplink->wblock != NULL && uplink->wblock->len == sizeof(uplink->wblock->data))
+        if (uplink->wblock != NULL && buf_size_get(uplink->wblock) >= GW_BLOCK_MAX_BYTES)
         {
-            submit_block(uplink);
+            submit_wblock(uplink);
         }
 
         if (uplink->wblock == NULL)
         {
-            uplink->wblock = block_alloc(uplink);
+            uplink->wblock = blockbuf_alloc(POUCH_NO_WAIT);
             if (uplink->wblock == NULL)
             {
                 POUCH_LOG_ERR("Failed to alloc new block");
@@ -200,23 +214,23 @@ int pouch_gateway_uplink_write(struct pouch_gateway_uplink *uplink,
             }
         }
 
-        size_t bytes_to_copy = MIN(len, sizeof(uplink->wblock->data) - uplink->wblock->len);
+        size_t space = GW_BLOCK_MAX_BYTES - buf_size_get(uplink->wblock);
+        size_t bytes_to_copy = MIN(len, space);
 
-        memcpy(&uplink->wblock->data[uplink->wblock->len], payload, bytes_to_copy);
-        uplink->wblock->len += bytes_to_copy;
+        buf_write(uplink->wblock, payload, bytes_to_copy);
 
         len -= bytes_to_copy;
         payload += bytes_to_copy;
     }
 
-    process_uplink(uplink);
-
     return 0;
 }
 
-void pouch_gateway_uplink_module_init(struct golioth_client *c)
+void pouch_gateway_uplink_module_init(void)
 {
-    client = c;
+    /* Cloud transport state is registered separately via
+     * pouch_gateway_cloud_transport_register().
+     */
 }
 
 struct pouch_gateway_uplink *pouch_gateway_uplink_open(
@@ -230,32 +244,19 @@ struct pouch_gateway_uplink *pouch_gateway_uplink_open(
         return NULL;
     }
 
-    uplink->wblock = block_alloc(uplink);
+    uplink->wblock = blockbuf_alloc(POUCH_NO_WAIT);
     if (uplink->wblock == NULL)
     {
         free(uplink);
         return NULL;
     }
 
-    if (IS_ENABLED(CONFIG_POUCH_GATEWAY_CLOUD))
-    {
-        uplink->session = golioth_gateway_uplink_start(client,
-                                                       pouch_gateway_downlink_block_cb,
-                                                       pouch_gateway_downlink_end_cb,
-                                                       downlink);
-        if (uplink->session == NULL)
-        {
-            POUCH_LOG_ERR("Failed to start blockwise upload");
-            free(uplink->wblock);
-            free(uplink);
-            return NULL;
-        }
-    }
-
-    uplink->rblock = NULL;
-    uplink->block_idx = 0;
-    atomic_set(uplink->flags, 0);
-    sys_slist_init(&uplink->queue);
+    uplink->downlink = downlink;
+    uplink->total_len = 0;
+    uplink->remaining_len = 0;
+    uplink->drain_block = NULL;
+    pouch_atomic_set(uplink->flags, 0);
+    buf_queue_init(&uplink->queue);
     uplink->end_cb = end_cb;
     uplink->end_cb_arg = end_cb_arg;
 
@@ -264,12 +265,12 @@ struct pouch_gateway_uplink *pouch_gateway_uplink_open(
 
 void pouch_gateway_uplink_close(struct pouch_gateway_uplink *uplink)
 {
-    bool closed = atomic_test_and_set_bit(uplink->flags, POUCH_UPLINK_CLOSED);
+    bool closed = pouch_atomic_test_and_set_bit(uplink->flags, POUCH_UPLINK_CLOSED);
 
-    if (!closed && uplink->wblock != NULL)
+    if (!closed && uplink->wblock != NULL && buf_size_get(uplink->wblock) > 0)
     {
-        submit_block(uplink);
+        submit_wblock(uplink);
     }
 
-    process_uplink(uplink);
+    send_uplink_via_cloud(uplink);
 }

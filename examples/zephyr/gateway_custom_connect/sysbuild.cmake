@@ -24,6 +24,15 @@ if(BOARD MATCHES "bsim")
     sysbuild_add_dependencies(FLASH ${DEFAULT_IMAGE} bsim_handbrake)
   endif()
 
+  # Mount gateway DTLS credentials (device cert + key for mTLS).
+  # The CA used to verify the server is taken from the built-in ISRG
+  # Root X1 unless EXAMPLE_COAP_CLIENT_DTLS_LOAD_CA_FROM_FILESYSTEM is set.
+  if(SB_CONFIG_GATEWAY_MOUNT_CREDS)
+    set_config_bool(${DEFAULT_IMAGE} CONFIG_FILE_SYSTEM_NSIM_MOUNT y)
+    set_config_string(${DEFAULT_IMAGE} CONFIG_NATIVE_EXTRA_CMDLINE_ARGS "-volume=creds:/creds")
+    set_config_string(${DEFAULT_IMAGE} CONFIG_EXAMPLE_CREDENTIALS_DIR "/creds")
+  endif()
+
   function(add_peripheral name path)
     string(TOUPPER "${name}" sb_variable_suffix)
     set(sb_variable_enable_name "SB_CONFIG_PERIPHERAL_${sb_variable_suffix}")

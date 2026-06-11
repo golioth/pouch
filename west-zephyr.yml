@@ -30,10 +30,5 @@ manifest:
           - "tools/bsim/*"
           - "tools/bsim/*/*"
 
-    - name: golioth
-      path: modules/lib/golioth-firmware-sdk
-      revision: d703b1f8805c7584a44dabc31bdf09164637d888
-      url: https://github.com/golioth/golioth-firmware-sdk.git
-
   self:
     path: pouch

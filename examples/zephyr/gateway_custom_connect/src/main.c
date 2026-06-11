@@ -8,22 +8,33 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/net/net_if.h>
+#include <zephyr/net/net_mgmt.h>
 #include <zephyr/net/dhcpv4.h>
 #include <zephyr/drivers/gpio.h>
 
-#include <golioth/client.h>
-#include <golioth/gateway.h>
-#include <samples/common/sample_credentials.h>
-
+#include <pouch/pouch.h>
+#include <pouch/uplink.h>
 #include <pouch/transport/bluetooth/gatt.h>
+#include <pouch/transport/certificate.h>
+#include <pouch/transport/coap/client.h>
+#include <pouch/transport/coap/gateway.h>
 
 #include <pouch/gateway/bt/bond.h>
 #include <pouch/gateway/bt/connect.h>
 #include <pouch/gateway/cert.h>
-#include <pouch/gateway/downlink.h>
+#include <pouch/gateway/cloud.h>
 #include <pouch/gateway/uplink.h>
 
+#include <golioth/settings_callbacks.h>
+
+#include "credentials.h"
 #include "scan.h"
+
+#if defined(CONFIG_WIFI)
+#include "wifi.h"
+#endif
+
+#include <git_describe.h>
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(main);
@@ -36,8 +47,6 @@ struct sync_data
 };
 
 static struct sync_data sync_data;
-
-struct golioth_client *client;
 
 struct net_wait_data
 {
@@ -70,40 +79,25 @@ static void button_pressed(const struct device *dev, struct gpio_callback *cb, u
     }
 }
 
-#ifdef CONFIG_POUCH_GATEWAY_CLOUD
-
-static K_SEM_DEFINE(connected, 0, 1);
-
-static void on_client_event(struct golioth_client *client,
-                            enum golioth_client_event event,
-                            void *arg)
+static void do_uplink(void)
 {
-    bool is_connected = (event == GOLIOTH_CLIENT_EVENT_CONNECTED);
-    if (is_connected)
-    {
-        k_sem_give(&connected);
-    }
-    LOG_INF("Golioth client %s", is_connected ? "connected" : "disconnected");
+    const char *payload = "{\"temp\":22}";
+    pouch_uplink_entry_write(".s/sensor",
+                             POUCH_CONTENT_TYPE_JSON,
+                             payload,
+                             strlen(payload),
+                             POUCH_FOREVER);
+}
+POUCH_UPLINK_HANDLER(do_uplink);
+
+static int led_setting_cb(bool new_value)
+{
+    LOG_INF("Received LED setting: %d", (int) new_value);
+
+    return 0;
 }
 
-static void connect_golioth_client(void)
-{
-    const struct golioth_client_config *client_config = golioth_sample_credentials_get();
-    if (client_config == NULL || client_config->credentials.psk.psk_id_len == 0
-        || client_config->credentials.psk.psk_len == 0)
-    {
-        LOG_ERR("No credentials found.");
-        LOG_ERR(
-            "Please store your credentials with the following commands, then reboot the device.");
-        LOG_ERR("\tsettings set golioth/psk-id <your-psk-id>");
-        LOG_ERR("\tsettings set golioth/psk <your-psk>");
-        return;
-    }
-
-    client = golioth_client_create(client_config);
-
-    golioth_client_register_event_callback(client, on_client_event, NULL);
-}
+GOLIOTH_SETTINGS_HANDLER(LED, led_setting_cb);
 
 static void event_cb_handler(struct net_mgmt_event_callback *cb,
                              uint64_t mgmt_event,
@@ -132,7 +126,7 @@ static void wait_for_net_event(struct net_if *iface, uint64_t event)
     net_mgmt_del_event_callback(&wait.cb);
 }
 
-static void connect_to_cloud(void)
+static void wait_for_network(void)
 {
     struct net_if *iface = net_if_get_default();
 
@@ -147,7 +141,27 @@ static void connect_to_cloud(void)
         }
     }
 
-    if (IS_ENABLED(CONFIG_NET_L2_ETHERNET) && IS_ENABLED(CONFIG_NET_DHCPV4))
+    if (IS_ENABLED(CONFIG_WIFI))
+    {
+        struct net_wait_data wait;
+
+        wait.cb.handler = event_cb_handler;
+        wait.cb.event_mask = NET_EVENT_IPV4_ADDR_ADD;
+        k_sem_init(&wait.sem, 0, 1);
+        net_mgmt_add_event_callback(&wait.cb);
+
+        IF_ENABLED(CONFIG_WIFI, (wifi_connect()));
+
+        if (IS_ENABLED(CONFIG_NET_DHCPV4))
+        {
+            net_dhcpv4_start(iface);
+        }
+
+        LOG_INF("Waiting to obtain IP address");
+        k_sem_take(&wait.sem, K_FOREVER);
+        net_mgmt_del_event_callback(&wait.cb);
+    }
+    else if (IS_ENABLED(CONFIG_NET_L2_ETHERNET) && IS_ENABLED(CONFIG_NET_DHCPV4))
     {
         net_dhcpv4_start(net_if_get_default());
     }
@@ -158,16 +172,7 @@ static void connect_to_cloud(void)
                            IS_ENABLED(DNS_SERVER_IP_ADDRESSES) ? NET_EVENT_DNS_SERVER_ADD
                                                                : NET_EVENT_IPV4_ADDR_ADD);
     }
-
-    connect_golioth_client();
-    k_sem_take(&connected, K_FOREVER);
 }
-
-#else /* CONFIG_POUCH_GATEWAY_CLOUD */
-
-static inline void connect_to_cloud(void) {}
-
-#endif /* CONFIG_POUCH_GATEWAY_CLOUD */
 
 static void bt_connected(struct bt_conn *conn, uint8_t err)
 {
@@ -210,6 +215,27 @@ static void bt_disconnected(struct bt_conn *conn, uint8_t reason)
     bt_conn_unref(conn);
 
     custom_scan_start();
+}
+
+static void on_gateway_end(struct bt_conn *conn)
+{
+    sync_data.counter++;
+
+    if (sync_data.counter > 1)
+    {
+        LOG_INF("Disconnecting");
+        bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+    }
+    else
+    {
+        LOG_INF("Start sync once again in 5s");
+        k_work_schedule(&sync_data.work, K_SECONDS(5));
+    }
+}
+
+static void sync_start_handler(struct k_work *work)
+{
+    pouch_gateway_bt_start(sync_data.conn, on_gateway_end);
 }
 
 static void security_changed(struct bt_conn *conn, bt_security_t level, enum bt_security_err err)
@@ -311,27 +337,6 @@ static struct bt_conn_auth_info_cb auth_info_cb = {
     .pairing_failed = pairing_failed,
 };
 
-static void gateway_bt_finished(struct bt_conn *conn)
-{
-    sync_data.counter++;
-
-    if (sync_data.counter > 1)
-    {
-        LOG_INF("Disconnecting");
-        bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
-    }
-    else
-    {
-        LOG_INF("Start sync once again in 5s");
-        k_work_schedule(&sync_data.work, K_SECONDS(5));
-    }
-}
-
-static void sync_start_handler(struct k_work *work)
-{
-    pouch_gateway_bt_start(sync_data.conn, gateway_bt_finished);
-}
-
 int main(void)
 {
     int err;
@@ -340,6 +345,66 @@ int main(void)
     LOG_INF("Pouch BLE Transport Protocol Version: %d", POUCH_GATT_VERSION);
 
     k_work_init_delayable(&sync_data.work, sync_start_handler);
+
+    /* Load the Pouch device's identity (cert + key). */
+    struct pouch_config config = {0};
+
+    err = load_certificate(&config.certificate);
+    if (err)
+    {
+        LOG_ERR("Failed to load certificate (err %d)", err);
+        return 0;
+    }
+
+    config.private_key = load_private_key();
+    if (config.private_key == PSA_KEY_ID_NULL)
+    {
+        LOG_ERR("Failed to load private key");
+        return 0;
+    }
+
+    LOG_INF("Credentials loaded");
+
+    err = pouch_init(&config);
+    if (err)
+    {
+        LOG_ERR("Pouch init failed (err %d)", err);
+        return 0;
+    }
+
+    /* Load DTLS credentials for the CoAP transport. */
+    if (IS_ENABLED(CONFIG_POUCH_GATEWAY_CLOUD))
+    {
+        err = load_coap_server_ca(CONFIG_EXAMPLE_COAP_CLIENT_DTLS_CREDENTIALS);
+        if (err)
+        {
+            LOG_ERR("Failed to load server CA certificate (err %d)", err);
+            return 0;
+        }
+
+        err = load_coap_gw_device_crt(CONFIG_EXAMPLE_COAP_CLIENT_DTLS_CREDENTIALS);
+        if (err)
+        {
+            LOG_ERR("Failed to load device certificate (err %d)", err);
+            return 0;
+        }
+
+        err = load_coap_gw_device_key(CONFIG_EXAMPLE_COAP_CLIENT_DTLS_CREDENTIALS);
+        if (err)
+        {
+            LOG_ERR("Failed to load device key (err %d)", err);
+            return 0;
+        }
+
+        err = pouch_coap_client_init(CONFIG_EXAMPLE_COAP_CLIENT_DTLS_CREDENTIALS);
+        if (err)
+        {
+            LOG_ERR("Failed to initialize CoAP client transport: %d", err);
+            return err;
+        }
+
+        pouch_coap_gateway_init();
+    }
 
     if (DT_HAS_ALIAS(sw0))
     {
@@ -365,11 +430,22 @@ int main(void)
         gpio_add_callback(button.port, &button_cb_data);
     }
 
-    connect_to_cloud();
+    /* Wait for network and prime the cloud transport so the server
+     * certificate is available before any BLE peripheral connects.
+     */
+    if (IS_ENABLED(CONFIG_POUCH_GATEWAY_CLOUD))
+    {
+        wait_for_network();
 
-    pouch_gateway_cert_module_on_connected(client);
-    pouch_gateway_uplink_module_init(client);
-    pouch_gateway_downlink_module_init(client);
+        err = pouch_gateway_cloud_ensure_ready();
+        if (err)
+        {
+            LOG_WRN("Initial cloud transport setup failed: %d, will retry", err);
+        }
+    }
+
+    pouch_gateway_cert_module_init();
+    pouch_gateway_uplink_module_init();
 
     err = bt_enable(NULL);
     if (err)
@@ -393,13 +469,19 @@ int main(void)
 
     custom_scan_start();
 
-#ifdef CONFIG_POUCH_GATEWAY_CLOUD
-    while (true)
+    if (IS_ENABLED(CONFIG_POUCH_GATEWAY_CLOUD))
     {
-        k_sem_take(&connected, K_FOREVER);
-        pouch_gateway_cert_module_on_connected(client);
+        while (true)
+        {
+            k_sleep(K_SECONDS(CONFIG_EXAMPLE_COAP_CLIENT_SYNC_PERIOD_S));
+
+            err = pouch_coap_client_sync();
+            if (err)
+            {
+                LOG_WRN("CoAP sync failed: %d", err);
+            }
+        }
     }
-#endif
 
     return 0;
 }
