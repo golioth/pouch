@@ -1,15 +1,21 @@
 config POUCH_GATEWAY
     bool "Pouch Gateway"
+    depends on POUCH
+    help
+      Enable the Pouch Gateway library.  Requires POUCH to be enabled
+      because the gateway buffers per-block data through the pouch_buf
+      pool (CONFIG_POUCH_BLOCK_SIZE / CONFIG_POUCH_BLOCK_COUNT).
 
 if POUCH_GATEWAY
 
 config POUCH_GATEWAY_NUM_BLOCKS
-    int "Number of blocks in downlink/uplink buffer"
+    int "Number of downlink blocks awaiting consumption"
     default 10
     help
-      The number of blocks available for buffering uplink or downlink
-      data between a node device and the cloud. Each block is equal
-      to CONFIG_GOLIOTH_BLOCKWISE_UPLOAD_MAX_BLOCK_SIZE in length.
+      Maximum number of in-flight downlink blocks queued between the
+      cloud transport (producer) and the broker side (consumer).
+      Each entry is a pointer; the backing buffers come from the
+      pouch_buf pool sized by CONFIG_POUCH_BLOCK_COUNT.
 
 config POUCH_GATEWAY_DEVICE_CERT_MAX_LEN
     int "Device certificate maximum length"

@@ -42,10 +42,10 @@ int pouch_gateway_cloud_ensure_ready(void)
     return current->ensure_ready();
 }
 
-int pouch_gateway_cloud_forward_pouch(const uint8_t *data,
-                                      size_t len,
+int pouch_gateway_cloud_forward_pouch(pouch_gateway_cloud_upload_chunk_cb_t chunk_cb,
+                                      void *chunk_arg,
                                       pouch_gateway_cloud_block2_cb_t resp_cb,
-                                      void *arg)
+                                      void *resp_arg)
 {
     if (current == NULL || current->forward_pouch == NULL)
     {
@@ -53,7 +53,7 @@ int pouch_gateway_cloud_forward_pouch(const uint8_t *data,
         return -ENODEV;
     }
 
-    return current->forward_pouch(data, len, resp_cb, arg);
+    return current->forward_pouch(chunk_cb, chunk_arg, resp_cb, resp_arg);
 }
 
 int pouch_gateway_cloud_upload_device_cert(const uint8_t *cert, size_t len)

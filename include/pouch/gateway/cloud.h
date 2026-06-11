@@ -42,6 +42,30 @@ typedef int (*pouch_gateway_cloud_block2_cb_t)(const uint8_t *data,
                                                void *arg);
 
 /**
+ * Callback invoked by the cloud forwarder to pull the next uplink
+ * chunk from the gateway.
+ *
+ * The callback must fill @p buf with up to @p buf_size bytes and set
+ * @p chunk_len to the number of bytes written. Every non-final call
+ * must fill exactly @p buf_size bytes; the final call may return a
+ * partial chunk with @p is_last set to true. When there is no data
+ * left @p chunk_len may be zero with @p is_last set to true.
+ *
+ * @param buf         Destination buffer.
+ * @param buf_size    Capacity of @p buf.
+ * @param chunk_len   Out: number of bytes written to @p buf.
+ * @param is_last     Out: true if this is the last chunk.
+ * @param arg         User-provided context pointer.
+ *
+ * @return 0 on success, negative errno on error.
+ */
+typedef int (*pouch_gateway_cloud_upload_chunk_cb_t)(uint8_t *buf,
+                                                     size_t buf_size,
+                                                     size_t *chunk_len,
+                                                     bool *is_last,
+                                                     void *arg);
+
+/**
  * Cloud transport implementation registered with the gateway.
  *
  * Implementations are expected to be statically allocated by the
@@ -66,19 +90,23 @@ struct pouch_gateway_cloud_transport
     /**
      * Forward a peripheral's pouch payload to the cloud.
      *
-     * @param data      Pouch payload data.
-     * @param len       Length of the payload.
-     * @param resp_cb   Callback invoked for each Block2 response
-     *                  block (downlink data). May be NULL if the
-     *                  caller does not need the downlink.
-     * @param arg       Context passed to @p resp_cb.
+     * Pulls uplink data incrementally via @p chunk_cb so the whole
+     * pouch never has to be resident in memory at once.
+     *
+     * @param chunk_cb    Callback invoked to obtain successive
+     *                    uplink chunks.
+     * @param chunk_arg   Context passed to @p chunk_cb.
+     * @param resp_cb     Callback invoked for each Block2 response
+     *                    block (downlink data). May be NULL if the
+     *                    caller does not need the downlink.
+     * @param resp_arg    Context passed to @p resp_cb.
      *
      * @return 0 on success, negative errno on error.
      */
-    int (*forward_pouch)(const uint8_t *data,
-                         size_t len,
+    int (*forward_pouch)(pouch_gateway_cloud_upload_chunk_cb_t chunk_cb,
+                         void *chunk_arg,
                          pouch_gateway_cloud_block2_cb_t resp_cb,
-                         void *arg);
+                         void *resp_arg);
 
     /**
      * Upload a peripheral's device certificate to the cloud.
@@ -121,10 +149,10 @@ int pouch_gateway_cloud_ensure_ready(void);
  *
  * @return -ENODEV if no transport is registered.
  */
-int pouch_gateway_cloud_forward_pouch(const uint8_t *data,
-                                      size_t len,
+int pouch_gateway_cloud_forward_pouch(pouch_gateway_cloud_upload_chunk_cb_t chunk_cb,
+                                      void *chunk_arg,
                                       pouch_gateway_cloud_block2_cb_t resp_cb,
-                                      void *arg);
+                                      void *resp_arg);
 
 /**
  * Dispatch helper: upload a device certificate through the registered transport.

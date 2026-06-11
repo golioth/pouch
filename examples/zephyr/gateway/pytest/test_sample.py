@@ -20,8 +20,8 @@ async def test_setting_project(dut: DeviceAdapter):
     dut.readlines_until(regex="Received LED setting: 0")
 
 
-async def test_setting_device(device, dut: DeviceAdapter):
-    logging.info("Set device-level setting")
-    await device.settings.set("LED", True)
+async def test_setting_device(gateway, dut: DeviceAdapter):
+    logging.info("Set device-level setting on gateway")
+    await gateway.settings.set("LED", True)
 
     dut.readlines_until(regex="Received LED setting: 1")
