@@ -7,6 +7,6 @@ zephyr_library()
 zephyr_library_link_libraries(pouch)
 
 zephyr_library_sources(
-    client.c
-    blockwise.c
+    ${CMAKE_CURRENT_LIST_DIR}/client.c
+    ${CMAKE_CURRENT_LIST_DIR}/blockwise.c
 )
