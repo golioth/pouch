@@ -2,8 +2,13 @@ build/
 .cache
 .DS_Store
 .vscode
-twister-out*/
-sdkconfig
-sdkconfig.old
 *.py[cod]
 *.egg
+
+# Zephyr
+twister-out*/
+
+# ESP-IDF
+sdkconfig
+sdkconfig.old
+dependencies.lock
