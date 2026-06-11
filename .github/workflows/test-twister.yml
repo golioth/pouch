@@ -51,7 +51,7 @@ jobs:
              twister-out/integration-${{ matrix.manifest_yml }}.xml
 
       - name: Upload CI report summary
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: success() || failure()
         with:
           name: ci-summary-integration-${{ matrix.manifest_yml }}
