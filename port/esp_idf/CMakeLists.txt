@@ -4,23 +4,18 @@
 
 cmake_minimum_required(VERSION 3.20.0)
 
-#########################
-# Path definitions
-#########################
-
 set(POUCH_ROOT ${CMAKE_CURRENT_LIST_DIR}/../..)
 set(POUCH_PORT ${POUCH_ROOT}/port)
-set(POUCH_TRANSPORT_COMMON ${POUCH_ROOT}/src/transport)
 
-#########################
-# Port
-#########################
+include(${POUCH_ROOT}/cmake/pouch_target.cmake)
+
+pouch_config_enabled(_pouch_selected CONFIG_POUCH)
 
 list(APPEND POUCH_PORT_INC_DIRS
-    ${POUCH_PORT}/esp_idf         # esp_idf/pouch_port_macros_internal.h
-    ${POUCH_PORT}/esp_idf/include # port transport headers
-    ${POUCH_PORT}/include         # pouch/port.h
-    ${POUCH_PORT}/freertos        # port/freertos
+    ${POUCH_PORT}/esp_idf
+    ${POUCH_PORT}/esp_idf/include
+    ${POUCH_PORT}/include
+    ${POUCH_PORT}/freertos
 )
 
 list(APPEND POUCH_PORT_SRCS
@@ -29,31 +24,9 @@ list(APPEND POUCH_PORT_SRCS
     ${POUCH_PORT}/esp_idf/blockbuf.c
 )
 
-#########################
-# Pouch Core
-#########################
-
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/include)
 list(APPEND POUCH_CORE_INC_DIRS
-      ${POUCH_ROOT}/include
-
-      # Generated Headers
-      ${CMAKE_CURRENT_BINARY_DIR}/include
+    ${POUCH_ROOT}/include
 )
-
-list(APPEND POUCH_CORE_SRCS
-      ${POUCH_ROOT}/src/pouch.c
-      ${POUCH_ROOT}/src/uplink.c
-      ${POUCH_ROOT}/src/header.c
-      ${POUCH_ROOT}/src/buf.c
-      ${POUCH_ROOT}/src/block.c
-      ${POUCH_ROOT}/src/entry.c
-      ${POUCH_ROOT}/src/stream.c
-      ${POUCH_ROOT}/src/downlink.c
-      # Generated Sources
-      ${CMAKE_CURRENT_BINARY_DIR}/header_decode.c
-      ${CMAKE_CURRENT_BINARY_DIR}/header_encode.c
-  )
 
 list(APPEND POUCH_CORE_LINKER_FILES
     ${POUCH_PORT}/esp_idf/downlink_handlers.lf
@@ -61,161 +34,50 @@ list(APPEND POUCH_CORE_LINKER_FILES
     ${POUCH_PORT}/esp_idf/uplink_handlers.lf
 )
 
-if ("${CONFIG_POUCH_ENCRYPTION_NONE}" STREQUAL "y")
-    list(APPEND POUCH_CORE_SRCS ${POUCH_ROOT}/src/crypto_none.c)
-endif()
+if(_pouch_selected)
+    if(NOT "${CONFIG_POUCH_CA_CERT_FILENAME}" STREQUAL "")
+        find_file(ca_cert ${CONFIG_POUCH_CA_CERT_FILENAME}
+            PATHS
+            ${CMAKE_CURRENT_LIST_DIR}
+            ${POUCH_ROOT}
+            REQUIRED)
 
-if ("${CONFIG_POUCH_ENCRYPTION_SAEAD}" STREQUAL "y")
-    list(APPEND POUCH_CORE_SRCS
-        ${POUCH_ROOT}/src/crypto_saead.c
-        ${POUCH_ROOT}/src/cert.c
-        ${POUCH_ROOT}/src/saead/session.c
-        ${POUCH_ROOT}/src/saead/uplink.c
-        ${POUCH_ROOT}/src/saead/downlink.c
-    )
-endif()
+        message("-- Adding binary ca_cert: ${ca_cert}")
 
-if(NOT CMAKE_BUILD_EARLY_EXPANSION)
-    add_custom_command(
-        OUTPUT
-            ${CMAKE_CURRENT_BINARY_DIR}/header_decode.c
-            ${CMAKE_CURRENT_BINARY_DIR}/header_encode.c
-        COMMAND zcbor code -c ${POUCH_ROOT}/src/header.cddl -t pouch_header -sde
-            --include-prefix cddl/ --oc header.c --oh include/cddl/header.h
-        BYPRODUCTS
-            ${CMAKE_CURRENT_BINARY_DIR}/include/cddl/header_decode.h
-            ${CMAKE_CURRENT_BINARY_DIR}/include/cddl/header_encode.h
-            ${CMAKE_CURRENT_BINARY_DIR}/include/cddl/header_types.h
-        DEPENDS ${POUCH_ROOT}/src/header.cddl)
-
-    add_custom_target(pouch_generate_headers DEPENDS
-        ${CMAKE_CURRENT_BINARY_DIR}/header_decode.c
-        ${CMAKE_CURRENT_BINARY_DIR}/header_encode.c)
-endif()
-
-if ("${CONFIG_POUCH_ENCRYPTION_SAEAD}" STREQUAL "y")
-    if (NOT "${CONFIG_POUCH_VALIDATE_SERVER_CERT}" STREQUAL "y")
-        message(WARNING " \n"
-                " ************************************************\n"
-                " Pouch server certificate validation is disabled.\n"
-                " Do not use this in production.\n"
-                " ************************************************")
+        configure_file(${ca_cert} "${CMAKE_CURRENT_BINARY_DIR}/pouch_ca_cert.der" COPYONLY)
+        set(CA_CERT_IF_SELECTED "${CMAKE_CURRENT_BINARY_DIR}/pouch_ca_cert.der")
     endif()
 
-    if ("${CONFIG_MBEDTLS_PSA_P256M_DRIVER_ENABLED}" STREQUAL "y")
-        message(FATAL_ERROR " \n"
-                " **************************************************\n"
-                " CONFIG_MBEDTLS_PSA_256M_DRIVER_ENABLED breaks\n"
-                " support for the secp384r1 curve, which is required\n"
-                " for Pouch. Disable this option in sdkconfig\n"
-                " **************************************************")
-    endif()
-endif()
+    idf_component_register(SRCS
+                            ${POUCH_PORT_SRCS}
 
-#########################
-# Transport Common
-#########################
+                           INCLUDE_DIRS
+                            ${POUCH_CORE_INC_DIRS}
+                            ${POUCH_PORT_INC_DIRS}
 
-if("${CONFIG_POUCH_TRANSPORT_BLE_GATT}" STREQUAL "y")
-    list(APPEND POUCH_TRANSPORT_SRCS
-        ${POUCH_TRANSPORT_COMMON}/endpoints/device/info.c
-        ${POUCH_TRANSPORT_COMMON}/endpoints/device/uplink.c
-        ${POUCH_TRANSPORT_COMMON}/endpoints/device/downlink.c
-        ${POUCH_TRANSPORT_COMMON}/sar/sender.c
-        ${POUCH_TRANSPORT_COMMON}/sar/receiver.c
-        ${POUCH_TRANSPORT_COMMON}/sar/packet.c
-        ${CMAKE_CURRENT_BINARY_DIR}/info_encode.c
-    )
+                           EMBED_FILES
+                            ${CA_CERT_IF_SELECTED}
 
-    if ("${CONFIG_POUCH_ENCRYPTION_SAEAD}" STREQUAL "y")
-        list(APPEND POUCH_TRANSPORT_SRCS
-            ${POUCH_TRANSPORT_COMMON}/endpoints/device/device_cert.c
-            ${POUCH_TRANSPORT_COMMON}/endpoints/device/server_cert.c
-        )
-    endif()
+                            LDFRAGMENTS
+                              ${POUCH_CORE_LINKER_FILES}
 
-    list(APPEND POUCH_TRANSPORT_INC_DIRS
-        ${POUCH_ROOT}/src
-        ${POUCH_TRANSPORT_COMMON}
-        ${CMAKE_CURRENT_BINARY_DIR}/include
-    )
+                           REQUIRES
+                            mbedtls
+
+                            KCONFIG
+                             ${POUCH_PORT}/esp_idf/Kconfig
+                           )
+
+    set(POUCH_ACTIVE_TARGET ${COMPONENT_LIB})
+    set(POUCH_ACTIVE_GENERATED_DIR ${CMAKE_CURRENT_BINARY_DIR})
+
+    add_subdirectory(${POUCH_PORT}/esp_idf/transport transport)
 
     if(NOT CMAKE_BUILD_EARLY_EXPANSION)
-        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/info_encode.c
-            COMMAND zcbor code -c ${POUCH_TRANSPORT_COMMON}/info.cddl -t pouch_gatt_info -e
-            --include-prefix cddl/ --output-c ${CMAKE_CURRENT_BINARY_DIR}/info_encode.c --output-h
-            ${CMAKE_CURRENT_BINARY_DIR}/include/cddl/info_encode.h
-            BYPRODUCTS include/cddl/info_encode.h include/cddl/info_encode_types.h
-            DEPENDS ${POUCH_TRANSPORT_COMMON}/info.cddl)
+        add_subdirectory(${POUCH_PORT}/esp_idf/lib/zcbor zcbor)
     endif()
-endif()
 
-#########################
-# Transports
-#########################
-
-if("${CONFIG_POUCH_TRANSPORT_HTTP_CLIENT}" STREQUAL "y")
-    list(APPEND POUCH_TRANSPORT_SRCS ${POUCH_PORT}/esp_idf/transport/http/client.c)
-    list(APPEND POUCH_PRIV_REQUIRES
-        esp_http_client
-        esp-tls
-    )
-endif()
-
-if("${CONFIG_POUCH_TRANSPORT_BLE_GATT}" STREQUAL "y")
-    list(APPEND POUCH_TRANSPORT_SRCS ${POUCH_PORT}/esp_idf/transport/gatt/peripheral.c)
-    list(APPEND POUCH_PRIV_REQUIRES
-        bt
-    )
-endif()
-
-#########################
-# Server CA Cert
-#########################
-
-if(NOT "${CONFIG_POUCH_CA_CERT_FILENAME}" STREQUAL "")
-    find_file(ca_cert ${CONFIG_POUCH_CA_CERT_FILENAME}
-        PATHS
-        ${CMAKE_CURRENT_LIST_DIR}
-        ${POUCH_ROOT}
-        REQUIRED)
-
-    message("-- Adding binary ca_cert: ${ca_cert}")
-
-    configure_file(${ca_cert} "${CMAKE_CURRENT_BINARY_DIR}/pouch_ca_cert.der" COPYONLY)
-    set(CA_CERT_IF_SELECTED "${CMAKE_CURRENT_BINARY_DIR}/pouch_ca_cert.der")
-endif()
-
-#########################
-# ESP-IDF Component
-#########################
-
-idf_component_register(SRCS
-                        ${POUCH_CORE_SRCS}
-                        ${POUCH_PORT_SRCS}
-                        ${POUCH_TRANSPORT_SRCS}
-
-                       INCLUDE_DIRS
-                        ${POUCH_CORE_INC_DIRS}
-                        ${POUCH_PORT_INC_DIRS}
-                        ${POUCH_TRANSPORT_INC_DIRS}
-
-                       EMBED_FILES
-                        ${CA_CERT_IF_SELECTED}
-
-                       LDFRAGMENTS
-                        ${POUCH_CORE_LINKER_FILES}
-
-                       REQUIRES
-                         mbedtls
-
-                       KCONFIG
-                        ${POUCH_PORT}/esp_idf/Kconfig
-                       )
-
-# Conditionally required components need to be processed after initial registration
-idf_component_optional_requires(PRIVATE ${POUCH_PRIV_REQUIRES})
-
-if(NOT CMAKE_BUILD_EARLY_EXPANSION)
-    add_subdirectory(${POUCH_PORT}/esp_idf/lib/zcbor zcbor)
+else()
+    idf_component_register(KCONFIG
+                           ${POUCH_PORT}/esp_idf/Kconfig)
 endif()

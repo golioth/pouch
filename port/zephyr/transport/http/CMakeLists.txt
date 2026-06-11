@@ -7,7 +7,7 @@ zephyr_library()
 zephyr_library_link_libraries(pouch)
 
 zephyr_library_sources(
-    client.c
+    ${CMAKE_CURRENT_LIST_DIR}/client.c
 )
 
 zephyr_library_include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
