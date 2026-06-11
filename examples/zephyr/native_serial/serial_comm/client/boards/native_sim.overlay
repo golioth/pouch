@@ -1,0 +1,14 @@
+/*
+ * Copyright (c) 2026 Golioth, Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/* serial_link_0: client end of the virtual serial link; see the
+ * server overlay for what the label does (and does not) imply.
+ */
+serial_link_0: &uart1 {
+	status = "okay";
+	compatible = "zephyr,native-tty-uart";
+	current-speed = <115200>;
+};

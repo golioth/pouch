@@ -1,0 +1,16 @@
+/*
+ * Copyright (c) 2026 Golioth, Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/* The serial_link_0 label is documentation only -- a hint that this
+ * UART is one end of a virtual serial link.  The actual wiring is
+ * done by native_parallel_serial_link() in sysbuild.cmake, which
+ * matches domains and UART node names rather than labels.
+ */
+serial_link_0: &uart1 {
+	status = "okay";
+	compatible = "zephyr,native-tty-uart";
+	current-speed = <115200>;
+};

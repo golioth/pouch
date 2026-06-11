@@ -1,0 +1,13 @@
+# Copyright (c) 2026 Golioth, Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+sample:
+  name: Serial Communication Test
+
+tests:
+  pouch.serial_comm:
+    sysbuild: true
+    platform_allow:
+      - native_sim
+    harness: pytest
+    tags: serial uart
