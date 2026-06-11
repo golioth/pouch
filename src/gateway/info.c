@@ -10,7 +10,7 @@
 #include <string.h>
 
 #include <pouch/gateway/cert.h>
-#include <pouch/gateway/info.h>
+#include "info.h"
 #include <pouch/port.h>
 
 #include <cddl/info_decode.h>
