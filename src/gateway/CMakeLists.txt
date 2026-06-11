@@ -3,6 +3,7 @@ zephyr_library()
 zephyr_library_sources(
     block.c
     cert.c
+    cloud.c
     downlink.c
     info.c
     info_decode.c
