@@ -25,6 +25,37 @@ config SAMPLE_POUCH_GATEWAY_BT_AUTO_CONFIRM
 	default y if BOARD_NRF52_BSIM_NATIVE
 	default y if BOARD_NRF9160DK_NRF52840
 
-source "${ZEPHYR_GOLIOTH_FIRMWARE_SDK_MODULE_DIR}/examples/zephyr/common/Kconfig.defconfig"
+config EXAMPLE_COAP_CLIENT_SYNC_PERIOD_S
+	int "CoAP client sync period (s)"
+	default 30
+
+config EXAMPLE_CREDENTIALS_DIR
+	string "Directory containing credentials"
+	default "/lfs1/credentials"
+	help
+	  Directory on mounted file system containing credentials.
+
+config EXAMPLE_COAP_CLIENT_DTLS_CREDENTIALS
+	int "Sec Tag to use when storing DTLS credentials"
+	default 515765868
+
+config EXAMPLE_COAP_CLIENT_DTLS_LOAD_CA_FROM_FILESYSTEM
+	bool "Load the server CA cert from filesystem"
+	help
+	  Optionally load the CA certificate used for DTLS/mTLS from
+	  EXAMPLE_CREDENTIALS_DIR/ca.der. If this symbol is not selected,
+	  ISRG Root X1 is used.
+
+config EXAMPLE_COAP_CLIENT_GW_DEVICE_CRT_FILENAME
+	string "Gateway device crt filename in filesystem"
+	default "crt.der"
+	help
+	  The filename used to store the mTLS device certificate in the filesystem.
+
+config EXAMPLE_COAP_CLIENT_GW_DEVICE_KEY_FILENAME
+	string "Gateway device key filename in filesystem"
+	default "key.der"
+	help
+	  The filename used to store the mTLS device private key in the filesystem.
 
 source "Kconfig.zephyr"

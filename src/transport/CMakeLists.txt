@@ -5,8 +5,9 @@
 pouch_config_enabled(_pouch_encryption_saead CONFIG_POUCH_ENCRYPTION_SAEAD)
 pouch_config_enabled(_pouch_transport_sar CONFIG_POUCH_TRANSPORT_SAR)
 pouch_config_enabled(_pouch_transport_ble_gatt CONFIG_POUCH_TRANSPORT_BLE_GATT)
+pouch_config_enabled(_pouch_gateway CONFIG_POUCH_GATEWAY)
 
-if(NOT _pouch_transport_sar AND NOT _pouch_transport_ble_gatt)
+if(NOT _pouch_transport_sar AND NOT _pouch_transport_ble_gatt AND NOT _pouch_gateway)
     return()
 endif()
 
@@ -14,7 +15,7 @@ set(_pouch_transport_root ${CMAKE_CURRENT_LIST_DIR})
 set(_pouch_target ${POUCH_ACTIVE_TARGET})
 set(_pouch_generated_dir ${POUCH_ACTIVE_GENERATED_DIR})
 
-if(_pouch_transport_sar)
+if(_pouch_transport_sar OR _pouch_gateway)
     target_sources(${_pouch_target} PRIVATE
         ${_pouch_transport_root}/sar/sender.c
         ${_pouch_transport_root}/sar/receiver.c
@@ -28,6 +29,15 @@ target_include_directories(${_pouch_target} PRIVATE
     ${_pouch_transport_root}
     ${_pouch_generated_dir}/include
 )
+if(_pouch_gateway)
+    target_sources(${_pouch_target} PRIVATE
+        ${_pouch_transport_root}/endpoints/broker/info.c
+        ${_pouch_transport_root}/endpoints/broker/uplink.c
+        ${_pouch_transport_root}/endpoints/broker/downlink.c
+        ${_pouch_transport_root}/endpoints/broker/device_cert.c
+        ${_pouch_transport_root}/endpoints/broker/server_cert.c
+    )
+endif()
 
 if(_pouch_transport_ble_gatt)
     target_sources(${_pouch_target} PRIVATE

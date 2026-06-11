@@ -33,6 +33,15 @@ config POUCH_COAP_BLOCK_SIZE
       CoAP block size used for blockwise transfers (Block1/Block2).
       Possible values: 64, 128, 256, 512, 1024.
 
+config POUCH_GATEWAY_CLOUD_TRANSPORT_COAP
+    bool "Use Pouch CoAP transport as the gateway cloud forwarder"
+    default y
+    depends on POUCH_GATEWAY && POUCH_TRANSPORT_COAP_CLIENT
+    help
+      Builds the CoAP implementation of the gateway cloud transport
+      vtable (see <pouch/gateway/cloud.h>). The application registers
+      it by calling pouch_coap_gateway_init().
+
 module = POUCH_COAP_CLIENT
 module-str = Pouch CoAP Client
 source "subsys/logging/Kconfig.template.log_config"

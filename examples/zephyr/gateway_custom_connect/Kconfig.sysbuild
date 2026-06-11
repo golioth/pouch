@@ -72,4 +72,10 @@ config PERIPHERAL_MOUNT_CREDS
 	help
 	  Mount credentials located ${BUILD_DIR}/creds under /creds mountpoint in Zephyr.
 
+config GATEWAY_MOUNT_CREDS
+	bool "Mount gateway credentials under /creds directory"
+	help
+	  Mount gateway DTLS credentials located ${BUILD_DIR}/gateway/creds
+	  under /creds mountpoint in the gateway application.
+
 source "share/sysbuild/Kconfig"

@@ -8,6 +8,7 @@ import logging
 import os
 import random
 import string
+import subprocess
 import sys
 from pathlib import Path
 from typing import Generator
@@ -51,7 +52,6 @@ async def gateway(request, project, gateway_name):
         if request.config.getoption("--mask-secrets"):
             print(f"::add-mask::{name}")
         gateway = await project.create_device(name, name)
-        await gateway.credentials.add(name, name)
 
         yield gateway
 
@@ -66,7 +66,7 @@ def determine_scope(fixture_name, config):
 
 @pytest.fixture(scope=determine_scope)
 async def dut(
-    gateway, request: pytest.FixtureRequest, device_object: DeviceAdapter
+    gateway, gateway_creds, request: pytest.FixtureRequest, device_object: DeviceAdapter
 ) -> Generator[DeviceAdapter, None, None]:
     """Return launched device - with run application."""
     device_object.initialize_log_files(request.node.name)
@@ -81,11 +81,6 @@ async def dut(
         ]
         device_object.process_kwargs["cwd"] = str(device_object.device_config.build_dir)
 
-        gateway_cred = (await gateway.credentials.list())[0]
-        device_object.process_kwargs["env"]["GOLIOTH_SAMPLE_PSK_ID"] = (
-            gateway_cred.identity
-        )
-        device_object.process_kwargs["env"]["GOLIOTH_SAMPLE_PSK"] = gateway_cred.key
         device_object.launch()
         yield device_object
     finally:  # to make sure we close all running processes execution
@@ -102,14 +97,102 @@ def creds_dir(twister_harness_config: TwisterHarnessConfig):
     )
 
 
+@pytest.fixture(scope="module")
+def gateway_creds_dir(twister_harness_config: TwisterHarnessConfig):
+    """Credential directory for the gateway application (DTLS certs).
+
+    Supports both the 'gateway' and 'gateway_custom_connect' image names.
+    """
+    build_dir = twister_harness_config.devices[0].build_dir
+    for name in ["gateway", "gateway_custom_connect"]:
+        if (build_dir / name).exists():
+            return build_dir / name / "creds"
+    # Default fallback
+    return build_dir / "gateway" / "creds"
+
+
+@pytest.fixture(scope="module")
+async def gateway_creds(gateway_creds_dir, gateway, creds_dir, creds, project):
+    """Generate gateway DTLS credentials using the same CA as the peripheral.
+
+    This fixture depends on `creds` so the CA key/cert are already
+    generated in `creds_dir` before we run.
+    """
+    gateway_creds_dir.mkdir(mode=0o755, exist_ok=True, parents=True)
+
+    ca_key = creds_dir / "ca.key.pem"
+    ca_cert = creds_dir / "ca.crt.pem"
+
+    logging.info("Generate gateway device private key and cert (signed by shared CA)")
+
+    subprocess.run(
+        f"openssl ecparam -name prime256v1 -genkey -noout -out {gateway.name}.key.pem",
+        check=True,
+        shell=True,
+        cwd=gateway_creds_dir,
+    )
+    subprocess.run(
+        f"""\
+    openssl req -new \
+        -key {gateway.name}.key.pem \
+        -subj "/C=US/O={project.id}/CN={gateway.name}" \
+        -out {gateway.name}.csr.pem""",
+        check=True,
+        shell=True,
+        cwd=gateway_creds_dir,
+    )
+    subprocess.run(
+        f"""\
+    openssl x509 -req \
+        -in "{gateway.name}.csr.pem" \
+        -CA "{ca_cert}" \
+        -CAkey "{ca_key}" \
+        -CAcreateserial \
+        -out "{gateway.name}.crt.pem" \
+        -days 500 -sha256""",
+        check=True,
+        shell=True,
+        cwd=gateway_creds_dir,
+    )
+
+    logging.info("Convert gateway key and cert to DER format")
+
+    subprocess.run(
+        f"openssl x509 -in {gateway.name}.crt.pem -outform DER -out crt.der",
+        check=True,
+        shell=True,
+        cwd=gateway_creds_dir,
+    )
+    subprocess.run(
+        f"openssl ec -in {gateway.name}.key.pem -outform DER -out key.der",
+        check=True,
+        shell=True,
+        cwd=gateway_creds_dir,
+    )
+
+    logging.info("Convert CA cert to DER for gateway DTLS")
+
+    subprocess.run(
+        f"openssl x509 -in {ca_cert} -outform DER -out ca.der",
+        check=True,
+        shell=True,
+        cwd=gateway_creds_dir,
+    )
+
+
 @pytest.fixture(scope="module", autouse=True)
-async def setup(project, device, creds):
+async def setup(project, device, gateway, creds):
     logging.info("Delete existing device-level LED setting")
 
     settings = await device.settings.get_all()
     for setting in settings:
         if "deviceId" in setting and setting["key"] == "LED":
             await device.settings.delete(setting["key"])
+
+    gw_settings = await gateway.settings.get_all()
+    for setting in gw_settings:
+        if "deviceId" in setting and setting["key"] == "LED":
+            await gateway.settings.delete(setting["key"])
 
     logging.info("Ensure the project-level LED setting exists")
     await project.settings.set("LED", False)
@@ -122,3 +205,8 @@ async def setup(project, device, creds):
     for setting in settings:
         if "deviceId" in setting and setting["key"] == "LED":
             await device.settings.delete(setting["key"])
+
+    gw_settings = await gateway.settings.get_all()
+    for setting in gw_settings:
+        if "deviceId" in setting and setting["key"] == "LED":
+            await gateway.settings.delete(setting["key"])
