@@ -27,7 +27,7 @@ WiFi by including the extra config file in the `boards` directory.
 Build and flash the binary:
 
 ```
-west build -p -b frdm_rw612 examples/zephyr/coap_client -- -DEXTRA_CONF_FILE=boards/frdm_rw612_wifi.conf
+west build -p -b frdm_rw612 --sysbuild examples/zephyr/coap_client -- -DEXTRA_CONF_FILE=boards/frdm_rw612_wifi.conf
 west flash
 ```
 
