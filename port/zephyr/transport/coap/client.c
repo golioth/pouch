@@ -54,6 +54,7 @@ K_MUTEX_DEFINE(pouch_coap_mutex);
  */
 static int coap_sock = -1;
 static sec_tag_t sec_tag_val;
+static atomic_t server_cert_len;
 
 static uint8_t coap_send_buf[COAP_BUF_SIZE];
 static uint8_t coap_recv_buf[COAP_BUF_SIZE];
@@ -353,7 +354,7 @@ static int pouch_coap_set_sockopt_dtls(int sock, sec_tag_t sec_tag)
     return 0;
 }
 
-static int pouch_coap_setup_socket(sec_tag_t sec_tag)
+int pouch_coap_setup_socket(void)
 {
     struct zsock_addrinfo hints = {0};
     struct zsock_addrinfo *addrs = NULL;
@@ -362,6 +363,12 @@ static int pouch_coap_setup_socket(sec_tag_t sec_tag)
     if (coap_sock >= 0)
     {
         return 0;
+    }
+
+    if (sec_tag_val <= 0)
+    {
+        LOG_ERR("sec_tag not set");
+        return -ENOENT;
     }
 
     hints.ai_family = AF_INET;
@@ -389,7 +396,7 @@ static int pouch_coap_setup_socket(sec_tag_t sec_tag)
         goto cleanup;
     }
 
-    err = pouch_coap_set_sockopt_dtls(coap_sock, sec_tag);
+    err = pouch_coap_set_sockopt_dtls(coap_sock, sec_tag_val);
     if (err)
     {
         LOG_ERR("Failed setting DTLS socket options: %d", err);
@@ -415,8 +422,7 @@ cleanup:
     return err;
 }
 
-/* Close the DTLS connection and reset session state. */
-static void pouch_coap_close_connection(void)
+void pouch_coap_close_connection(void)
 {
     if (coap_sock >= 0)
     {
@@ -432,7 +438,7 @@ static void pouch_coap_close_connection(void)
  * Application-level operations
  *------------------------------------------------*/
 
-static int pouch_coap_fetch_server_cert(void)
+int pouch_coap_fetch_server_cert(void)
 {
     size_t cert_len = 0;
     int err;
@@ -469,12 +475,14 @@ static int pouch_coap_fetch_server_cert(void)
         return err;
     }
 
+    atomic_set(&server_cert_len, cert_len);
     atomic_set_bit(&cert_flow_flags, SERVER_CERT_DOWNLOADED_BIT);
     LOG_INF("Server certificate fetch complete (%zu bytes)", cert_len);
+
     return 0;
 }
 
-static int pouch_coap_upload_cert(void)
+int pouch_coap_upload_cert(void)
 {
     struct pouch_cert device_cert;
     int err;
@@ -505,6 +513,16 @@ static int pouch_coap_upload_cert(void)
     atomic_set_bit(&cert_flow_flags, POUCH_CERT_UPLOADED_BIT);
     LOG_INF("Pouch certificate upload complete");
     return 0;
+}
+
+size_t pouch_coap_server_cert_get(const uint8_t **buf)
+{
+    if (buf != NULL)
+    {
+        *buf = server_cert_buf;
+    }
+
+    return atomic_get(&server_cert_len);
 }
 
 /*--------------------------------------------------
@@ -646,15 +664,9 @@ int pouch_coap_client_sync(void)
 {
     int err;
 
-    if (sec_tag_val <= 0)
-    {
-        LOG_ERR("sec_tag not set");
-        return -ENOENT;
-    }
-
     k_mutex_lock(&pouch_coap_mutex, K_FOREVER);
 
-    err = pouch_coap_setup_socket(sec_tag_val);
+    err = pouch_coap_setup_socket();
     if (err)
     {
         goto cleanup;
