@@ -8,7 +8,7 @@
 #include <errno.h>
 #include <string.h>
 
-#include <pouch/gateway/info.h>
+#include "gateway/info.h"
 #include "gateway/types.h"
 #include "transport/bearer.h"
 #include "endpoints.h"
