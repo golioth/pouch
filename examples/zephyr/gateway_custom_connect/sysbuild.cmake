@@ -1,4 +1,4 @@
-set_config_string(${DEFAULT_IMAGE} CONFIG_GOLIOTH_COAP_HOST_URI "${SB_CONFIG_GOLIOTH_COAP_HOST_URI}")
+set_config_string(${DEFAULT_IMAGE} CONFIG_POUCH_COAP_GW_URI "${SB_CONFIG_POUCH_COAP_GW_URI}")
 
 if(NOT SB_CONFIG_POUCH_GATEWAY_CLOUD)
   set_config_bool(${DEFAULT_IMAGE} CONFIG_POUCH_GATEWAY_CLOUD n)
@@ -50,7 +50,7 @@ if(BOARD MATCHES "bsim")
         endif()
 
         if(name STREQUAL "ble_gatt_example" AND
-           SB_CONFIG_GOLIOTH_COAP_HOST_URI STREQUAL "coaps://coap.golioth.dev")
+           SB_CONFIG_POUCH_COAP_GW_URI STREQUAL "coap.golioth.dev")
           set_config_string(${target_name} CONFIG_POUCH_SERVER_CERT_CN "pouch.golioth.dev")
         endif()
       endforeach()

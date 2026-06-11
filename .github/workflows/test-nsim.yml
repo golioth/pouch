@@ -90,8 +90,8 @@ jobs:
           COAP_HOST="${COAP_HOST#coaps://}"
           COAP_HOST="${COAP_HOST#coap://}"
 
-          export CONFIG_GOLIOTH_COAP_HOST_URI="${{ inputs.coap_gateway_url }}"
           export CONFIG_POUCH_HTTP_GW_URI="gw.${COAP_HOST#coap.}"
+          export CONFIG_POUCH_COAP_GW_URI="${COAP_HOST}"
           export CONFIG_POUCH_SERVER_CERT_CN="pouch.${COAP_HOST#coap.}"
 
           zephyr/scripts/twister                                                  \
