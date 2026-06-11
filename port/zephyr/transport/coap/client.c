@@ -42,9 +42,15 @@ static atomic_t cert_flow_flags;
 #define POUCH_CERT_UPLOADED_BIT (1)
 
 /*
- * All CoAP state below is accessed from a single thread only.
- * The caller must ensure that pouch_coap_client_sync() is not
- * called concurrently.
+ * Mutex serialising all CoAP socket and buffer access.  The gateway
+ * impl (gateway.c) may call into the connection helpers from BLE
+ * callback threads while the device-side sync loop runs from the
+ * main thread, so every public entry point locks this mutex.
+ */
+K_MUTEX_DEFINE(pouch_coap_mutex);
+
+/*
+ * All CoAP state below is protected by pouch_coap_mutex.
  */
 static int coap_sock = -1;
 static sec_tag_t sec_tag_val;
@@ -629,8 +635,10 @@ static int pouch_coap_send_uplink(void)
 
 int pouch_coap_client_init(sec_tag_t sec_tag)
 {
+    k_mutex_lock(&pouch_coap_mutex, K_FOREVER);
     pouch_coap_close_connection();
     sec_tag_val = sec_tag;
+    k_mutex_unlock(&pouch_coap_mutex);
     return 0;
 }
 
@@ -643,6 +651,8 @@ int pouch_coap_client_sync(void)
         LOG_ERR("sec_tag not set");
         return -ENOENT;
     }
+
+    k_mutex_lock(&pouch_coap_mutex, K_FOREVER);
 
     err = pouch_coap_setup_socket(sec_tag_val);
     if (err)
@@ -668,9 +678,11 @@ int pouch_coap_client_sync(void)
         goto cleanup;
     }
 
+    k_mutex_unlock(&pouch_coap_mutex);
     return 0;
 
 cleanup:
     pouch_coap_close_connection();
+    k_mutex_unlock(&pouch_coap_mutex);
     return err;
 }
