@@ -7,6 +7,16 @@ add_library(zcbor)
 target_link_libraries(${COMPONENT_LIB} PUBLIC zcbor)
 
 set(ZCBOR_DIR "${CMAKE_CURRENT_LIST_DIR}/zcbor_submodule")
+set(ZCBOR_COMMON_C "${ZCBOR_DIR}/src/zcbor_common.c")
+
+if(NOT EXISTS "${ZCBOR_COMMON_C}")
+    message(FATAL_ERROR
+        "Missing zcbor submodule source: ${ZCBOR_COMMON_C}\n"
+        "The zcbor git submodule appears to be uninitialized.\n"
+        "Run:\n"
+        "  git submodule update --init --recursive"
+    )
+endif()
 
 target_include_directories(zcbor PUBLIC "${ZCBOR_DIR}/include")
 
