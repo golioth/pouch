@@ -13,12 +13,12 @@ config POUCH_GATEWAY_CLOUD
 	  functionality without relying on communication with backend. All
 	  pouches received from Bluetooth nodes are dropped in that case.
 
-config GOLIOTH_COAP_HOST_URI
-	string "CoAP server URI"
-	default "$(CONFIG_GOLIOTH_COAP_HOST_URI)" if "$(CONFIG_GOLIOTH_COAP_HOST_URI)" != ""
-	default "coaps://coap.golioth.io"
+config POUCH_COAP_GW_URI
+	string "CoAP gateway address"
+	default "$(CONFIG_POUCH_COAP_GW_URI)" if "$(CONFIG_POUCH_COAP_GW_URI)" != ""
+	default "coap.golioth.io"
 	help
-	  The URI of the CoAP server.
+	  Hostname of the CoAP gateway server.
 
 endmenu
 
