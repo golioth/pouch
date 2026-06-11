@@ -1,5 +1,5 @@
 build:
-  cmake: port/zephyr
+  cmake: .
   kconfig: port/zephyr/Kconfig
   settings:
     board_root: .
