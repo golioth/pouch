@@ -5,13 +5,18 @@
  */
 
 /*
- * Private header shared between client.c and blockwise.c.
- * Not part of the public API — do not include outside this
- * transport directory.
+ * Private header shared between client.c, blockwise.c and (optionally)
+ * gateway.c.  Not part of the public API — do not include outside
+ * this transport directory.
  */
 
 #pragma once
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include <zephyr/kernel.h>
 #include <zephyr/net/coap.h>
 
 /* Callback type for processing Block2 response payload chunks. */
@@ -36,6 +41,53 @@ typedef int (*pouch_coap_upload_chunk_cb_t)(uint8_t *buf,
                                             size_t *chunk_len,
                                             bool *is_last,
                                             void *user_data);
+
+/*--------------------------------------------------
+ * Connection helpers provided by client.c
+ *------------------------------------------------*/
+
+/**
+ * Mutex serialising all CoAP socket and buffer access.
+ *
+ * Both the device-side sync path (client.c) and the gateway
+ * forwarding path (gateway.c) may run from different threads, so
+ * every public entry point must lock this mutex.
+ */
+extern struct k_mutex pouch_coap_mutex;
+
+/**
+ * Set up the DTLS socket if not already connected.  Uses the
+ * sec_tag stored by pouch_coap_client_init().
+ */
+int pouch_coap_setup_socket(void);
+
+/** Close the DTLS connection and reset the per-session cert flags. */
+void pouch_coap_close_connection(void);
+
+/**
+ * Fetch the server certificate from the cloud (idempotent).
+ *
+ * On success, the certificate is stored in an internal buffer and
+ * also passed to pouch_server_certificate_set() so the device-side
+ * pouch transport can verify it.  Use pouch_coap_server_cert_get()
+ * to access the buffer.
+ */
+int pouch_coap_fetch_server_cert(void);
+
+/**
+ * Upload the local Pouch device certificate to the cloud (idempotent).
+ */
+int pouch_coap_upload_cert(void);
+
+/**
+ * Get a pointer to the cached server certificate buffer.
+ *
+ * @param[out] buf  Set to the internal buffer.  Valid as long as
+ *                  the CoAP transport remains initialised.
+ *
+ * @return Length of the cached certificate, or 0 if not yet fetched.
+ */
+size_t pouch_coap_server_cert_get(const uint8_t **buf);
 
 /*--------------------------------------------------
  * Functions provided by client.c
