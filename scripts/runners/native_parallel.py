@@ -46,6 +46,8 @@ class NativeParallelBinaryRunner(ZephyrBinaryRunner):
         foreground_domain=None,
         serial_exes=None,
         output_mode=None,
+        tui=False,
+        gdb_args=None,
     ):
         super().__init__(cfg)
 
@@ -58,6 +60,13 @@ class NativeParallelBinaryRunner(ZephyrBinaryRunner):
         self._foreground_domain = foreground_domain
         self.serial_exes = serial_exes or {}
         self.output_mode = output_mode or "prefixed"
+        self.tui = tui
+        self.gdb_args = gdb_args or []
+
+        if cfg.gdb is None:
+            self.gdb_cmd = None
+        else:
+            self.gdb_cmd = [cfg.gdb] + (["-tui"] if tui else [])
 
     @classmethod
     def name(cls):
@@ -65,13 +74,14 @@ class NativeParallelBinaryRunner(ZephyrBinaryRunner):
 
     @classmethod
     def capabilities(cls):
-        return RunnerCaps(commands={"flash"})
+        return RunnerCaps(commands={"flash", "debug"})
 
     @classmethod
     def do_add_parser(cls, parser: argparse.ArgumentParser):
         parser.add_argument(
             "--foreground-domain",
-            help="Domain to run in the foreground "
+            help="Domain to run in the foreground for 'west flash' or to "
+            "launch under GDB for 'west debug' "
             "(default: last domain in flash order)",
         )
         parser.add_argument(
@@ -82,17 +92,32 @@ class NativeParallelBinaryRunner(ZephyrBinaryRunner):
             help="Output mode: 'prefixed' adds colored [DOMAIN] prefix to "
             "each line (default), 'passthrough' preserves raw output",
         )
+        parser.add_argument(
+            "--tui",
+            default=False,
+            action="store_true",
+            help="if given, GDB uses -tui",
+        )
+        parser.add_argument(
+            "--gdb-args",
+            action="append",
+            help="pass additional arguments to GDB",
+        )
 
     @classmethod
     def args_from_previous_runner(cls, previous_runner, args):
         if not hasattr(args, "serial_exes"):
             args.serial_exes = {}
         args.serial_exes.update(previous_runner.serial_exes)
-        # Propagate output_mode across domains so --output works with
+        # Propagate runner options across domains so CLI flags work with
         # multi-domain sysbuild (west passes runner args only to the
         # first domain).
         if hasattr(previous_runner, "output_mode"):
             args.output_mode = previous_runner.output_mode
+        if hasattr(previous_runner, "tui"):
+            args.tui = previous_runner.tui
+        if hasattr(previous_runner, "gdb_args"):
+            args.gdb_args = previous_runner.gdb_args
 
     @classmethod
     def do_create(
@@ -104,6 +129,8 @@ class NativeParallelBinaryRunner(ZephyrBinaryRunner):
             foreground_domain=getattr(args, "foreground_domain", None),
             serial_exes=getattr(args, "serial_exes", None),
             output_mode=getattr(args, "output_mode", None),
+            tui=getattr(args, "tui", False),
+            gdb_args=getattr(args, "gdb_args", None),
         )
 
     def do_run(self, command: str, **kwargs):
@@ -115,6 +142,8 @@ class NativeParallelBinaryRunner(ZephyrBinaryRunner):
 
         if command == "flash":
             self.do_flash(**kwargs)
+        elif command == "debug":
+            self.do_debug(**kwargs)
         else:
             raise AssertionError(f"Unsupported command: {command}")
 
@@ -208,6 +237,19 @@ class NativeParallelBinaryRunner(ZephyrBinaryRunner):
             for p in socat_procs:
                 p.wait()
 
+    def _build_cmds(self, port_map):
+        """Build per-domain native_sim command lines with UART port flags."""
+        cmds: dict[str, list[str]] = {}
+        for dname, exe in self.serial_exes.items():
+            cmd = [exe]
+            if dname == self.foreground_domain:
+                cmd.append("-uart_stdinout")
+            for (link_domain, uart), port in port_map.items():
+                if link_domain == dname:
+                    cmd.append(f"-{uart}_port={port}")
+            cmds[dname] = cmd
+        return cmds
+
     def do_flash(self, **kwargs):
         # Non-sysbuild single-image build: nothing to coordinate.
         if not self.sysbuild_conf.options:
@@ -219,25 +261,41 @@ class NativeParallelBinaryRunner(ZephyrBinaryRunner):
             return
 
         tmpdir = Path(tempfile.mkdtemp(prefix="zephyr_parallel_"))
-
         try:
             with interruptible_sigterm(), self.socat_links(tmpdir) as port_map:
-                # Build per-domain commands
-                cmds: dict[str, list[str]] = {}
-                for dname, exe in self.serial_exes.items():
-                    cmd = [exe]
-                    if dname == self.foreground_domain:
-                        cmd.append("-uart_stdinout")
-                    # Append UART port assignments from serial links
-                    for (link_domain, uart), port in port_map.items():
-                        if link_domain == dname:
-                            cmd.append(f"-{uart}_port={port}")
-                    cmds[dname] = cmd
-
+                cmds = self._build_cmds(port_map)
                 if self.output_mode == "prefixed":
                     self._launch_prefixed(cmds)
                 else:
                     self._launch_passthrough(cmds)
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+    def do_debug(self, **kwargs):
+        if self.gdb_cmd is None:
+            raise ValueError(
+                "GDB not available; no 'gdb' was configured for this runner."
+            )
+
+        # Non-sysbuild single-image build: just run gdb on the exe.
+        if not self.sysbuild_conf.options:
+            cmd = self.gdb_cmd + self.gdb_args + ["--quiet", self.cfg.exe_file]
+            self.check_call(cmd)
+            return
+
+        # Defer until called for the last domain (see do_run).
+        if self.domain.name != self.domains_selected[-1]:
+            return
+
+        # No interruptible_sigterm() anywhere in the debug path: GDB
+        # puts the terminal in raw mode, and a SystemExit raised mid
+        # session would leave it broken.  Background socat / domain
+        # processes are cleaned up by _launch_debug's finally block.
+        tmpdir = Path(tempfile.mkdtemp(prefix="zephyr_parallel_"))
+        try:
+            with self.socat_links(tmpdir) as port_map:
+                cmds = self._build_cmds(port_map)
+                self._launch_debug(cmds)
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -323,6 +381,30 @@ class NativeParallelBinaryRunner(ZephyrBinaryRunner):
         os.close(stdout_fd)
         return proc
 
+    def _start_backgrounds(self, cmds: dict[str, list[str]]):
+        """Start all non-foreground domains per the configured output_mode.
+
+        Returns (bg_procs, threads).  ``threads`` is empty when
+        output_mode is 'passthrough'.
+        """
+        bg_names = [n for n in cmds if n != self.foreground_domain]
+        if not bg_names:
+            return [], []
+        if self.output_mode != "prefixed":
+            return [self._start_background(n, cmds[n]) for n in bg_names], []
+
+        use_color = sys.stdout.isatty()
+        max_len = max(len(n) for n in cmds)
+        domain_order = list(cmds.keys())
+        procs, threads = [], []
+        for dname in bg_names:
+            idx = domain_order.index(dname)
+            tag = self._build_prefix_tag(dname, idx, max_len, use_color)
+            slave_fd, t = self._open_prefixed_pty(tag)
+            threads.append(t)
+            procs.append(self._start_background(dname, cmds[dname], slave_fd))
+        return procs, threads
+
     @staticmethod
     def _terminate_all(procs):
         """Terminate the given processes and wait for each to exit."""
@@ -381,3 +463,26 @@ class NativeParallelBinaryRunner(ZephyrBinaryRunner):
 
         if rc:
             raise subprocess.CalledProcessError(rc, cmds[self.foreground_domain])
+
+    def _launch_debug(self, cmds: dict[str, list[str]]):
+        """Run background domains per output_mode; run the foreground domain under GDB on the controlling terminal."""
+        bg_procs, threads = self._start_backgrounds(cmds)
+
+        fg_cmd = cmds[self.foreground_domain]
+        gdb_full = self.gdb_cmd + self.gdb_args + ["--quiet", "--args"] + fg_cmd
+        self.logger.info(f"launching foreground under GDB: {self.foreground_domain}")
+        self._log_cmd(gdb_full)
+        # Plain Popen: GDB owns the controlling terminal's stdin/stdout.
+        # See do_debug() for why no interruptible_sigterm wraps this.
+        fg_proc = subprocess.Popen(gdb_full)
+
+        try:
+            rc = fg_proc.wait()
+        finally:
+            self._terminate_all([fg_proc, *bg_procs])
+
+        for t in threads:
+            t.join(timeout=2)
+
+        if rc:
+            raise subprocess.CalledProcessError(rc, gdb_full)
