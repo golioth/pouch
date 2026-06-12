@@ -95,9 +95,8 @@ void pouch_serial_broker_destroy(struct pouch_serial_broker *broker);
  * @param broker  Broker instance.
  * @param node    Gateway node info carrying provisioning state and gateway
  *                contexts. Must remain valid until @c adapter->end is called.
- * @return 0 on success, negative error code if the exchange cannot be started.
  */
-int pouch_serial_broker_start(struct pouch_serial_broker *broker);
+void pouch_serial_broker_start(struct pouch_serial_broker *broker);
 
 /**
  * Deliver a received frame from the device to the broker transport layer.

@@ -54,6 +54,13 @@ config POUCH_TRANSPORT_SAR
     help
         Selected by transports that require Segmentation and Reassembly (SAR)
 
+config POUCH_TRANSPORT_ACK_TIMEOUT_MS
+    int "Pouch Transport ACK timeout (ms)"
+    default 1000
+    help
+        The timeout, in milliseconds, that a receiver will wait
+        for new packets before retransmitting an acknowledgement
+
 module = POUCH_TRANSPORT
 module-str = Pouch Transport
 source "subsys/logging/Kconfig.template.log_config"

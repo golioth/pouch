@@ -1,0 +1,59 @@
+/*
+ * Thingy:91 X overlay for Serial Modem communication with on-board nRF9151
+ *
+ * UART0 is used for Serial Modem communication with 4-wire UART (HW flow control).
+ * Pin assignment matches the pouch-gateway BT HCI UART wiring:
+ *   TX  = P0.29 <-> nRF9151 P0.00 (RX)
+ *   RX  = P1.04 <-> nRF9151 P0.01 (TX)
+ *   RTS = P1.06 <-> nRF9151 P0.05 (CTS)
+ *   CTS = P1.08 <-> nRF9151 P0.04 (RTS)
+ *   DTR = P1.15 <-> nRF9151 P0.26 (Power/DTR)
+ *
+ * Console is on RTT since UART0 is used for the modem.
+ */
+
+/ {
+	aliases {
+		modem = &modem;
+	};
+};
+
+&uart0 {
+	status = "okay";
+	current-speed = <115200>;
+	hw-flow-control;
+	pinctrl-0 = <&uart_vcom0_vcom1_default>;
+	pinctrl-1 = <&uart_vcom0_vcom1_sleep>;
+	pinctrl-names = "default", "sleep";
+
+	/* Nordic nRF91 Serial Modem configuration */
+	modem: modem {
+		compatible = "nordic,nrf91-slm";
+		status = "okay";
+		mdm-dtr-gpios = <&gpio0 30 GPIO_ACTIVE_LOW>;
+		mdm-ring-gpios = <&gpio0 31 (GPIO_ACTIVE_LOW | GPIO_PULL_DOWN)>;
+		mdm-reset-gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
+	};
+};
+
+&pinctrl {
+	/* UART0 with HW flow control using pouch-gateway BT HCI pin assignment */
+	uart_vcom0_vcom1_default: uart_vcom0_vcom1_default {
+		group1 {
+			psels = <NRF_PSEL(UART_TX,  0, 29)>,
+			        <NRF_PSEL(UART_CTS, 1, 8)>,
+			        <NRF_PSEL(UART_RX,  1, 4)>,
+			        <NRF_PSEL(UART_RTS, 1, 6)>;
+		};
+	};
+
+	uart_vcom0_vcom1_sleep: uart_vcom0_vcom1_sleep {
+		group1 {
+			psels = <NRF_PSEL(UART_TX, 0, 29)>,
+				<NRF_PSEL(UART_CTS, 1, 8)>,
+				<NRF_PSEL(UART_RX, 1, 4)>,
+				<NRF_PSEL(UART_RTS, 1, 6)>;
+			low-power-enable;
+		};
+	};
+};

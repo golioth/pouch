@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 menuconfig POUCH
-  bool "Golioth Pouch protocol"
+  bool "Golioth Pouch Device"
   select ZCBOR
   select ZCBOR_CANONICAL
   select MBEDTLS
@@ -12,6 +12,9 @@ menuconfig POUCH
   help
     Pouch is a protocol for communicating with Golioth from devices not
     directly connected to the internet.
+
+# Port-specific log-level constants
+rsource "Kconfig.port_log_levels"
 
 if POUCH
 
@@ -114,21 +117,18 @@ endif
 config MBEDTLS_USER_CONFIG_ENABLE
   default y
 
-config MBEDTLS_USER_CONFIG_FILE
-  default "$(ZEPHYR_POUCH_MODULE_DIR)/src/saead/mbedtls_config.h"
-
 # Saead common
 rsource "../../src/saead/Kconfig"
 
 endmenu
 
+endif
+
+config MBEDTLS_USER_CONFIG_FILE
+  default "$(ZEPHYR_POUCH_MODULE_DIR)/src/saead/mbedtls_config.h"
+
 # Transport choices
 rsource "transport/Kconfig"
-
-# Port-specific log-level constants
-rsource "Kconfig.port_log_levels"
-
-endif
 
 # Gateway
 rsource "../../src/gateway/Kconfig"
