@@ -81,6 +81,12 @@ void pouch_serial_init(struct pouch_serial *s,
 
 int pouch_serial_recv(struct pouch_serial *s, const void *frame, size_t len)
 {
+    if (s == NULL)
+    {
+        POUCH_LOG_ERR("Received frame but transport is not initialized");
+        return -EINVAL;
+    }
+
     if (frame == NULL || len == 0)
     {
         return -EINVAL;
@@ -91,7 +97,7 @@ int pouch_serial_recv(struct pouch_serial *s, const void *frame, size_t len)
     int err = pouch_serial_header_decode(bytes[0], &header);
     if (err)
     {
-        POUCH_LOG_WRN("malformed header 0x%02x, ignoring", bytes[0]);
+        POUCH_LOG_WRN("malformed header 0x%02x, ignoring (len=%zu)", bytes[0], len);
         return err;
     }
 

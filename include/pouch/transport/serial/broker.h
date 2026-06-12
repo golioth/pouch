@@ -86,10 +86,8 @@ struct pouch_serial_broker *pouch_serial_broker_create(
  * fails. Only one exchange may be in progress at a time.
  *
  * @param broker  Broker instance.
- *
- * @return 0 on success, negative error code if the exchange cannot be started.
  */
-int pouch_serial_broker_start(struct pouch_serial_broker *broker);
+void pouch_serial_broker_start(struct pouch_serial_broker *broker);
 
 /**
  * Deliver a received frame from the device to the broker transport layer.
