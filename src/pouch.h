@@ -8,9 +8,12 @@
 
 #include <pouch/events.h>
 #include <pouch/types.h>
+#if CONFIG_POUCH_ENCRYPTION_SAEAD
 #include <psa/crypto_sizes.h>
-
 #define PUBKEY_LEN PSA_EXPORT_PUBLIC_KEY_MAX_SIZE
+#else
+#define PUBKEY_LEN 1
+#endif
 
 /** Role of pouch participant */
 enum pouch_role

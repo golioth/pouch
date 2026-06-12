@@ -6,7 +6,9 @@
 
 #pragma once
 
+#if CONFIG_POUCH_ENCRYPTION_SAEAD
 #include <psa/crypto_types.h>
+#endif
 
 #include <pouch/types.h>
 

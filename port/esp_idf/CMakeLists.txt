@@ -11,6 +11,14 @@ include(${POUCH_ROOT}/cmake/pouch_target.cmake)
 
 pouch_config_enabled(_pouch_selected CONFIG_POUCH)
 
+if(ESP_PLATFORM AND CMAKE_BUILD_EARLY_EXPANSION AND NOT DEFINED CONFIG_POUCH)
+    # During ESP-IDF early expansion, CONFIG_* values may be unavailable while
+    # component requirements are being enumerated. Default CONFIG_POUCH to
+    # enabled in this phase so REQUIRES dependencies (for example mbedtls) are
+    # captured for the pouch component.
+    set(_pouch_selected TRUE)
+endif()
+
 list(APPEND POUCH_PORT_INC_DIRS
     ${POUCH_PORT}/esp_idf
     ${POUCH_PORT}/esp_idf/include
