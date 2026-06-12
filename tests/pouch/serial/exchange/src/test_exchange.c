@@ -49,11 +49,6 @@ static const struct pouch_serial_broker_adapter adapter = {
     .end = broker_end,
 };
 
-static void device_ready(void)
-{
-    pouch_serial_broker_notify(test_broker);
-}
-
 /*
  * Pump frames between broker and device until both sides are idle.
  *
@@ -137,8 +132,7 @@ static void run_exchange(void)
     broker_done = false;
     broker_success = false;
 
-    int err = pouch_serial_broker_start(test_broker);
-    zassert_ok(err, "broker_start failed: %d", err);
+    pouch_serial_broker_start(test_broker);
 
     pump(MAX_PUMP_ITER);
 
@@ -151,7 +145,7 @@ static void *suite_setup(void)
     test_broker = pouch_serial_broker_create(&adapter);
     zassert_not_null(test_broker, "broker_create returned NULL");
 
-    pouch_serial_device_init(device_ready);
+    pouch_serial_device_init(NULL);
 
     return NULL;
 }
@@ -165,7 +159,8 @@ static void before(void *f)
     zassert_not_null(test_broker, "broker_create returned NULL");
 
     stubs_reset();
-    pouch_serial_device_init(device_ready);
+    pouch_serial_device_init(NULL);
+    pouch_serial_device_sync();  // unsuspend device
 
     broker_done = false;
     broker_success = false;
@@ -405,8 +400,7 @@ ZTEST(serial_exchange, test_recv_error)
     load_default_payloads();
     broker_stubs.uplink.recv_err = -EIO;
 
-    int err = pouch_serial_broker_start(test_broker);
-    zassert_ok(err, "broker_start failed: %d", err);
+    pouch_serial_broker_start(test_broker);
 
     pump_until_done(MAX_PUMP_ITER);
 
@@ -429,8 +423,7 @@ ZTEST(serial_exchange, test_send_error)
     load_default_payloads();
     broker_stubs.downlink.send_err_after = 0;
 
-    int err = pouch_serial_broker_start(test_broker);
-    zassert_ok(err, "broker_start failed: %d", err);
+    pouch_serial_broker_start(test_broker);
 
     pump_until_done(MAX_PUMP_ITER);
 
@@ -461,8 +454,7 @@ ZTEST(serial_exchange, test_remote_send_error)
     stub_sender_set_data(&device_stubs.uplink, uplink_large, sizeof(uplink_large));
     device_stubs.uplink.send_err_after = 1;
 
-    int err = pouch_serial_broker_start(test_broker);
-    zassert_ok(err, "broker_start failed: %d", err);
+    pouch_serial_broker_start(test_broker);
 
     pump_until_done(MAX_PUMP_ITER);
 

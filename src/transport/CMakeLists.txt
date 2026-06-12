@@ -32,7 +32,7 @@ set(_pouch_transport_root ${CMAKE_CURRENT_LIST_DIR})
 set(_pouch_target ${POUCH_ACTIVE_TARGET})
 set(_pouch_generated_dir ${POUCH_ACTIVE_GENERATED_DIR})
 
-if(_pouch_transport_sar OR _pouch_gateway)
+if(_pouch_transport_sar)
     target_sources(${_pouch_target} PRIVATE
         ${_pouch_transport_root}/sar/sender.c
         ${_pouch_transport_root}/sar/receiver.c

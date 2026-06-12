@@ -1,0 +1,12 @@
+# Copyright (c) 2026 Golioth, Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+configdefault MBEDTLS_USE_PSA_CRYPTO
+	default n
+
+configdefault MBEDTLS_HEAP_SIZE
+	default 16384
+
+source "${ZEPHYR_GOLIOTH_FIRMWARE_SDK_MODULE_DIR}/examples/zephyr/common/Kconfig.defconfig"
+
+source "Kconfig.zephyr"

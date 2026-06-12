@@ -21,6 +21,84 @@ config POUCH_TRANSPORT_SERIAL_DEVICE
         runs on the node device and communicates with a gateway running the
         broker implementation.
 
+menuconfig POUCH_SPI_DEVICE
+    bool "Pouch SPI device transport"
+    depends on SPI
+    depends on POUCH
+    select SPI_ASYNC
+    select SPSC_PBUF
+    select POUCH_TRANSPORT_SERIAL_DEVICE
+    default $(dt_compat_on_bus,$(DT_COMPAT_GOLIOTH_POUCH_DEVICE),spi)
+    help
+      Enable the SPI slave transport adapter for the Pouch serial
+      device protocol.
+
+if POUCH_SPI_DEVICE
+
+config POUCH_SPI_DEVICE_FRAME_SIZE
+    int "SPI slave frame size"
+    default 128
+    range 2 256
+    help
+      Maximum frame size in bytes for SPI transactions. Controls the
+      size of the TX and RX buffers. The first byte is reserved for
+      a length field, so the maximum payload is one less than this
+      value.
+
+config POUCH_SPI_DEVICE_RX_BUFFER_SIZE
+    int "SPI slave RX buffer size"
+    default 256
+    help
+      Size of the RX buffer in bytes for the SPI slave transport adapter.
+      Must be at least as large as POUCH_SPI_DEVICE_FRAME_SIZE.
+
+module = POUCH_SPI_DEVICE
+module-str = Pouch SPI Slave
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # POUCH_SPI_DEVICE
+
+menuconfig POUCH_SPI_BROKER
+    bool "Pouch SPI broker transport"
+    depends on SPI
+    depends on POUCH_GATEWAY
+    default $(dt_compat_on_bus,$(DT_COMPAT_GOLIOTH_POUCH_BROKER),spi)
+    help
+      Enable the SPI broker (master) transport adapter for the Pouch serial
+      broker protocol. Each devicetree node with compatible
+      "golioth,pouch-broker" on an SPI bus creates a broker instance.
+
+if POUCH_SPI_BROKER
+
+config POUCH_SPI_BROKER_FRAME_SIZE
+    int "SPI broker frame size"
+    default 128
+    range 2 256
+    help
+      Maximum frame size in bytes for SPI transactions. Controls the
+      size of the TX and RX buffers. The first byte is reserved for
+      a length field, so the maximum payload is one less than this
+      value.
+
+config POUCH_SPI_BROKER_THREAD_STACK_SIZE
+    int "SPI broker work queue thread stack size"
+    default 1200
+    help
+      Stack size in bytes for the shared SPI broker work queue thread.
+
+config POUCH_SPI_BROKER_INTERFRAME_DELAY
+    int "Delay between each frame in milliseconds"
+    default 5
+    help
+      Time in milliseconds to wait between frames, to allow the SPI slave to
+      set up its SPI buffers.
+
+module = POUCH_SPI_BROKER
+module-str = Pouch SPI Broker
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # POUCH_SPI_BROKER
+
 module = POUCH_SERIAL
 module-str = Pouch Serial Transport
 source "subsys/logging/Kconfig.template.log_config"
