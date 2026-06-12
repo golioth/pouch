@@ -1,0 +1,13 @@
+# Copyright (c) 2026 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Note: This file must be sourced by each port transport Kconfig file.
+# This is approach is brittle and should be improved in future work.
+
+config POUCH_TRANSPORT_SAR
+  bool "Enable SAR core transport support"
+  help
+    Enable shared Segmentation and Reassembly (SAR) sender/receiver
+    packetization support used by transport backends and transport unit
+    tests.
