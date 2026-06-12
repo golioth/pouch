@@ -11,6 +11,10 @@ if(IDF_TARGET STREQUAL "linux")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m32")
 endif()
 
+list(APPEND EXTRA_COMPONENT_DIRS
+    ${CMAKE_CURRENT_LIST_DIR}/tests
+)
+
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 idf_build_set_property(MINIMAL_BUILD ON)
 project(esp_idf_unit_test)
