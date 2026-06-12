@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include <pouch/pouch.h>
+#include <stddef.h>
 
 struct mtls_credentials
 {
