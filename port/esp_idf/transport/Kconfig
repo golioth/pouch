@@ -23,12 +23,15 @@ config POUCH_TRANSPORT_HTTP_CLIENT
 
 config POUCH_TRANSPORT_BLE_GATT
   bool "BLE GATT"
+  select POUCH_TRANSPORT_SAR
   help
     BLE GATT peripheral transport for Pouch.
     The device exposes a GATT service that a gateway
     can connect to for transferring Pouch data.
 
 endchoice
+
+rsource "../../../src/transport/Kconfig"
 
 config POUCH_TRANSPORT_ACK_TIMEOUT_MS
     int "Pouch Transport ACK timeout (ms)"
