@@ -46,6 +46,10 @@ static int start(struct pouch_bearer *bearer)
 static int recv(struct pouch_bearer *bearer, const void *payload, size_t len)
 {
     struct pouch_gateway_node_info *node = bearer->ctx;
+    if (node->uplink == NULL)
+    {
+        return -EBUSY;
+    }
 
     return pouch_gateway_uplink_write(node->uplink, payload, len, false);
 }
@@ -53,6 +57,12 @@ static int recv(struct pouch_bearer *bearer, const void *payload, size_t len)
 static void end(struct pouch_bearer *bearer, bool success)
 {
     struct pouch_gateway_node_info *node = bearer->ctx;
+    if (node->uplink == NULL)
+    {
+        // Already closed
+        return;
+    }
+
     POUCH_LOG_DBG("Uplink end: %s", success ? "success" : "fail");
     pouch_gateway_uplink_close(node->uplink);
     node->uplink = NULL;

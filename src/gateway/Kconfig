@@ -47,14 +47,6 @@ config POUCH_GATEWAY_SERVER_CERT_BUILTIN
     bool
     default y if !POUCH_GATEWAY_CLOUD
 
-config POUCH_TRANSPORT_ACK_TIMEOUT_MS
-    int "Pouch Transport ACK timeout (ms)"
-    default 1000
-    help
-        The timeout, in milliseconds, that a receiver will wait
-        for new packets before retransmitting an acknowledgement
-
-
 module = POUCH_GATEWAY
 module-str = Pouch Gateway Library
 source "subsys/logging/Kconfig.template.log_config"
@@ -64,7 +56,8 @@ menu "Gateway Pouch Transport"
 menuconfig POUCH_GATEWAY_GATT
     bool "BLE GATT broker transport"
     depends on BT
-    default y if BT
+    select POUCH_TRANSPORT_SAR
+    default y
     help
       Enable the BLE GATT broker transport for the Pouch gateway.
       This builds the GATT central/broker side, including scanning,

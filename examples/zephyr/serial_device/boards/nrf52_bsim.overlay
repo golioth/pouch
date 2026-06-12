@@ -1,0 +1,26 @@
+/ {
+	chosen {
+		zephyr,code-partition = &slot0_partition;
+	};
+};
+
+&flash0 {
+	partitions {
+		/delete-node/ partition@0;
+
+		slot0_partition: partition@0 {
+			label = "slot0";
+			reg = <0x0 DT_SIZE_K(240)>;
+		};
+
+		slot1_partition: partition@3c000 {
+			label = "slot1";
+			reg = <0x3c000 DT_SIZE_K(240)>;
+		};
+
+		storage_partition: partition@78000 {
+			label = "storage";
+			reg = <0x78000 DT_SIZE_K(32)>;
+		};
+	};
+};

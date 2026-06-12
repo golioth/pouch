@@ -34,6 +34,11 @@ static enum pouch_result send(struct pouch_bearer *bearer, void *dst, size_t *ds
 
 static void end(struct pouch_bearer *bearer, bool success)
 {
+    if (uplink == NULL)
+    {
+        return;
+    }
+
     pouch_uplink_finish(uplink);
     uplink = NULL;
 }

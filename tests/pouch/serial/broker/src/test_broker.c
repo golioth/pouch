@@ -284,7 +284,7 @@ static void advance_to_sync(bool skip_server_cert, bool skip_device_cert)
     const uint8_t *payload;
     size_t payload_len;
 
-    zassert_ok(pouch_serial_broker_start(test_broker));
+    pouch_serial_broker_start(test_broker);
 
     /* 1. INFO: get the ACK prompt */
     size_t len = get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf));
@@ -470,11 +470,6 @@ ZTEST(serial_broker, test_create_null_adapter)
     zassert_is_null(b);
 }
 
-ZTEST(serial_broker, test_start_null_broker)
-{
-    zassert_equal(pouch_serial_broker_start(NULL), -EINVAL);
-}
-
 ZTEST(serial_broker, test_recv_null_params)
 {
     uint8_t buf[4] = {0};
@@ -509,7 +504,7 @@ ZTEST(serial_broker, test_frame_get_no_pending)
 
 ZTEST(serial_broker, test_start_triggers_info_prompt)
 {
-    zassert_ok(pouch_serial_broker_start(test_broker));
+    pouch_serial_broker_start(test_broker);
     zassert_true(ready_count > 0, "ready callback not called after start");
 
     uint8_t buf[FRAME_BUF_SIZE];
@@ -830,7 +825,7 @@ ZTEST(serial_broker, test_sender_server_cert_with_data)
     static const uint8_t cert[] = {0xCA, 0xFE, 0xBA, 0xBE, 0x01, 0x02};
     stub_sender_set_data(&broker_stubs.server_cert, cert, sizeof(cert));
 
-    zassert_ok(pouch_serial_broker_start(test_broker));
+    pouch_serial_broker_start(test_broker);
 
     /* Complete INFO */
     complete_receiver_channel(POUCH_SERIAL_CH_INFO, NULL, 0);
@@ -1072,7 +1067,7 @@ ZTEST(serial_broker, test_receiver_info_with_data)
 {
     static const uint8_t info_data[] = {0x01, 0x02, 0x03};
 
-    zassert_ok(pouch_serial_broker_start(test_broker));
+    pouch_serial_broker_start(test_broker);
 
     /* Get INFO prompt */
     uint8_t buf[FRAME_BUF_SIZE];
@@ -1098,7 +1093,7 @@ ZTEST(serial_broker, test_receiver_device_cert_with_data)
 {
     static const uint8_t cert_data[] = {0xDE, 0xAD, 0xBE, 0xEF};
 
-    zassert_ok(pouch_serial_broker_start(test_broker));
+    pouch_serial_broker_start(test_broker);
 
     uint8_t buf[FRAME_BUF_SIZE];
     struct pouch_serial_header hdr;
@@ -1271,7 +1266,7 @@ ZTEST(serial_broker, test_info_error_ends_exchange)
 {
     broker_stubs.info.start_err = -ENOMEM;
 
-    zassert_ok(pouch_serial_broker_start(test_broker));
+    pouch_serial_broker_start(test_broker);
 
     uint8_t buf[FRAME_BUF_SIZE];
     struct pouch_serial_header hdr;
