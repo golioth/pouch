@@ -1,0 +1,4 @@
+dependencies:
+  pouch:
+    version: "*"
+    override_path: "../../../.."
