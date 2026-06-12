@@ -33,9 +33,12 @@ int pouch_serial_ch_recv(struct pouch_serial_channel *ch,
 size_t pouch_serial_ch_frame_get(struct pouch_serial_channel *ch, uint8_t *buf, size_t maxlen);
 
 void pouch_serial_ch_ready(struct pouch_serial_channel *ch);
+int pouch_serial_ch_open(struct pouch_serial_channel *ch);
 void pouch_serial_ch_close(struct pouch_serial_channel *ch, bool success);
 bool pouch_serial_ch_is_open(struct pouch_serial_channel *ch);
 bool pouch_serial_ch_has_error(struct pouch_serial_channel *ch);
+
+void pouch_serial_ch_suspend(struct pouch_serial_channel *ch, bool suspend);
 
 static inline struct pouch_serial_channel *pouch_serial_ch_from_bearer(struct pouch_bearer *bearer)
 {

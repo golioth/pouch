@@ -1,0 +1,40 @@
+&pinctrl {
+	/* Override the board's pinmux_flexcomm1_spi, which includes BOTH an SS0
+	 * and an SS1 group. The RW61x MCI_IO_MUX pinctrl driver processes every
+	 * pin sequentially and, for each pin, first clears all conflicting
+	 * flexcomm bits via select_gpio_mode() before setting the new function.
+	 * The GPIO clear masks for IO 7/8/9 (IOMUX_GPIO_CLR_7/8/9) all include
+	 * FC1 bit 3 — the single SEL_FC1_SPI bit that routes GPIO 6/7/8/9 to the
+	 * SPI peripheral. When the SS1 group is applied after SS0, those clears
+	 * wipe FC1 bit 3, leaving the pins off the SPI function entirely.
+	 * Use a single SS0-only group so the SPI function bit survives.
+	 */
+	pinmux_flexcomm1_spi_ss0: pinmux_flexcomm1_spi_ss0 {
+		group0 {
+			pinmux = <IO_MUX_FC1_SPI_SS0>;
+			slew-rate = "ultra";
+		};
+	};
+};
+
+&arduino_spi {
+	/* SPI on J2:
+	 * GPIO 6: CS  (driven by Flexcomm1 hardware SS0)
+	 * GPIO 7: SCK
+	 * GPIO 8: MISO
+	 * GPIO 9: MOSI
+	 */
+	status = "okay";
+	pinctrl-0 = <&pinmux_flexcomm1_spi_ss0>;
+	pinctrl-names = "default";
+
+	def-char = <0>;
+	overrun-character = <0>;
+
+	pouch_broker: pouch-broker@0 {
+		compatible = "golioth,pouch-broker";
+		reg = <0>;
+		spi-max-frequency = <100000>;
+		data-ready-gpios = <&hsgpio0 15 GPIO_ACTIVE_HIGH>;
+	};
+};
