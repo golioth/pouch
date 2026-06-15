@@ -168,6 +168,22 @@ void test_atomic_bit_test_and_set_logic(void)
     TEST_ASSERT_TRUE(pouch_atomic_test_and_set_bit(flags, 5));
 }
 
+void test_atomic_bit_test_and_clear_logic(void)
+{
+    POUCH_ATOMIC_DEFINE(flags, 10);
+
+    pouch_atomic_set_bit(flags, 5);
+    TEST_ASSERT_TRUE(pouch_atomic_test_bit(flags, 5));
+
+    // First time: should be true (was 1), but now becomes false (0)
+    TEST_ASSERT_TRUE(pouch_atomic_test_and_clear_bit(flags, 5));
+    TEST_ASSERT_FALSE(pouch_atomic_test_bit(flags, 5));
+
+    // Second time: should be false (was 0), remains false
+    TEST_ASSERT_FALSE(pouch_atomic_test_and_clear_bit(flags, 5));
+    TEST_ASSERT_FALSE(pouch_atomic_test_bit(flags, 5));
+}
+
 void test_atomic_bit_concurrency(void)
 {
     pouch_atomic_set(&success_count, 0);
@@ -204,5 +220,6 @@ TEST_CASE("Atomic Types", "[pouch][atomic]")
     RUN_TEST(test_atomic_bit_basic_set_clear);
     RUN_TEST(test_atomic_bit_array_spanning);
     RUN_TEST(test_atomic_bit_test_and_set_logic);
+    RUN_TEST(test_atomic_bit_test_and_clear_logic);
     RUN_TEST(test_atomic_bit_concurrency);
 }
