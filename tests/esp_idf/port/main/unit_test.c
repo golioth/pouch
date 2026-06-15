@@ -11,6 +11,7 @@ void app_main(void)
     UNITY_BEGIN();
     unity_run_all_tests();
     int failures = UNITY_END();
+    (void) failures;
 
 #ifdef linux
     exit(failures);
