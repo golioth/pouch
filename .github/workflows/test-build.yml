@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-zephyr:
     container: golioth/golioth-zephyr-base:0.17.4-SDK-v0
     strategy:
       matrix:
@@ -59,3 +59,31 @@ jobs:
           fi
 
           west build ${SYSBUILD_FLAG} -p -b ${{ matrix.board }} pouch/examples/zephyr/${{ matrix.example }}
+
+  build-esp-idf:
+    strategy:
+      matrix:
+        include:
+          - example: ble_gatt
+            target: esp32s3
+          - example: http_client
+            target: esp32s3
+      fail-fast: false
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          submodules: recursive
+
+      - name: Build
+        uses: espressif/esp-idf-ci-action@e6f5c74232b1ccd4c97ed641f1e48553853f1fd5 # v1.2.0
+        with:
+          esp_idf_version: v6.0.1
+          target: ${{ matrix.target }}
+          command: |
+            EXAMPLE_APP_PATH=examples/esp_idf/${{ matrix.example }}
+
+            pip install -r requirements-ci-esp-idf.txt
+
+            idf.py -C $EXAMPLE_APP_PATH build
