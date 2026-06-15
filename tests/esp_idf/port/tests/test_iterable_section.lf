@@ -1,0 +1,27 @@
+[sections:test_iterable_item_sections]
+entries:
+    ._test_iterable_item.static+
+
+[scheme:test_iterable_item_iterable]
+entries:
+    test_iterable_item_sections -> flash_rodata
+
+[mapping:test_iterable_item]
+archive: *
+entries:
+    * (test_iterable_item_iterable);
+        test_iterable_item_sections -> flash_rodata KEEP() SORT(name) SURROUND(test_iterable_item)
+
+[sections:test_iterable_empty_struct_sections]
+entries:
+    ._test_iterable_empty_struct.static+
+
+[scheme:test_iterable_empty_struct_iterable]
+entries:
+    test_iterable_empty_struct_sections -> flash_rodata
+
+[mapping:test_iterable_empty_struct]
+archive: *
+entries:
+    * (test_iterable_empty_struct_iterable);
+        test_iterable_empty_struct_sections -> flash_rodata KEEP() SORT(name) SURROUND(test_iterable_empty_struct)
