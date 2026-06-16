@@ -186,6 +186,22 @@ if(NOT "${CONFIG_POUCH_CA_CERT_FILENAME}" STREQUAL "")
     set(CA_CERT_IF_SELECTED "${CMAKE_CURRENT_BINARY_DIR}/pouch_ca_cert.der")
 endif()
 
+
+#########################
+# Golioth SDK Linker files
+#########################
+
+if("${CONFIG_GOLIOTH}" STREQUAL "y")
+    include(${CMAKE_CURRENT_LIST_DIR}/../../golioth_sdk/cmake/golioth_sdk_linker_files.cmake)
+    golioth_sdk_get_linker_files_no_ext(_golioth_sdk_linker_files_no_extension)
+
+    foreach(_golioth_sdk_linker_file IN LISTS _golioth_sdk_linker_files_no_extension)
+        list(APPEND GOLIOTH_SDK_LINKER_FRAGMENTS ${_golioth_sdk_linker_file}.lf)
+    endforeach()
+
+    set(WHOLE_ARCHIVE_IF_SELECTED WHOLE_ARCHIVE)
+endif()
+
 #########################
 # ESP-IDF Component
 #########################
@@ -205,17 +221,22 @@ idf_component_register(SRCS
 
                        LDFRAGMENTS
                         ${POUCH_CORE_LINKER_FILES}
+                        ${GOLIOTH_SDK_LINKER_FRAGMENTS}
 
                        REQUIRES
                          mbedtls
 
                        KCONFIG
                         ${POUCH_PORT}/esp_idf/Kconfig
-                       )
+
+                       ${WHOLE_ARCHIVE_IF_SELECTED})
 
 # Conditionally required components need to be processed after initial registration
 idf_component_optional_requires(PRIVATE ${POUCH_PRIV_REQUIRES})
 
 if(NOT CMAKE_BUILD_EARLY_EXPANSION)
     add_subdirectory(${POUCH_PORT}/esp_idf/lib/zcbor zcbor)
+
+    set(POUCH_ACTIVE_TARGET ${COMPONENT_LIB})
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../golioth_sdk)
 endif()

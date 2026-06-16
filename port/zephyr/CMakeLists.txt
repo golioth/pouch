@@ -11,10 +11,18 @@ if(CONFIG_POUCH)
     zephyr_include_directories(../../include) # Pouch includes
 
     zephyr_library_named(pouch)
+    set(POUCH_ACTIVE_TARGET ${ZEPHYR_CURRENT_LIBRARY})
 
     zephyr_linker_sources(SECTIONS downlink_handlers.ld)
     zephyr_linker_sources(SECTIONS uplink_handlers.ld)
     zephyr_linker_sources(SECTIONS event_handlers.ld)
+
+    # Golioth_SDK linker sources
+    include(${CMAKE_CURRENT_LIST_DIR}/../../golioth_sdk/cmake/golioth_sdk_linker_files.cmake)
+    golioth_sdk_get_linker_files_no_ext(_golioth_sdk_linker_files_no_extension)
+    foreach(_golioth_sdk_linker_file IN LISTS _golioth_sdk_linker_files_no_extension)
+        zephyr_linker_sources(SECTIONS ${_golioth_sdk_linker_file}.ld)
+    endforeach()
 
     if (DEFINED CONFIG_POUCH_CA_CERT_FILENAME)
         find_file(ca_cert ../../${CONFIG_POUCH_CA_CERT_FILENAME}

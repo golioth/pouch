@@ -75,7 +75,11 @@ if(CONFIG_POUCH)
                 " **************************************************")
     endif()
 
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/golioth_sdk golioth_sdk)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/src/transport transport)
+
+    if(NOT DEFINED POUCH_ACTIVE_TARGET)
+        message(FATAL_ERROR "POUCH_ACTIVE_TARGET must be set by port/<platform>/CMakeLists.txt")
+    endif()
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/golioth_sdk golioth_sdk)
 
 endif()

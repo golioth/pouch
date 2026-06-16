@@ -21,7 +21,7 @@ LOG_MODULE_REGISTER(coap_transport, CONFIG_EXAMPLE_COAP_CLIENT_LOG_LEVEL);
 #include <pouch/transport/certificate.h>
 #include <pouch/transport/coap/client.h>
 
-#include <pouch/golioth/settings_callbacks.h>
+#include <golioth/settings_callbacks.h>
 
 static void do_uplink(void)
 {
