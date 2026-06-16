@@ -2,35 +2,39 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-if(NOT CONFIG_GOLIOTH)
+if(NOT (CONFIG_GOLIOTH OR "${CONFIG_GOLIOTH}" STREQUAL "y"))
     return()
 endif()
 
-zephyr_library()
+set(_golioth_sdk_root ${CMAKE_CURRENT_LIST_DIR})
 
-zephyr_library_sources(
-    dispatch.c
-)
+# Note: linker files for golioth_sdk are added in cmake/golioth_sdk_linker_files.cmake. Each port
+# should call golioth_sdk_get_linker_files_no_ext() to access this list, then iterate and append the
+# appropriate extension for each entry. This ensures that ports can access linker files when needed,
+# most notably ESP-IDF which needs access to all linker files during early expansion.
 
-zephyr_linker_sources(SECTIONS dispatch.ld)
+if(Zephyr_DIR)
+    # Workaround Zephyr not linking target_include_directories at the app level
+    zephyr_include_directories(${CMAKE_CURRENT_LIST_DIR}/include)
+else()
+    target_include_directories(${POUCH_ACTIVE_TARGET} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
+endif()
 
-# Settings
+target_sources(${POUCH_ACTIVE_TARGET} PRIVATE ${_golioth_sdk_root}/dispatch.c)
 
-zephyr_library_sources_ifdef(CONFIG_GOLIOTH_SETTINGS settings.c)
-zephyr_library_sources_ifdef(CONFIG_GOLIOTH_SETTINGS_FRONTEND_CALLBACKS settings_callbacks.c)
-zephyr_linker_sources_ifdef(CONFIG_GOLIOTH_SETTINGS_FRONTEND_CALLBACKS
-                            SECTIONS
-                            settings_callbacks.ld)
+if(CONFIG_GOLIOTH_SETTINGS OR "${CONFIG_GOLIOTH_SETTINGS}" STREQUAL "y")
+    target_sources(${POUCH_ACTIVE_TARGET} PRIVATE ${_golioth_sdk_root}/settings.c)
+    target_sources(${POUCH_ACTIVE_TARGET} PRIVATE ${_golioth_sdk_root}/settings_callbacks.c)
+    set(NEEDS_ZCBOR_UTILS TRUE)
+endif()
 
-# OTA
+if(CONFIG_GOLIOTH_OTA OR "${CONFIG_GOLIOTH_OTA}" STREQUAL "y")
+    target_sources(${POUCH_ACTIVE_TARGET} PRIVATE ${_golioth_sdk_root}/hex.c)
+    target_sources(${POUCH_ACTIVE_TARGET} PRIVATE ${_golioth_sdk_root}/ota_upper.c)
+    target_sources(${POUCH_ACTIVE_TARGET} PRIVATE ${_golioth_sdk_root}/ota.c)
+    set(NEEDS_ZCBOR_UTILS TRUE)
+endif()
 
-zephyr_library_sources_ifdef(CONFIG_GOLIOTH_OTA
-                                hex.c
-                                ota_upper.c
-                                ota.c
-                            )
-zephyr_linker_sources_ifdef(CONFIG_GOLIOTH_OTA SECTIONS ota.ld)
-
-if(CONFIG_GOLIOTH_SETTINGS OR CONFIG_GOLIOTH_OTA)
-    zephyr_library_sources(zcbor_utils.c)
+if(NEEDS_ZCBOR_UTILS)
+    target_sources(${POUCH_ACTIVE_TARGET} PRIVATE ${_golioth_sdk_root}/zcbor_utils.c)
 endif()

@@ -5,7 +5,7 @@
  */
 
 #include <errno.h>
-#include <pouch/golioth/ota.h>
+#include <golioth/ota.h>
 #include <pouch/port.h>
 #include <string.h>
 

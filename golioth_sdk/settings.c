@@ -14,7 +14,7 @@ POUCH_LOG_REGISTER(golioth_settings, CONFIG_GOLIOTH_LOG_LEVEL);
 
 #include <zcbor_decode.h>
 
-#include <pouch/golioth/settings_types.h>
+#include <golioth/settings_types.h>
 
 #include "dispatch.h"
 #include "settings.h"

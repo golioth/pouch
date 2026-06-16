@@ -16,7 +16,6 @@ idf_component_register(SRCS
                          app_update
                          bt
                          console
-                         golioth_sdk
                          mbedtls
                          nvs_flash
                          pouch

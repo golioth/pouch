@@ -18,7 +18,7 @@ LOG_MODULE_REGISTER(main);
 #include <pouch/downlink.h>
 #include <pouch/transport/bluetooth/gatt.h>
 
-#include <pouch/golioth/settings_callbacks.h>
+#include <golioth/settings_callbacks.h>
 
 #include <app_version.h>
 
