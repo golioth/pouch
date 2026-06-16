@@ -21,13 +21,7 @@ static psa_key_id_t import_raw_pk(const uint8_t *private_key, size_t size)
 {
     mbedtls_pk_context pk;
     mbedtls_pk_init(&pk);
-    int err = mbedtls_pk_parse_key(&pk,
-                                   private_key,
-                                   size,
-                                   NULL,
-                                   0,
-                                   mbedtls_psa_get_random,
-                                   MBEDTLS_PSA_RANDOM_STATE);
+    int err = mbedtls_pk_parse_key(&pk, private_key, size, NULL, 0);
     if (err)
     {
         LOG_ERR("Failed to parse key: -0x%x", -err);
