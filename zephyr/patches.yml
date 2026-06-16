@@ -1,31 +1,6 @@
 patches:
-  - path: ncs/zephyr/0001-modem-uart_isr-support-mdm-dtr-gpios.patch
-    sha256sum: 53b5acb22a3471b04bb38d297ef4bd5e3a2ed0464ab74b588f30408599307785
-    module: zephyr
-    author: Marcin Niestroj
-    email: m.niestroj@emb.dev
-    date: 2026-02-11
-    apply-command: >-
-      bash -c 'if [ $(west config manifest.file) = "west-ncs.yml" ]; then git am $@; fi' --
-  - path: ncs/zephyr/0002-dts-bindings-modem-add-common-autostarts-property.patch
-    sha256sum: abbdd4193332e4160dd5c0a29eaa1d0e5fde39b2de510fa215694fcdbdc5785a
-    module: zephyr
-    author: Marcin Niestroj
-    email: m.niestroj@emb.dev
-    date: 2026-02-12
-    apply-command: >-
-      bash -c 'if [ $(west config manifest.file) = "west-ncs.yml" ]; then git am $@; fi' --
-  - path: ncs/zephyr/0003-drivers-modem_cellular-add-Ready-signal-handling.patch
-    sha256sum: a2e3946a3794f3f19c94cd401755458c48c62a306cd39c924658daa5ca769dbc
-    module: zephyr
-    author: Marcin Niestroj
-    email: m.niestroj@emb.dev
-    date: 2026-02-12
-    apply-command: >-
-      bash -c 'if [ $(west config manifest.file) = "west-ncs.yml" ]; then git am $@; fi' --
-
   - path: zephyr/zephyr/0001-drivers-net-nsos-support-nrf_bsim.patch
-    sha256sum: 76ee96ad695aba17be8a96d8fe908eec937238fbd9e21be09b8ad9a524b8b90b
+    sha256sum: 870065fc55152ab723a36c076064fa83f269c9e6eae498463eff983c27acb890
     module: zephyr
     author: Marcin Niestroj
     email: m.niestroj@emb.dev
@@ -33,7 +8,7 @@ patches:
     apply-command: >-
       bash -c 'if [ $(west config manifest.file) = "west-zephyr.yml" ]; then git am $@; fi' --
   - path: zephyr/zephyr/0002-boards-nrf_bsim-define-NSOS_IRQ-for-offloaded-socket.patch
-    sha256sum: 7841eab516807fdff2bfbdf5a263c3a4c6b3573ce2a7d7df7522a21749aef32a
+    sha256sum: db79a736425cc8eacb374227e0e8deff730f61ae4e0bbfbb177b88fec9fe4d72
     module: zephyr
     author: Marcin Niestroj
     email: m.niestroj@emb.dev
@@ -41,7 +16,7 @@ patches:
     apply-command: >-
       bash -c 'if [ $(west config manifest.file) = "west-zephyr.yml" ]; then git am $@; fi' --
   - path: zephyr/zephyr/0003-nsi-move-nsos_fcntl-to-more-generic-nsi_fcntl.patch
-    sha256sum: 88930ff7892bdb51d01a9416306eb972bec92c08e6bd4f96611450664bdfc3ae
+    sha256sum: 63575e1cef512431bc6756ff53630c972d3d3291248e25e37190bfe622a4e806
     module: zephyr
     author: Marcin Niestroj
     email: m.niestroj@emb.dev
@@ -49,7 +24,7 @@ patches:
     apply-command: >-
       bash -c 'if [ $(west config manifest.file) = "west-zephyr.yml" ]; then git am $@; fi' --
   - path: zephyr/zephyr/0004-nsi-fcntl-add-O_CREAT-and-O_TRUNC.patch
-    sha256sum: 2839473d364cb08110ed0b825bd5099541540739c186dae7bdaf8d975c78132b
+    sha256sum: eb56ba771f129ea0883a8cbc514373dfc561fcba81c5d9fcf56a5cb2d01f96e9
     module: zephyr
     author: Marcin Niestroj
     email: m.niestroj@emb.dev
@@ -57,7 +32,7 @@ patches:
     apply-command: >-
       bash -c 'if [ $(west config manifest.file) = "west-zephyr.yml" ]; then git am $@; fi' --
   - path: zephyr/zephyr/0005-subsys-fs-nsim_mount-new-FS-for-mounting-host-filesy.patch
-    sha256sum: 38a053f49ab2c109347bfde5a1c4d0c163ff2e5859adc1c50a52b04976733229
+    sha256sum: 2a6a7a00351f43799f5be7ee468a97db8fcf370f3d3f327dcd5030d6396f222c
     module: zephyr
     author: Marcin Niestroj
     email: m.niestroj@emb.dev
@@ -65,7 +40,7 @@ patches:
     apply-command: >-
       bash -c 'if [ $(west config manifest.file) = "west-zephyr.yml" ]; then git am $@; fi' --
   - path: zephyr/zephyr/0006-tests-fs-nsim_mount-add-basic-tests-for-implemented-.patch
-    sha256sum: 1a1973a8682684cbe241c873d4f381b9df52bbba47e82a927e71b3cdce58b2e1
+    sha256sum: 2a778d1bec5220a30413023213961f8ff1ca7d7d6a3effe09b9a5811319c6a19
     module: zephyr
     author: Marcin Niestroj
     email: m.niestroj@emb.dev
@@ -73,7 +48,7 @@ patches:
     apply-command: >-
       bash -c 'if [ $(west config manifest.file) = "west-zephyr.yml" ]; then git am $@; fi' --
   - path: zephyr/zephyr/0007-net-nsos-always-update-poll-revents.patch
-    sha256sum: 4695c2c43e3904d7c251a5a319028b83f7d1302595b5998fb12aff51ab7db194
+    sha256sum: f9ba202ab76c08b6a74773b09a8444787eead97e18218c7828680e023b4efc1d
     module: zephyr
     author: Marcin Niestroj
     email: m.niestroj@emb.dev
