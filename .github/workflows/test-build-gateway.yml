@@ -18,6 +18,7 @@ jobs:
             target: thingy91x/nrf9151/ns
             app: ncs-serial-modem
             sysbuild: true
+            sdk: "0.17.4"
           - manifest: west-ncs.yml
             target: thingy91x/nrf5340/cpuapp
             app: gateway
@@ -26,6 +27,7 @@ jobs:
             target: nrf9160dk/nrf9160/ns
             app: ncs-serial-modem
             sysbuild: true
+            sdk: "0.17.4"
           - manifest: west-ncs.yml
             target: nrf9160dk/nrf52840
             app: gateway
@@ -65,9 +67,9 @@ jobs:
             target: mg100
             app: gateway
             sysbuild: true
-    container: golioth/golioth-zephyr-base:sdk-0.17.4
+    container: golioth/golioth-zephyr-base:sdk-${{ matrix.sdk || '1.0.1' }}
     env:
-      ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-0.17.4
+      ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-${{ matrix.sdk || '1.0.1' }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository

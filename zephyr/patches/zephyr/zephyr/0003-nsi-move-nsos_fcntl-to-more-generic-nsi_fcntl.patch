@@ -1,4 +1,4 @@
-From e3ad9fabde039ced9dec44d9068ee061bd8e0011 Mon Sep 17 00:00:00 2001
+From a0a1d618abe7a7cb98deaa660acb2d049421c1aa Mon Sep 17 00:00:00 2001
 From: Marcin Niestroj <m.niestroj@emb.dev>
 Date: Tue, 5 Aug 2025 18:18:07 +0200
 Subject: [PATCH] nsi: move nsos_fcntl to more generic nsi_fcntl
@@ -76,7 +76,7 @@ index ba3e44fd1f4..f439fc76592 100644
    target_sources(native_simulator INTERFACE nsos_netdb.c)
  endif()
 diff --git a/drivers/net/Kconfig b/drivers/net/Kconfig
-index c9672be5f77..1ab24ea93aa 100644
+index e0bac9afa4e..cfb76c24a46 100644
 --- a/drivers/net/Kconfig
 +++ b/drivers/net/Kconfig
 @@ -249,6 +249,7 @@ menuconfig NET_NATIVE_OFFLOADED_SOCKETS
@@ -88,7 +88,7 @@ index c9672be5f77..1ab24ea93aa 100644
  	  Offloaded sockets for Native Simulator utilize host BSD sockets API (like socket(),
  	  connect(), send(), recvfrom(), etc.) in order to provide networking capability.
 diff --git a/drivers/net/nsos_adapt.c b/drivers/net/nsos_adapt.c
-index 5e2976e49f0..04b36fac51b 100644
+index 3bf3a4e8642..bf620b7b738 100644
 --- a/drivers/net/nsos_adapt.c
 +++ b/drivers/net/nsos_adapt.c
 @@ -30,7 +30,7 @@
@@ -100,7 +100,7 @@ index 5e2976e49f0..04b36fac51b 100644
  #include "nsos_netdb.h"
  #include "nsos_socket.h"
  
-@@ -1083,14 +1083,14 @@ int nsos_adapt_fcntl_getfl(int fd)
+@@ -1113,14 +1113,14 @@ int nsos_adapt_fcntl_getfl(int fd)
  
  	flags = fcntl(fd, F_GETFL);
  
@@ -243,10 +243,10 @@ index 3cab88896f7..00000000000
 -
 -#endif /* __DRIVERS_NET_NSOS_FCNTL_H__ */
 diff --git a/drivers/net/nsos_sockets.c b/drivers/net/nsos_sockets.c
-index 9f50512cda5..ee96b43f31f 100644
+index 34f97113ce8..579277d68f6 100644
 --- a/drivers/net/nsos_sockets.c
 +++ b/drivers/net/nsos_sockets.c
-@@ -31,7 +31,7 @@ LOG_MODULE_REGISTER(nsos_sockets);
+@@ -30,7 +30,7 @@ LOG_MODULE_REGISTER(nsos_sockets);
  #include "sockets_internal.h"
  #include "nsos.h"
  #include "nsi_errno.h"
@@ -255,7 +255,7 @@ index 9f50512cda5..ee96b43f31f 100644
  #include "nsos_netdb.h"
  #include "nsos_socket.h"
  
-@@ -391,14 +391,14 @@ static int nsos_ioctl(void *obj, unsigned int request, va_list args)
+@@ -395,14 +395,14 @@ static int nsos_ioctl(void *obj, unsigned int request, va_list args)
  
  		flags = nsos_adapt_fcntl_getfl(sock->poll.mid.fd);
  
@@ -263,7 +263,7 @@ index 9f50512cda5..ee96b43f31f 100644
 +		return nsi_fcntl_from_mid(flags);
  	}
  
- 	case F_SETFL: {
+ 	case ZVFS_F_SETFL: {
  		int flags = va_arg(args, int);
  		int ret;
  
@@ -272,7 +272,7 @@ index 9f50512cda5..ee96b43f31f 100644
  		if (ret < 0) {
  			return -nsi_errno_from_mid(-ret);
  		}
-@@ -619,7 +619,7 @@ static int nsos_poll_if_blocking(struct nsos_socket *sock, int events,
+@@ -636,7 +636,7 @@ static int nsos_poll_if_blocking(struct nsos_socket *sock, int events,
  		non_blocking = true;
  	} else {
  		sock_flags = nsos_adapt_fcntl_getfl(sock->poll.mid.fd);
@@ -281,7 +281,7 @@ index 9f50512cda5..ee96b43f31f 100644
  	}
  
  	if (!non_blocking) {
-@@ -661,7 +661,7 @@ static int nsos_connect_blocking(struct nsos_socket *sock,
+@@ -678,7 +678,7 @@ static int nsos_connect_blocking(struct nsos_socket *sock,
  	int clear_nonblock_ret;
  	int ret;
  
@@ -290,7 +290,7 @@ index 9f50512cda5..ee96b43f31f 100644
  	if (ret < 0) {
  		return ret;
  	}
-@@ -711,7 +711,7 @@ static int nsos_connect(void *obj, const struct sockaddr *addr, socklen_t addrle
+@@ -728,7 +728,7 @@ static int nsos_connect(void *obj, const struct net_sockaddr *addr, net_socklen_
  
  	flags = nsos_adapt_fcntl_getfl(sock->poll.mid.fd);
  
@@ -425,5 +425,5 @@ index 00000000000..d1fb298a532
 +	return flags;
 +}
 -- 
-2.52.0
+2.54.0
 
