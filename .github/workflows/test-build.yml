@@ -6,7 +6,7 @@ on:
 
 jobs:
   build:
-    container: golioth/golioth-zephyr-base:0.17.0-SDK-v0
+    container: golioth/golioth-zephyr-base:0.17.4-SDK-v0
     strategy:
       matrix:
         include:
@@ -25,7 +25,7 @@ jobs:
             no_sysbuild: true
       fail-fast: false
     env:
-      ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-0.17.0
+      ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-0.17.4
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
