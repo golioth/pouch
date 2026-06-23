@@ -1,5 +1,6 @@
 boards:
 - name: bsim_2G4_phy
+  full_name: BabbleSim 2.4 GHz Physical Layer
   vendor: zephyr
   socs:
   - name: native
