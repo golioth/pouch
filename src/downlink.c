@@ -207,6 +207,7 @@ int pouch_downlink_push(const void *buf, size_t buf_len)
                 if (!encrypted)
                 {
                     POUCH_LOG_ERR("Failed to allocate pouch buf");
+                    buf_free(encrypted_block);
                     return -ENOMEM;
                 }
 
