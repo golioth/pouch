@@ -5,8 +5,8 @@
 #
 
 import logging
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -41,7 +41,11 @@ def creds_dir(request: pytest.FixtureRequest):
 
     Override this fixture in a local conftest.py to change the path.
     """
-    return Path(request.config.option.build_dir) / "creds"
+    try:
+        harness = request.getfixturevalue("twister_harness_config")
+        return harness.devices[0].build_dir / "creds"
+    except (pytest.FixtureLookupError, ImportError):
+        return Path(request.config.option.build_dir) / "creds"
 
 
 @pytest.fixture(scope="module")
