@@ -21,6 +21,7 @@ pytest_plugins = ["pytest_pouch.plugin"]
 import pytest  # noqa: E402
 
 from twister_harness.device.device_adapter import DeviceAdapter  # noqa: E402
+from twister_harness.twister_harness_config import TwisterHarnessConfig  # noqa: E402
 
 
 def pytest_addoption(parser):
@@ -92,10 +93,10 @@ async def dut(
 
 
 @pytest.fixture(scope="module")
-def creds_dir(request: pytest.FixtureRequest):
+def creds_dir(twister_harness_config: TwisterHarnessConfig):
     """Override default creds_dir for gateway sysbuild layout."""
     return (
-        Path(request.config.option.build_dir)
+        twister_harness_config.devices[0].build_dir
         / "peripheral_ble_gatt_example_0"
         / "creds"
     )
