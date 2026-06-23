@@ -17,7 +17,7 @@ async def test_ota_sha256(dut: DeviceAdapter, ota_firmware):
     expected_sha256 = ota_firmware
 
     logging.info("Waiting for device to boot and load credentials")
-    dut.readlines_until("Credentials loaded", timeout=60.0)
+    dut.readlines_until(regex="Credentials loaded", timeout=60.0)
 
     logging.info("Waiting for OTA download, expected SHA256=%s", expected_sha256)
     lines = dut.readlines_until(
