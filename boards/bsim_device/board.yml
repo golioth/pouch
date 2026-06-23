@@ -1,5 +1,6 @@
 boards:
   - name: bsim_device
+    full_name: BabbleSim Arbitrary Device
     vendor: zephyr
     socs:
       - name: native
