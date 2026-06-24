@@ -20,6 +20,11 @@
 #define __ASSERT_NO_MSG(condition) configASSERT(condition)
 #endif
 
+#ifndef ROUND_UP
+#define ROUND_UP(x, align) \
+    (((unsigned long) (x) + ((unsigned long) align - 1)) & ~((unsigned long) align - 1))
+#endif
+
 #ifndef DIV_ROUND_UP
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 #endif
