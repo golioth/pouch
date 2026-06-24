@@ -159,14 +159,14 @@ void pouch_put_be16(uint16_t val, uint8_t dst[2])
  * Time
  *------------------------------------------------*/
 
-static int32_t get_ticks(pouch_timeout_t timeout)
+int32_t pouch_timeout_to_freertos_ticks(int32_t pouch_timeout)
 {
-    if (timeout > 0)
+    if (pouch_timeout > 0)
     {
-        return pdMS_TO_TICKS(timeout);
+        return pdMS_TO_TICKS(pouch_timeout);
     }
 
-    if (0 == timeout)
+    if (0 == pouch_timeout)
     {
         return 0;
     }
@@ -267,14 +267,14 @@ void pouch_msgq_init(pouch_msgq_t *msgq,
 
 int pouch_msgq_put(pouch_msgq_t *msgq, const void *data, pouch_timeout_t timeout)
 {
-    bool result = xQueueSend(msgq->xQueue, data, get_ticks(timeout));
+    bool result = xQueueSend(msgq->xQueue, data, pouch_timeout_to_freertos_ticks(timeout));
 
     return (pdPASS == result) ? 0 : -EAGAIN;
 }
 
 int pouch_msgq_get(pouch_msgq_t *msgq, void *buf, pouch_timeout_t timeout)
 {
-    bool result = xQueueReceive(msgq->xQueue, buf, get_ticks(timeout));
+    bool result = xQueueReceive(msgq->xQueue, buf, pouch_timeout_to_freertos_ticks(timeout));
 
     return (pdPASS == result) ? 0 : -ENOMSG;
 }
@@ -303,7 +303,7 @@ void pouch_mutex_init(pouch_mutex_t *mutex)
 
 bool pouch_mutex_lock(pouch_mutex_t *mutex, pouch_timeout_t timeout)
 {
-    return xSemaphoreTake(*mutex, get_ticks(timeout));
+    return xSemaphoreTake(*mutex, pouch_timeout_to_freertos_ticks(timeout));
 }
 
 bool pouch_mutex_unlock(pouch_mutex_t *mutex)

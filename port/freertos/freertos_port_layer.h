@@ -86,6 +86,12 @@ typedef struct freertos_sem pouch_sem_internal_t;
     }                                                               \
     POUCH_APPLICATION_STARTUP_HOOK(static_semaphore_init_##name)
 
+/*------------------------------------------------
+ * Time
+ *------------------------------------------------*/
+
+int32_t pouch_timeout_to_freertos_ticks(int32_t pouch_timeout);
+
 /*--------------------------------------------------
  * Work Queue
  *------------------------------------------------*/
