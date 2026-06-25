@@ -42,7 +42,7 @@ on:
 
 jobs:
   nsim:
-    container: golioth/golioth-zephyr-base:0.17.4-SDK-v0
+    container: golioth/golioth-zephyr-base:pr-71-sdk-0.17.4
     env:
       ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-0.17.4
     runs-on: ubuntu-24.04
