@@ -154,7 +154,7 @@ jobs:
       - has_${{ inputs.hil_board }}
 
     container:
-      image: golioth/golioth-hil-base:latest
+      image: golioth/golioth-hil-base:pr-72
       volumes:
         - /dev:/dev
         - /home/golioth/credentials:/opt/credentials

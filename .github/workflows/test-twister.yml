@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   twister:
-    container: golioth/golioth-zephyr-base:sdk-1.0.1
+    container: golioth/golioth-zephyr-base:pr-72-sdk-1.0.1
     strategy:
       matrix:
         manifest_yml:
