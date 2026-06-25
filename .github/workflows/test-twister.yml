@@ -6,7 +6,7 @@ on:
 
 jobs:
   twister:
-    container: golioth/golioth-zephyr-base:pr-71-sdk-0.17.4
+    container: golioth/golioth-zephyr-base:pr-72-sdk-0.17.4
     strategy:
       matrix:
         manifest_yml:
