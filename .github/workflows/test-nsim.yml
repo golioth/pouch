@@ -46,8 +46,7 @@ permissions:
 
 jobs:
   nsim:
-    # yamllint disable-line rule:line-length
-    container: golioth/golioth-zephyr-base:0.17.4-SDK-v0@sha256:4b734cfd4784affb0df6a8d631db267d97bcec7fbfa67783ee85153592acb388
+    container: golioth/golioth-zephyr-base:sdk-0.17.4
     env:
       ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-0.17.4
     runs-on: ubuntu-24.04
