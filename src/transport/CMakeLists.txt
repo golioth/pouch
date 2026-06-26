@@ -10,14 +10,31 @@ zephyr_library_sources(
     endpoints/device/info.c
     endpoints/device/uplink.c
     endpoints/device/downlink.c
-    sar/sender.c
-    sar/receiver.c
-    sar/packet.c
     ${CMAKE_CURRENT_BINARY_DIR}/info_encode.c
 )
 zephyr_library_sources_ifdef(CONFIG_POUCH_ENCRYPTION_SAEAD
     endpoints/device/device_cert.c
     endpoints/device/server_cert.c
+)
+
+zephyr_library_sources_ifdef(CONFIG_POUCH_TRANSPORT_SAR
+    sar/sender.c
+    sar/receiver.c
+    sar/packet.c
+)
+
+zephyr_library_sources_ifdef(CONFIG_POUCH_TRANSPORT_SERIAL
+    serial/channel.c
+    serial/packet.c
+    serial/serial.c
+)
+
+zephyr_library_sources_ifdef(CONFIG_POUCH_TRANSPORT_SERIAL_BROKER
+    serial/broker.c
+)
+
+zephyr_library_sources_ifdef(CONFIG_POUCH_TRANSPORT_SERIAL_DEVICE
+    serial/device.c
 )
 
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/info_encode.c
