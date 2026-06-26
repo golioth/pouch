@@ -43,6 +43,19 @@ if(CONFIG_POUCH)
     set(POUCH_ACTIVE_TARGET ${ZEPHYR_CURRENT_LIBRARY})
     set(POUCH_ACTIVE_GENERATED_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
+    # Check for zcbor python package
+    execute_process(
+        COMMAND ${PYTHON_EXECUTABLE} -c "import zcbor"
+        RESULT_VARIABLE _pouch_zcbor_check
+        OUTPUT_QUIET ERROR_QUIET)
+    if(_pouch_zcbor_check)
+        get_filename_component(_pouch_requirements_txt "${POUCH_ROOT}/requirements.txt" ABSOLUTE)
+        message(FATAL_ERROR
+            "\n\nThe 'zcbor' Python package is required by pouch but was not found.\n"
+            "Install it with:\n"
+            "  pip install -r ${_pouch_requirements_txt}\n\n")
+    endif()
+
     zephyr_library_sources(${CMAKE_CURRENT_LIST_DIR}/blockbuf.c)
 
     zephyr_library_include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
