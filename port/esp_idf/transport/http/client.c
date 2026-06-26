@@ -371,6 +371,7 @@ static int send_pouch_uplink(struct sync_context *sync)
     esp_http_client_set_url(sync->client, (char *) sync->url_buf);
     esp_http_client_set_method(sync->client, HTTP_METHOD_POST);
     esp_http_client_set_header(sync->client, "Content-Type", "application/octet-stream");
+    esp_http_client_set_post_field(sync->client, NULL, 0);
 
     err = esp_http_client_open(sync->client, -1);
     if (0 > err)
