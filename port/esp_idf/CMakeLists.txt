@@ -110,8 +110,22 @@ if(_pouch_selected)
     # Transports
     add_subdirectory(${POUCH_PORT}/esp_idf/transport transport)
 
-    # Zcbor library (via submodule)
+    # Check for zcbor python package
     if(NOT CMAKE_BUILD_EARLY_EXPANSION)
         add_subdirectory(${POUCH_PORT}/esp_idf/lib/zcbor zcbor)
+
+        # Check that the zcbor Python package is available
+        idf_build_get_property(_pouch_python PYTHON)
+        execute_process(
+            COMMAND ${_pouch_python} -c "import zcbor"
+            RESULT_VARIABLE _pouch_zcbor_check
+            OUTPUT_QUIET ERROR_QUIET)
+        if(_pouch_zcbor_check)
+            get_filename_component(_pouch_requirements_txt "${POUCH_ROOT}/requirements.txt" ABSOLUTE)
+            message(FATAL_ERROR
+                "\n\nThe 'zcbor' Python package is required by pouch but was not found.\n"
+                "Install it with:\n"
+                "  pip install -r ${_pouch_requirements_txt}\n\n")
+        endif()
     endif()
 endif()
