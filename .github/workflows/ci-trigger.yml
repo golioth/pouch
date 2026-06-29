@@ -7,6 +7,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  actions: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -22,18 +26,30 @@ jobs:
     secrets: inherit
   trigger-build-gateway:
     name: Run Gateway Build
+    permissions:
+      contents: read
+      actions: write
     uses: ./.github/workflows/test-build-gateway.yml
     secrets: inherit
   trigger-twister:
     name: Run Twister
+    permissions:
+      contents: read
+      actions: write
     uses: ./.github/workflows/test-twister.yml
     secrets: inherit
   trigger-esp-idf:
     name: Run ESP-IDF Unit Test
+    permissions:
+      contents: read
+      actions: write
     uses: ./.github/workflows/test-esp-idf.yml
     secrets: inherit
   trigger-esp-idf-hil:
     name: Run ESP-IDF HTTP Client HIL
+    permissions:
+      contents: read
+      actions: write
     uses: ./.github/workflows/test-esp-idf-hil.yml
     with:
       hil_board: esp32s3_devkitc
@@ -43,6 +59,9 @@ jobs:
     secrets: inherit
   trigger-nsim:
     name: Run Native Simulator and BabbleSim Tests
+    permissions:
+      contents: read
+      actions: write
     uses: ./.github/workflows/test-nsim.yml
     with:
       api_url: "https://api.golioth.io"
