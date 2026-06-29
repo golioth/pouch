@@ -115,7 +115,8 @@ jobs:
       - has_${{ inputs.hil_board }}
 
     container:
-      image: golioth/golioth-hil-base:ed52d4f
+      # yamllint disable-line rule:line-length
+      image: golioth/golioth-hil-base:ed52d4f@sha256:3a1682e2ffd33fad5c01a664e98e21fe5f56abbeebb9a063a38b81dd32b9e546
       volumes:
         - /dev:/dev
         - /home/golioth/credentials:/opt/credentials
