@@ -8,6 +8,7 @@ jobs:
   unit-tests:
     permissions:
       contents: read
+      actions: write
     runs-on: ubuntu-24.04
     # ESP-IDF v6.0.1
     container: espressif/idf@sha256:efc19fae2f52fc6873630c668da26aa834139a063b5fb73a46ebc0dbd217b587

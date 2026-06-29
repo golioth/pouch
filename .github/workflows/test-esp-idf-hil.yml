@@ -54,6 +54,7 @@ jobs:
   build:
     permissions:
       contents: read
+      actions: write
     runs-on: ubuntu-24.04
     needs: prepare-matrix
     strategy:
@@ -101,6 +102,7 @@ jobs:
   hil-test:
     permissions:
       contents: read
+      actions: write
 
     needs:
       - prepare-matrix

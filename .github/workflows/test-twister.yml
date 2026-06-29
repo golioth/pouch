@@ -4,6 +4,10 @@ on:
   workflow_call:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   twister:
     # yamllint disable-line rule:line-length

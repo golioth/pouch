@@ -40,6 +40,10 @@ on:
         default: "coaps://coap.golioth.io"
         type: string
 
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   nsim:
     # yamllint disable-line rule:line-length
