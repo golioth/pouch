@@ -64,7 +64,7 @@ jobs:
           ls release/*.hex
 
       - name: Upload release artifacts
-        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         with:
           files: |
             release/*.elf
