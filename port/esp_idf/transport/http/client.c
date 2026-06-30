@@ -229,49 +229,46 @@ static int upload_pouch_cert(struct sync_context *sync)
 esp_err_t pouch_uplink_response_callback(esp_http_client_event_t *evt)
 {
     struct sync_context *sync = (struct sync_context *) evt->user_data;
+    int err = 0;
 
-    if (HTTP_EVENT_ON_DATA == evt->event_id)
+    switch (evt->event_id)
     {
-        if (false == pouch_atomic_test_and_set_bit(&sync->flags, DOWNLINK_IN_PROGRESS))
-        {
-            /* This is the first downlink data */
-            pouch_downlink_start();
-        }
+        case HTTP_EVENT_ON_DATA:
+            if (false == pouch_atomic_test_and_set_bit(&sync->flags, DOWNLINK_IN_PROGRESS))
+            {
+                /* This is the first downlink data */
+                pouch_downlink_start();
+            }
 
-        int err = pouch_downlink_push(evt->data, evt->data_len);
-        if (0 != err)
-        {
-            ESP_LOGE(TAG, "Failed to push downlink data: %i", err);
-            return ESP_FAIL;
-        }
+            err = pouch_downlink_push(evt->data, evt->data_len);
+            if (0 != err)
+            {
+                ESP_LOGE(TAG, "Failed to push downlink data: %i", err);
+                return ESP_FAIL;
+            }
 
-        sync->downlink_pos += evt->data_len;
+            sync->downlink_pos += evt->data_len;
 
-        if (!esp_http_client_is_chunked_response(evt->client))
-        {
-            /* Data was not chunked, this is the end of the downlink */
-            ESP_LOGD(TAG, "Downlink complete: %" PRIi64 " bytes", sync->downlink_pos);
-            pouch_downlink_finish();
-            pouch_atomic_clear_bit(&sync->flags, DOWNLINK_IN_PROGRESS);
-            return 0;
-        }
+            /* Feed the watchdog timer between each payload (required for chunked get) */
+            taskYIELD();
+            return err;
 
-        /* Data is chunked, feed the watchdog timer between each payload */
-        taskYIELD();
+        case HTTP_EVENT_DISCONNECTED:
+        case HTTP_EVENT_ERROR:
+            err = ESP_FAIL;
+            /* falls through */
+        case HTTP_EVENT_ON_FINISH:
+
+            if (true == pouch_atomic_test_and_clear_bit(&sync->flags, DOWNLINK_IN_PROGRESS))
+            {
+                ESP_LOGI(TAG, "Received downlink");
+                pouch_downlink_finish();
+            }
+            return err;
+
+        default:
+            return err;
     }
-
-    if (HTTP_EVENT_ON_FINISH == evt->event_id)
-    {
-        if (true == pouch_atomic_test_and_clear_bit(&sync->flags, DOWNLINK_IN_PROGRESS))
-        {
-            /* This is the end of a chunked downlink */
-            ESP_LOGI(TAG, "Received final downlink block");
-            pouch_downlink_finish();
-            pouch_atomic_clear_bit(&sync->flags, DOWNLINK_IN_PROGRESS);
-        }
-    }
-
-    return 0;
 }
 
 static int pouch_http_client_uplink_payload_send(struct sync_context *sync,
@@ -411,11 +408,6 @@ static int send_pouch_uplink(struct sync_context *sync)
 finish_and_return:
     pouch_uplink_finish(sync->uplink);
     sync->uplink = NULL;
-
-    if (true == pouch_atomic_test_and_clear_bit(&sync->flags, DOWNLINK_IN_PROGRESS))
-    {
-        /* TODO: pouch_downlink_finish(); */
-    }
 
     return err;
 }
