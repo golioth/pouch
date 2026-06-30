@@ -269,6 +269,11 @@ int pouch_uplink_error(struct pouch_uplink *uplink)
 
 void pouch_uplink_finish(struct pouch_uplink *uplink)
 {
+    if (NULL == uplink)
+    {
+        return;
+    }
+
     // Free any remaining blocks, as they won't be valid in the next pouch:
     struct pouch_buf *buf;
     while ((buf = buf_queue_get(&uplink->transport.queue)))
