@@ -234,10 +234,7 @@ esp_err_t pouch_uplink_response_callback(esp_http_client_event_t *evt)
     {
         if (false == pouch_atomic_test_and_set_bit(&sync->flags, DOWNLINK_IN_PROGRESS))
         {
-            pouch_uplink_finish(sync->uplink);
-            ESP_LOGD(TAG, "Uplink complete");
-
-            sync->uplink = NULL;
+            /* This is the first downlink data */
             pouch_downlink_start();
         }
 
@@ -412,10 +409,8 @@ static int send_pouch_uplink(struct sync_context *sync)
     err = 0;
 
 finish_and_return:
-    if (NULL != sync->uplink)
-    {
-        pouch_uplink_finish(sync->uplink);
-    }
+    pouch_uplink_finish(sync->uplink);
+    sync->uplink = NULL;
 
     if (true == pouch_atomic_test_and_clear_bit(&sync->flags, DOWNLINK_IN_PROGRESS))
     {
