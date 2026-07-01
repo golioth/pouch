@@ -78,6 +78,18 @@ if("${CONFIG_GOLIOTH}" STREQUAL "y")
 endif()
 
 #########################
+# Components required by the transports
+#########################
+
+# http_client transport
+list(APPEND POUCH_TRANSPORT_REQUIRES esp_http_client esp-tls)
+
+# ble_gatt transport (not available for Linux unit testing)
+if(NOT IDF_TARGET STREQUAL "linux")
+    list(APPEND POUCH_TRANSPORT_REQUIRES bt)
+endif()
+
+#########################
 # ESP-IDF Component
 #########################
 
@@ -97,6 +109,7 @@ idf_component_register(SRCS
 
                        REQUIRES
                         mbedtls
+                        ${POUCH_TRANSPORT_REQUIRES}
 
                        KCONFIG
                         ${POUCH_PORT}/esp_idf/Kconfig
