@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#if SOC_TEMPERATURE_SENSOR_SUPPORTED
+
 #include <driver/temperature_sensor.h>
 
 static bool initialized = false;
@@ -26,3 +28,12 @@ float read_temperature(void)
 
     return tsens_out;
 }
+
+#else
+
+float read_temperature(void)
+{
+    return 22.0;
+}
+
+#endif
