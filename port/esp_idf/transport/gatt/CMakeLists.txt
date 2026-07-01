@@ -13,7 +13,3 @@ target_include_directories(${POUCH_ACTIVE_TARGET} PRIVATE
     # Access to shared headers like: #include "transport/sar/receiver.h"
     ${POUCH_ROOT}/src
 )
-
-target_link_libraries(${POUCH_ACTIVE_TARGET} PUBLIC
-    idf::bt
-)

@@ -14,7 +14,6 @@ idf_component_register(SRCS
 
                        PRIV_REQUIRES
                          app_update
-                         bt
                          console
                          mbedtls
                          nvs_flash
