@@ -52,9 +52,7 @@ jobs:
             target: mg100
             app: gateway
             sysbuild: true
-    container: golioth/golioth-zephyr-base:sdk-0.17.4
-    env:
-      ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-0.17.4
+    container: golioth/golioth-zephyr-base:pr-78-sdk-0.17.4
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
