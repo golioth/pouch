@@ -1,4 +1,4 @@
-set_config_string(${DEFAULT_IMAGE} CONFIG_GOLIOTH_COAP_HOST_URI "${SB_CONFIG_GOLIOTH_COAP_HOST_URI}")
+set_config_string(${DEFAULT_IMAGE} CONFIG_POUCH_COAP_GW_URI "${SB_CONFIG_POUCH_COAP_GW_URI}")
 
 if(NOT SB_CONFIG_POUCH_GATEWAY_CLOUD)
   set_config_bool(${DEFAULT_IMAGE} CONFIG_POUCH_GATEWAY_CLOUD n)
@@ -22,6 +22,15 @@ if(BOARD MATCHES "bsim")
       BOARD bsim_device/native/handbrake
     )
     sysbuild_add_dependencies(FLASH ${DEFAULT_IMAGE} bsim_handbrake)
+  endif()
+
+  # Mount gateway DTLS credentials (device cert + key for mTLS).
+  # The CA used to verify the server is taken from the built-in ISRG
+  # Root X1 unless EXAMPLE_COAP_CLIENT_DTLS_LOAD_CA_FROM_FILESYSTEM is set.
+  if(SB_CONFIG_GATEWAY_MOUNT_CREDS)
+    set_config_bool(${DEFAULT_IMAGE} CONFIG_FILE_SYSTEM_NSIM_MOUNT y)
+    set_config_string(${DEFAULT_IMAGE} CONFIG_NATIVE_EXTRA_CMDLINE_ARGS "-volume=creds:/creds")
+    set_config_string(${DEFAULT_IMAGE} CONFIG_EXAMPLE_CREDENTIALS_DIR "/creds")
   endif()
 
   function(add_peripheral name path)
@@ -50,7 +59,7 @@ if(BOARD MATCHES "bsim")
         endif()
 
         if(name STREQUAL "ble_gatt_example" AND
-           SB_CONFIG_GOLIOTH_COAP_HOST_URI STREQUAL "coaps://coap.golioth.dev")
+           SB_CONFIG_POUCH_COAP_GW_URI STREQUAL "coap.golioth.dev")
           set_config_string(${target_name} CONFIG_POUCH_SERVER_CERT_CN "pouch.golioth.dev")
         endif()
       endforeach()

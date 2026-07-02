@@ -10,12 +10,12 @@
 #include <string.h>
 
 #include <pouch/gateway/cert.h>
-#include <pouch/gateway/info.h>
+#include "info.h"
 #include <pouch/port.h>
 
 #include <cddl/info_decode.h>
 
-POUCH_LOG_REGISTER(info, CONFIG_POUCH_GATEWAY_LOG_LEVEL);
+POUCH_LOG_REGISTER(gw_info, CONFIG_POUCH_GATEWAY_LOG_LEVEL);
 
 #define INFO_MAX_SIZE 64
 
@@ -83,7 +83,9 @@ int pouch_gateway_info_finish(struct pouch_gateway_info_context *context,
 
     pouch_gateway_server_cert_get_serial(server_cert_serial_buf, &server_cert_serial.len);
 
-    *server_cert_provisioned = (zcbor_compare_strings(&info.server_cert_snr, &server_cert_serial));
+    *server_cert_provisioned =
+        (server_cert_serial.len > 0
+         && zcbor_compare_strings(&info.server_cert_snr, &server_cert_serial));
     *device_cert_provisioned = !!(info.flags & INFO_FLAG_DEVICE_PROVISIONED);
 
     pouch_gateway_info_abort(context);

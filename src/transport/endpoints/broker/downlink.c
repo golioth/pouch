@@ -5,7 +5,7 @@
  */
 
 #include <errno.h>
-#include <pouch/gateway/downlink.h>
+#include "gateway/downlink.h"
 #include <pouch/port.h>
 #include "gateway/types.h"
 #include "transport/bearer.h"

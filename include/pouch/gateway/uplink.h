@@ -6,16 +6,12 @@
 
 #pragma once
 
-#include <stdint.h>
+#include <stdbool.h>
 #include <stddef.h>
-#include <golioth/client.h>
-#include <zephyr/sys/sflist.h>
-#include <zephyr/sys/slist.h>
-
-#include <pouch/gateway/downlink.h>
+#include <stdint.h>
 
 struct pouch_block;
-
+struct pouch_gateway_downlink_context;
 struct pouch_gateway_uplink;
 
 enum pouch_gateway_uplink_result
@@ -47,23 +43,25 @@ int pouch_gateway_uplink_write(struct pouch_gateway_uplink *uplink,
  * The uplink must be closed by a call to @ref pouch_gateway_uplink_close().
  *
  * @param downlink The downlink context.
+ * @param end_cb Callback invoked when the uplink exchange completes.
+ * @param end_cb_arg Argument for @p end_cb.
  * @return Pointer to the uplink context.
  */
 struct pouch_gateway_uplink *pouch_gateway_uplink_open(
     struct pouch_gateway_downlink_context *downlink,
     pouch_gateway_uplink_end_cb end_cb,
-    void *failed_cb_arg);
+    void *end_cb_arg);
 
 /**
  * Close the uplink.
+ *
+ * Triggers the CoAP POST to forward all buffered data to the server.
  *
  * @param uplink The uplink context.
  */
 void pouch_gateway_uplink_close(struct pouch_gateway_uplink *uplink);
 
 /**
- * Initialize the uplink module with the Golioth client.
- *
- * @param c The Golioth client.
+ * Initialize the uplink module.
  */
-void pouch_gateway_uplink_module_init(struct golioth_client *c);
+void pouch_gateway_uplink_module_init(void);

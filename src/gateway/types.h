@@ -7,9 +7,9 @@
 #pragma once
 
 #include <stdint.h>
-#include <pouch/gateway/info.h>
+#include "info.h"
 #include <pouch/gateway/uplink.h>
-#include <pouch/gateway/downlink.h>
+#include "downlink.h"
 #include <pouch/gateway/cert.h>
 
 struct pouch_gateway_node_info

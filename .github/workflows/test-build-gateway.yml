@@ -44,6 +44,19 @@ jobs:
             blobs: hal_nxp
             extra_args: -DEXTRA_CONF_FILE=boards/frdm_rw612_wifi.conf
           - manifest: west-zephyr.yml
+            target: frdm_rw612
+            artifact_suffix: -ethernet
+            app: gateway_custom_connect
+            sysbuild: false
+            blobs: hal_nxp
+          - manifest: west-zephyr.yml
+            target: frdm_rw612
+            artifact_suffix: -wifi
+            app: gateway_custom_connect
+            sysbuild: false
+            blobs: hal_nxp
+            extra_args: -DEXTRA_CONF_FILE=boards/frdm_rw612_wifi.conf
+          - manifest: west-zephyr.yml
             target: native_sim
             app: gateway
             sysbuild: false

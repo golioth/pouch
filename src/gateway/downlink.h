@@ -6,17 +6,12 @@
 
 #pragma once
 
-#include <golioth/client.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 struct pouch_gateway_downlink_context;
 typedef void (*pouch_gateway_downlink_data_available_cb)(void *);
-
-/**
- * Initialize the downlink module with the Golioth client.
- *
- * @param client The Golioth client.
- */
-void pouch_gateway_downlink_module_init(struct golioth_client *client);
 
 /**
  * Initialize a downlink context.
@@ -68,24 +63,22 @@ bool pouch_gateway_downlink_is_complete(const struct pouch_gateway_downlink_cont
 /**
  * Block callback for downlink data.
  *
+ * Called by the transport (CoAP) when a response block arrives.
+ *
  * @param data The data received.
  * @param len The length of the data.
  * @param is_last True if this is the last block.
- * @param arg User argument.
- * @return Golioth status.
+ * @param arg User argument (downlink context).
+ * @return 0 on success, negative errno on error.
  */
-enum golioth_status pouch_gateway_downlink_block_cb(const uint8_t *data,
-                                                    size_t len,
-                                                    bool is_last,
-                                                    void *arg);
+int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_last, void *arg);
 
 /**
  * End callback for downlink.
  *
- * @param status Golioth status.
- * @param coap_rsp_code CoAP response code.
- * @param arg User argument.
+ * Called when the transport exchange completes.
+ *
+ * @param status 0 on success, negative errno on error.
+ * @param arg User argument (downlink context).
  */
-void pouch_gateway_downlink_end_cb(enum golioth_status status,
-                                   const struct golioth_coap_rsp_code *coap_rsp_code,
-                                   void *arg);
+void pouch_gateway_downlink_end_cb(int status, void *arg);

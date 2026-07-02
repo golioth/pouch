@@ -10,3 +10,7 @@ zephyr_library_sources(
     ${CMAKE_CURRENT_LIST_DIR}/client.c
     ${CMAKE_CURRENT_LIST_DIR}/blockwise.c
 )
+
+zephyr_library_sources_ifdef(CONFIG_POUCH_GATEWAY_CLOUD_TRANSPORT_COAP
+    gateway.c
+)
