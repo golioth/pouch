@@ -7,4 +7,4 @@
 
 def test_serial_communication(dut, client_process):
     """Verify that the client can send data to the server over a serial link."""
-    dut.readlines_until("RECEIVED: Hello from client!", timeout=10)
+    dut.readlines_until(regex="RECEIVED: Hello from client!", timeout=10)

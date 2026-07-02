@@ -8,6 +8,7 @@ menuconfig POUCH
   select ZCBOR_CANONICAL
   select MBEDTLS
   select MBEDTLS_PSA_CRYPTO_C
+  select PSA_CRYPTO
   select PSA_WANT_ALG_SHA_256
   help
     Pouch is a protocol for communicating with Golioth from devices not
@@ -32,21 +33,21 @@ config POUCH_ENCRYPTION_SAEAD
   select PSA_WANT_ALG_ECDH
   select PSA_WANT_ALG_HKDF
   select PSA_WANT_ALG_HMAC
-  select PSA_WANT_ALG_STREAM_CIPHER
   select PSA_WANT_ALG_SHA_256
   select PSA_WANT_ALG_SHA_384
   select PSA_WANT_ECC_SECP_R1_256
   select PSA_WANT_ECC_SECP_R1_384
   select PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_DERIVE
   select PSA_WANT_KEY_TYPE_ECC_PUBLIC_KEY
-  select MBEDTLS_ECDSA_C
-  select MBEDTLS_ECP_C
-  # nRF Connect SDK only:
-  select NORDIC_SECURITY_BACKEND
-  select MBEDTLS_PK_PARSE_C
+  select MBEDTLS_ASN1_PARSE_C
+  select MBEDTLS_BASE64_C
+  select MBEDTLS_PEM_PARSE_C
   select MBEDTLS_PK_C
-  select MBEDTLS_X509_LIBRARY
+  select MBEDTLS_PK_PARSE_C
   select MBEDTLS_X509_CRT_PARSE_C
+  select MBEDTLS_X509_USE_C
+  # nRF Connect SDK only:
+  select MBEDTLS_X509_LIBRARY
   help
     Use a streaming AEAD encryption scheme for uplink Pouch transfers.
 
@@ -81,9 +82,6 @@ config POUCH_ENCRYPTION_AES_GCM
     Support AES-GCM for encryption and decryption.
 
 endchoice
-
-config MBEDTLS_USER_CONFIG_ENABLE
-  default y
 
 config MBEDTLS_USER_CONFIG_FILE
   default "$(ZEPHYR_POUCH_MODULE_DIR)/src/saead/mbedtls_config.h"

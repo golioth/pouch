@@ -7,7 +7,7 @@ manifest:
 
   projects:
     - name: zephyr
-      revision: v4.3.0
+      revision: v4.4.0
       url: https://github.com/zephyrproject-rtos/zephyr
       west-commands: scripts/west-commands.yml
       import:
@@ -21,6 +21,7 @@ manifest:
           - nrf_hw_models
           - picolibc
           - segger
+          - tf-psa-crypto
           - tfm-mcuboot
           - trusted-firmware-m
           - littlefs

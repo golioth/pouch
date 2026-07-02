@@ -4,9 +4,6 @@
 configdefault NET_SHELL
 	default n
 
-configdefault MBEDTLS_USE_PSA_CRYPTO
-	default n
-
 configdefault MBEDTLS_HEAP_SIZE
 	default 16384
 

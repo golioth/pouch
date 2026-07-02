@@ -59,7 +59,7 @@ See the [Zephyr examples](./examples/zephyr) for more information.
 
 **Supported Versions**
 
-- `v4.3.0`
+- `v4.4.0`
 
 ### nRF Connect SDK (NCS)
 
@@ -69,7 +69,7 @@ Zephyr, using the same steps described above.
 
 **Supported Versions**
 
-- `v3.2.3`
+- `v3.4.0-rc2`
 
 ### ESP-IDF
 
