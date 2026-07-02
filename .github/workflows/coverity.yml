@@ -35,7 +35,7 @@ jobs:
       - name: Coverity build
         run: |
           /opt/toolchains/coverity/bin/cov-configure --comptype gcc \
-            --compiler /opt/toolchains/zephyr-sdk-0.17.4/arm-zephyr-eabi/bin/arm-zephyr-eabi-gcc
+            --compiler ${ZEPHYR_SDK_INSTALL_DIR}/arm-zephyr-eabi/bin/arm-zephyr-eabi-gcc
           /opt/toolchains/coverity/bin/cov-build --dir cov-int \
             west build -p -b nrf52840dk/nrf52840 pouch/examples/zephyr/ble_gatt \
             -- -DCONFIG_LOG=n
