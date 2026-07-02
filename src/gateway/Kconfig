@@ -64,7 +64,8 @@ menu "Gateway Pouch Transport"
 menuconfig POUCH_GATEWAY_GATT
     bool "BLE GATT broker transport"
     depends on BT
-    default y if BT
+    select POUCH_TRANSPORT_SAR
+    default y
     help
       Enable the BLE GATT broker transport for the Pouch gateway.
       This builds the GATT central/broker side, including scanning,

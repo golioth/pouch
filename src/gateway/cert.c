@@ -91,6 +91,13 @@ static void device_cert_set_callback(struct golioth_client *client,
 
     ctx->status = status;
     k_sem_give(&ctx->sem);
+    if (status != GOLIOTH_OK)
+    {
+        POUCH_LOG_ERR("Failed to set device cert: %d (%u.%02u)",
+                      status,
+                      coap_rsp_code->code_class,
+                      coap_rsp_code->code_detail);
+    }
 }
 
 int pouch_gateway_device_cert_finish(struct pouch_gateway_device_cert_context *context)
@@ -169,6 +176,8 @@ static int server_crt_update(size_t len)
     memcpy(server_crt_serial, cert_chain.serial.p, cert_chain.serial.len);
     atomic_set(&server_crt_serial_len, cert_chain.serial.len);
 
+    POUCH_LOG_INF("Server cert updated, len=%zu", len);
+
     atomic_set(&server_crt_len, len);
     atomic_inc(&server_crt_id);
 
@@ -187,12 +196,20 @@ int pouch_gateway_server_cert_get_data(struct pouch_gateway_server_cert_context 
                                        size_t *dst_len,
                                        bool *is_last)
 {
+    if (context == NULL || dst == NULL || dst_len == NULL || is_last == NULL)
+    {
+        POUCH_LOG_ERR("Invalid arguments (%p, %p, %p, %p)", context, dst, dst_len, is_last);
+        return -EINVAL;
+    }
     size_t len = atomic_get(&server_crt_len);
 
     *is_last = false;
 
     if (context->offset >= len)
     {
+        POUCH_LOG_ERR("Attempt to read past end of server cert (offset=%zu, len=%zu)",
+                      context->offset,
+                      len);
         return -ENODATA;
     }
 

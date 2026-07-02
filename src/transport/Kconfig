@@ -1,0 +1,32 @@
+# Copyright (c) 2026 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+menu "Pouch Transport"
+
+choice POUCH_TRANSPORT
+    prompt "Transport protocol"
+    optional
+    help
+      The transport protocol to use for communicating with Golioth.
+
+endchoice
+
+config POUCH_TRANSPORT_SAR
+    bool # Selected by transports that require Segmentation and Reassembly (SAR)
+
+menu "Transport Segmentation and Reassembly"
+    visible if POUCH_TRANSPORT_SAR
+
+config POUCH_TRANSPORT_ACK_TIMEOUT_MS
+    int "Pouch Transport ACK timeout (ms)"
+    default 1000
+    help
+        The timeout, in milliseconds, that a receiver will wait
+        for new packets before retransmitting an acknowledgement
+
+endmenu # SAR options
+
+rsource "../../port/zephyr/transport/Kconfig"
+
+endmenu # Pouch Transport

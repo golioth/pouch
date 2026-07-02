@@ -1,0 +1,19 @@
+# Copyright (c) 2026 Golioth, Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+title: Pouch SPI Device transport adapter
+
+description: |
+  This node should be a child of an SPI bus controller. The device acts as an
+  SPI slave, exchanging frames with a broker (SPI master).
+
+compatible: "golioth,pouch-device"
+
+include: spi-device.yaml
+
+properties:
+  data-ready-gpios:
+    type: phandle-array
+    description: |
+      Optional GPIO pin asserted when the device has data to send.
+      If omitted, the master must poll periodically.
