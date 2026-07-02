@@ -15,6 +15,12 @@ struct mtls_credentials
     const char *cert_pem;
     /** Length of @ref cert_pem in bytes. */
     size_t cert_pem_len;
+    /** @brief Server certificate common name.
+     *
+     *  When set to NULL, the common name must match hostname.  Strings must be
+     *  null-terminated.
+     */
+    const char *cert_cn;
 
     /** Device certificate in DER format */
     const char *client_cert_der;

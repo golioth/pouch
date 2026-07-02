@@ -450,6 +450,7 @@ esp_http_client_handle_t client_initialize(struct sync_context *sync)
         .event_handler = event_handler_proxy,
         .cert_pem = sync->mtls_creds->cert_pem,
         .cert_len = sync->mtls_creds->cert_pem_len,
+        .common_name = sync->mtls_creds->cert_cn,
         .client_cert_der = sync->mtls_creds->client_cert_der,
         .client_cert_len = sync->mtls_creds->client_cert_der_len,
         .client_key_pem = sync->mtls_creds->client_key_der,

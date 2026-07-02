@@ -112,6 +112,7 @@ int fill_mtls_credentials(struct mtls_credentials *creds)
 {
     creds->cert_pem = server_ca_cert_pem_start;
     creds->cert_pem_len = server_ca_cert_pem_end - server_ca_cert_pem_start;
+    creds->cert_cn = NULL; /* Use hostname for server cert common name */
 
     if ((NULL == creds->cert_pem) || (0 == creds->cert_pem_len))
     {
