@@ -47,7 +47,7 @@ static int recv(struct pouch_bearer *bearer, const void *payload, size_t len)
 {
     struct pouch_gateway_node_info *node = bearer->ctx;
 
-    return pouch_gateway_uplink_write(node->uplink, payload, len, false);
+    return pouch_gateway_uplink_write(node->uplink, payload, len);
 }
 
 static void end(struct pouch_bearer *bearer, bool success)

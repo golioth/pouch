@@ -181,8 +181,7 @@ static void submit_block(struct pouch_gateway_uplink *uplink)
 
 int pouch_gateway_uplink_write(struct pouch_gateway_uplink *uplink,
                                const uint8_t *payload,
-                               size_t len,
-                               bool is_last)
+                               size_t len)
 {
     while (len)
     {

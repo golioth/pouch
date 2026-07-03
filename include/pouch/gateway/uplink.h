@@ -33,13 +33,11 @@ typedef void (*pouch_gateway_uplink_end_cb)(void *arg, enum pouch_gateway_uplink
  * @param uplink The uplink context.
  * @param payload The payload to write.
  * @param len The length of the payload.
- * @param is_last true if this is the last chunk.
  * @return 0 on success, negative on error.
  */
 int pouch_gateway_uplink_write(struct pouch_gateway_uplink *uplink,
                                const uint8_t *payload,
-                               size_t len,
-                               bool is_last);
+                               size_t len);
 
 /**
  * Open an uplink for the given downlink context.
