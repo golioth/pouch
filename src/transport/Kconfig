@@ -6,7 +6,7 @@
 # This is approach is brittle and should be improved in future work.
 
 config POUCH_TRANSPORT_SAR
-  bool "Enable SAR core transport support"
+  bool "Enable SAR core transport support" if ZTEST
   help
     Enable shared Segmentation and Reassembly (SAR) sender/receiver
     packetization support used by transport backends and transport unit

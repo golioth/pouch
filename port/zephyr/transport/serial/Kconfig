@@ -1,0 +1,28 @@
+# Copyright (c) 2026 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+menu "Pouch Serial Transport"
+    visible if POUCH_TRANSPORT_SERIAL
+
+config POUCH_TRANSPORT_SERIAL_BROKER
+    bool
+    depends on POUCH_GATEWAY
+    default y
+    help
+        Enable the broker-based implementation of the Pouch Serial transport.
+
+config POUCH_TRANSPORT_SERIAL_DEVICE
+    bool
+    depends on POUCH
+    default y
+    help
+        Enable the device implementation of the Pouch Serial transport, which
+        runs on the node device and communicates with a gateway running the
+        broker implementation.
+
+module = POUCH_SERIAL
+module-str = Pouch Serial Transport
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu
