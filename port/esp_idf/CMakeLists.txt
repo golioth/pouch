@@ -135,7 +135,7 @@ if(_pouch_selected)
             OUTPUT_QUIET ERROR_QUIET)
         if(_pouch_zcbor_check)
             get_filename_component(_pouch_requirements_txt "${POUCH_ROOT}/requirements.txt" ABSOLUTE)
-            message(FATAL_ERROR
+            message(WARNING
                 "\n\nThe 'zcbor' Python package is required by pouch but was not found.\n"
                 "Install it with:\n"
                 "  pip install -r ${_pouch_requirements_txt}\n\n")
