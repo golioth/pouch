@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#if SOC_TEMPERATURE_SENSOR_SUPPORTED
+#include "sdkconfig.h"
+
+#if CONFIG_SOC_TEMP_SENSOR_SUPPORTED
 
 #include <driver/temperature_sensor.h>
 
