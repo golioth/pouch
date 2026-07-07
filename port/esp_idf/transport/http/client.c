@@ -517,6 +517,7 @@ clear_and_return:
     if (0 != err)
     {
         ESP_LOGI(TAG, "Freeing http client");
+        esp_http_client_close(sync->client);
         esp_http_client_cleanup(sync->client);
         sync->client = NULL;
     }
