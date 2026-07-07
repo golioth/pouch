@@ -10,6 +10,7 @@ menuconfig POUCH
   select MBEDTLS_PSA_CRYPTO_C
   select PSA_CRYPTO
   select PSA_WANT_ALG_SHA_256
+  imply MBEDTLS_ECP_NIST_OPTIM
   help
     Pouch is a protocol for communicating with Golioth from devices not
     directly connected to the internet.
