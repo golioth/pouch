@@ -38,3 +38,14 @@
 		data-ready-gpios = <&hsgpio0 15 GPIO_ACTIVE_HIGH>;
 	};
 };
+
+/* GPIO 2, GPIO 3 */
+&flexcomm0 {
+	status = "okay";
+
+	pouch_uart_broker: pouch-uart-broker {
+		compatible = "golioth,pouch-broker";
+		status = "okay";
+	};
+};
+

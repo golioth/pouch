@@ -74,6 +74,9 @@ endmenu
 # Transport choices
 rsource "transport/Kconfig"
 
+# Gateway
+rsource "../../src/gateway/Kconfig"
+
 endif
 
 config POUCH_FREERTOS_WORK_Q_SIZE

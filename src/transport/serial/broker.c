@@ -62,6 +62,16 @@ static void open_channel(struct pouch_serial_broker *broker, enum pouch_serial_c
     broker->active_channel = ch;
 }
 
+static void reset(struct pouch_serial_broker *broker)
+{
+    for (enum pouch_serial_channel_id i = 0; i < POUCH_SERIAL_CHANNEL_COUNT; i++)
+    {
+        pouch_serial_ch_close(&broker->serial.channels[i], false);
+    }
+
+    pouch_serial_broker_start(broker);
+}
+
 static void next(struct pouch_serial_broker *broker)
 {
     if (!pouch_atomic_test_and_set_bit(&broker->flags, FLAG_INFO_READ))
@@ -149,8 +159,7 @@ static void channel_closed(struct pouch_serial *s, enum pouch_serial_channel_id 
             broker->adapter->end(broker, false);
         }
 
-        // start over:
-        pouch_serial_broker_start(broker);
+        reset(broker);
         return;
     }
 
@@ -207,6 +216,8 @@ void pouch_serial_broker_start(struct pouch_serial_broker *broker)
     pouch_atomic_clear_bit(&broker->flags, FLAG_SYNC);
     pouch_atomic_clear_bit(&broker->flags, FLAG_DOWNLINK_DONE);
     pouch_atomic_clear_bit(&broker->flags, FLAG_UPLINK_DONE);
+    broker->node.device_cert_provisioned = false;
+    broker->node.server_cert_provisioned = false;
     broker->active_channel = NO_CHANNEL;
 
     next(broker);

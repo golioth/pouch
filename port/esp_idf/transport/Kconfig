@@ -35,3 +35,11 @@ rsource "../../../src/transport/Kconfig"
 
 rsource "http/Kconfig"
 rsource "gatt/Kconfig"
+rsource "uart/Kconfig"
+
+# Hidden symbol selected by the serial device transport adapter. It enables
+# the shared serial device transport module in src/transport/serial.
+# POUCH_TRANSPORT_SERIAL and POUCH_TRANSPORT_SERIAL_BROKER are defined in
+# src/gateway/Kconfig.
+config POUCH_TRANSPORT_SERIAL_DEVICE
+    bool

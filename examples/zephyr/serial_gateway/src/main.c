@@ -16,6 +16,7 @@
 #include <pouch/gateway/uplink.h>
 #include <pouch/transport/serial/broker.h>
 #include <pouch/transport/spi/broker.h>
+#include <pouch/transport/uart/broker.h>
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
@@ -132,7 +133,14 @@ int main(void)
     pouch_gateway_uplink_module_init(client);
     pouch_gateway_downlink_module_init(client);
 
-    pouch_spi_broker_start();
+    if (IS_ENABLED(CONFIG_POUCH_SPI_BROKER))
+    {
+        pouch_spi_broker_start();
+    }
+    if (IS_ENABLED(CONFIG_POUCH_UART_BROKER))
+    {
+        pouch_uart_broker_start();
+    }
 
     return 0;
 }

@@ -19,6 +19,8 @@
 
 #include <stdlib.h>
 
+POUCH_LOG_REGISTER(uplink, POUCH_LOG_LEVEL_DBG);
+
 enum flags
 {
     SESSION_ACTIVE,
@@ -181,6 +183,7 @@ struct pouch_uplink *pouch_uplink_start(void)
 
     if (pouch_atomic_test_and_set_bit(uplink.flags, SESSION_ACTIVE))
     {
+        POUCH_LOG_ERR("uplink already active");
         return NULL;
     }
 
@@ -188,6 +191,7 @@ struct pouch_uplink *pouch_uplink_start(void)
     if (err)
     {
         pouch_atomic_clear_bit(uplink.flags, SESSION_ACTIVE);
+        POUCH_LOG_ERR("crypto session start failed (%d)", err);
         return NULL;
     }
 
@@ -195,6 +199,7 @@ struct pouch_uplink *pouch_uplink_start(void)
     if (err)
     {
         pouch_atomic_clear_bit(uplink.flags, SESSION_ACTIVE);
+        POUCH_LOG_ERR("crypto pouch start failed (%d)", err);
         return NULL;
     }
 
@@ -203,8 +208,11 @@ struct pouch_uplink *pouch_uplink_start(void)
     if (!uplink.header)
     {
         pouch_atomic_clear_bit(uplink.flags, SESSION_ACTIVE);
+        POUCH_LOG_ERR("header create failed");
         return NULL;
     }
+
+    POUCH_LOG_INF("UPLINK START");
 
     pouch_event_emit(POUCH_EVENT_SESSION_START);
 
@@ -224,13 +232,14 @@ int pouch_wait_for_queue(struct pouch_uplink *uplink, pouch_timeout_t timeout)
 
 enum pouch_result pouch_uplink_fill(struct pouch_uplink *uplink, uint8_t *dst, size_t *len)
 {
-    if (!session_is_active())
-    {
-        return POUCH_ERROR;
-    }
-
     size_t maxlen = *len;
     *len = 0;
+
+    if (!session_is_active())
+    {
+        POUCH_LOG_ERR("session not active");
+        return POUCH_ERROR;
+    }
 
     while (*len < maxlen)
     {
@@ -292,6 +301,7 @@ void pouch_uplink_finish(struct pouch_uplink *uplink)
     pouch_atomic_inc(&uplink->id);
     if (pouch_atomic_clear(uplink->flags) & BIT(SESSION_ACTIVE))
     {
+        POUCH_LOG_INF("UPLINK END");
         /* Emit POUCH_EVENT_SESSION_END only after the transport has
          * declared the uplink session done, so subscribers (e.g. a
          * modem power manager) see the event after the bytes have

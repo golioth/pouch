@@ -76,10 +76,20 @@ if(CONFIG_POUCH)
     endif()
 endif()
 
-zephyr_library_sources_ifdef(CONFIG_POUCH_SPI_BROKER transport/serial/spi_broker.c)
-zephyr_library_sources_ifdef(CONFIG_POUCH_SPI_DEVICE transport/serial/spi_device.c)
+zephyr_library_sources_ifdef(CONFIG_POUCH_SPI_BROKER ${CMAKE_CURRENT_LIST_DIR}/transport/serial/spi_broker.c)
+zephyr_library_sources_ifdef(CONFIG_POUCH_SPI_DEVICE ${CMAKE_CURRENT_LIST_DIR}/transport/serial/spi_device.c)
+zephyr_library_sources_ifdef(CONFIG_POUCH_UART ${CMAKE_CURRENT_LIST_DIR}/transport/serial/uart.c)
+zephyr_library_sources_ifdef(CONFIG_POUCH_UART_BROKER ${CMAKE_CURRENT_LIST_DIR}/transport/serial/uart_broker.c)
+zephyr_library_sources_ifdef(CONFIG_POUCH_UART_DEVICE ${CMAKE_CURRENT_LIST_DIR}/transport/serial/uart_device.c)
 
 if(CONFIG_POUCH_GATEWAY)
-    zephyr_include_directories(${CMAKE_CURRENT_LIST_DIR}/../../include)
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../src/gateway gateway)
+    zephyr_library()
+
+    set(POUCH_ACTIVE_TARGET ${ZEPHYR_CURRENT_LIBRARY})
+    set(POUCH_ACTIVE_GENERATED_DIR ${CMAKE_CURRENT_BINARY_DIR})
+
+    zephyr_include_directories(${POUCH_ROOT}/include)
+
+    add_subdirectory(${POUCH_ROOT}/src/gateway)
+    add_subdirectory(${POUCH_ROOT}/src/transport)
 endif()

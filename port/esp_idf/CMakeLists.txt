@@ -84,6 +84,9 @@ endif()
 # http_client transport
 list(APPEND POUCH_TRANSPORT_REQUIRES esp_http_client esp-tls)
 
+# uart transport
+list(APPEND POUCH_TRANSPORT_REQUIRES esp_driver_uart esp_driver_gpio)
+
 # ble_gatt transport (not available for Linux unit testing)
 if(NOT IDF_TARGET STREQUAL "linux")
     list(APPEND POUCH_TRANSPORT_REQUIRES bt)
@@ -122,6 +125,9 @@ if(_pouch_selected)
 
     # Transports
     add_subdirectory(${POUCH_PORT}/esp_idf/transport transport)
+
+    # Gateway (broker-side logic)
+    add_subdirectory(${POUCH_ROOT}/src/gateway gateway)
 
     # Check for zcbor python package
     if(NOT CMAKE_BUILD_EARLY_EXPANSION)

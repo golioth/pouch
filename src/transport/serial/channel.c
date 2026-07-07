@@ -35,6 +35,40 @@ static void signal_ready(struct pouch_serial_channel *ch)
     }
 }
 
+static bool is_receiver(const struct pouch_serial_channel *ch)
+{
+    return ch->endpoint->send == NULL;
+}
+
+/**
+ * Start the channel's endpoint
+ */
+static int start_transfer(struct pouch_serial_channel *ch)
+{
+    if (pouch_atomic_test_and_set_bit(&ch->flags, CH_FLAG_OPEN))
+    {
+        return 0;
+    }
+
+    pouch_atomic_clear_bit(&ch->flags, CH_FLAG_ERROR);
+    pouch_atomic_set_bit(&ch->flags, CH_FLAG_OPENING);
+
+    POUCH_LOG_DBG("ch %d: opening...", channel_id(ch));
+    int ret = ch->endpoint->start(&ch->bearer);
+    if (ret)
+    {
+        POUCH_LOG_ERR("Endpoint start() failed for channel %d: %d", channel_id(ch), ret);
+        pouch_atomic_set_bit(&ch->flags, CH_FLAG_ERROR);
+        pouch_atomic_set_bit(&ch->flags, CH_FLAG_PENDING);
+        pouch_atomic_clear_bit(&ch->flags, CH_FLAG_OPENING);
+        signal_ready(ch);
+        return ret;
+    }
+
+    POUCH_LOG_DBG("ch %d: opened", channel_id(ch));
+    return 0;
+}
+
 static int handle_ack(struct pouch_serial_channel *ch, bool err)
 {
     POUCH_LOG_DBG("ACK on channel %d (err=%d)", channel_id(ch), err);
@@ -88,7 +122,7 @@ static int handle_data(struct pouch_serial_channel *ch,
     if (hdr->first)
     {
         POUCH_LOG_INF("ch %d: opening receiver channel", channel_id(ch));
-        int err = pouch_serial_ch_open(ch);
+        int err = start_transfer(ch);
         if (err)
         {
             return err;
@@ -155,8 +189,7 @@ size_t pouch_serial_ch_frame_get(struct pouch_serial_channel *ch, uint8_t *buf, 
         return 0;
     }
 
-    // If this is a receiver channel
-    if (ch->endpoint->send == NULL)
+    if (is_receiver(ch))
     {
         struct pouch_serial_header hdr = {
             .is_data = false,
@@ -197,6 +230,10 @@ size_t pouch_serial_ch_frame_get(struct pouch_serial_channel *ch, uint8_t *buf, 
 
     bool error = (result == POUCH_ERROR);
     bool is_last = (result == POUCH_NO_MORE_DATA) || error;
+    if (error)
+    {
+        POUCH_LOG_ERR("ch %d: ERROR from endpoint", channel_id(ch));
+    }
 
     struct pouch_serial_header hdr = {
         .channel = channel_id(ch),
@@ -223,33 +260,19 @@ size_t pouch_serial_ch_frame_get(struct pouch_serial_channel *ch, uint8_t *buf, 
 
 void pouch_serial_ch_ready(struct pouch_serial_channel *ch)
 {
-    POUCH_LOG_DBG("ch %d: is ready to send", channel_id(ch));
     if (ch->endpoint->send != NULL || pouch_atomic_test_bit(&ch->flags, CH_FLAG_OPENING))
     {
-        pouch_atomic_set_bit(&ch->flags, CH_FLAG_PENDING);
+        if (!pouch_atomic_test_and_set_bit(&ch->flags, CH_FLAG_PENDING))
+        {
+            signal_ready(ch);
+        }
     }
 }
 
 int pouch_serial_ch_open(struct pouch_serial_channel *ch)
 {
-    if (pouch_atomic_test_and_set_bit(&ch->flags, CH_FLAG_OPEN))
-    {
-        return 0;
-    }
+    int ret = start_transfer(ch);
 
-    POUCH_LOG_DBG("ch %d: opening", channel_id(ch));
-    int ret = ch->endpoint->start(&ch->bearer);
-    if (ret)
-    {
-        POUCH_LOG_ERR("Endpoint start() failed for channel %d: %d", channel_id(ch), ret);
-        pouch_atomic_set_bit(&ch->flags, CH_FLAG_ERROR);
-        pouch_atomic_set_bit(&ch->flags, CH_FLAG_PENDING);
-        signal_ready(ch);
-        return ret;
-    }
-
-    pouch_atomic_clear_bit(&ch->flags, CH_FLAG_ERROR);
-    pouch_atomic_set_bit(&ch->flags, CH_FLAG_OPENING);
     pouch_atomic_set_bit(&ch->flags, CH_FLAG_PENDING);
     signal_ready(ch);
     return ret;
@@ -266,6 +289,8 @@ void pouch_serial_ch_close(struct pouch_serial_channel *ch, bool success)
     {
         pouch_atomic_set_bit(&ch->flags, CH_FLAG_ERROR);
     }
+
+    POUCH_LOG_DBG("ch %d: closed", channel_id(ch));
 
     if (ch->endpoint->end != NULL)
     {

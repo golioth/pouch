@@ -1,0 +1,105 @@
+# Copyright (c) 2026 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# UART configuration shared by the device and broker adapters.
+# The role-specific symbols (POUCH_TRANSPORT_SERIAL_DEVICE and
+# POUCH_TRANSPORT_SERIAL_BROKER) are defined in the parent transport Kconfig.
+
+if POUCH_UART_DEVICE || POUCH_UART_BROKER
+
+config POUCH_UART_FRAME_SIZE
+    int "UART frame size"
+    default 255
+    range 2 255
+    help
+      Maximum payload size in bytes for a single UART frame. The first
+      byte of each frame carries the payload length, so the maximum
+      payload is 255.
+
+config POUCH_UART_PORT_NUM
+    int "UART port number"
+    default 1
+    help
+      ESP-IDF UART port to use (0, 1, or 2 depending on the target).
+
+config POUCH_UART_BAUD_RATE
+    int "UART baud rate"
+    default 115200
+    help
+      Baud rate for the UART link.
+
+config POUCH_UART_TX_PIN
+    int "UART TX GPIO pin"
+    default 17
+    help
+      GPIO pin for UART TX. Set to the pin connected to the peer's RX.
+
+config POUCH_UART_RX_PIN
+    int "UART RX GPIO pin"
+    default 18
+    help
+      GPIO pin for UART RX. Set to the pin connected to the peer's TX.
+
+config POUCH_UART_RX_BUFFER_SIZE
+    int "UART RX buffer size"
+    default 1024
+    help
+      Size in bytes of the ESP-IDF UART RX ring buffer.
+
+config POUCH_UART_TX_BUFFER_SIZE
+    int "UART TX buffer size"
+    default 512
+    help
+      Size in bytes of the ESP-IDF UART TX ring buffer.
+
+config POUCH_UART_EVENT_QUEUE_DEPTH
+    int "UART event queue depth"
+    default 20
+    help
+      Number of events the UART event queue can hold.
+
+config POUCH_UART_TASK_STACK_SIZE
+    int "UART RX task stack size"
+    default 8192
+    help
+      Stack size in bytes for the UART RX event task.
+
+config POUCH_UART_TASK_PRIORITY
+    int "UART RX task priority"
+    default 12
+    help
+      FreeRTOS priority for the UART RX event task.
+
+config POUCH_UART_INTERFRAME_DELAY_MS
+    int "Inter-frame delay (ms)"
+    default 5
+    range 0 10000
+    help
+      The minimum amount of time to wait between transmitted frames, in
+      milliseconds. The delay should be set to provide enough time for the peer
+      device to set up its RX buffers. Set to 0 to send frames back-to-back.
+
+endif # POUCH_UART_DEVICE || POUCH_UART_BROKER
+
+menuconfig POUCH_UART_DEVICE
+    bool "Pouch UART device transport"
+    depends on POUCH
+    select POUCH_TRANSPORT_SERIAL
+    select POUCH_TRANSPORT_SERIAL_DEVICE
+    help
+      Enable the UART transport adapter for the Pouch serial device
+      protocol. The device runs on the node and communicates with a
+      broker over a point-to-point UART link.
+
+menuconfig POUCH_UART_BROKER
+    bool "Pouch UART broker transport"
+    depends on POUCH_GATEWAY
+    select POUCH_TRANSPORT_SERIAL
+    select POUCH_TRANSPORT_SERIAL_BROKER
+    help
+      Enable the UART transport adapter for the Pouch serial broker
+      protocol. The broker runs on the gateway and drives the exchange
+      sequence with a device over a point-to-point UART link.
+
+      Requires Pouch gateway support.

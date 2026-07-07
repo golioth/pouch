@@ -99,6 +99,72 @@ source "subsys/logging/Kconfig.template.log_config"
 
 endif # POUCH_SPI_BROKER
 
+config POUCH_UART
+    bool # Invisible symbol enabling the common UART transport implementation
+
+config POUCH_UART_DEVICE
+    bool "Pouch UART device transport"
+    depends on SERIAL
+    depends on POUCH
+    select POUCH_UART
+    select UART_ASYNC_API
+    select POUCH_TRANSPORT_SERIAL_DEVICE
+    default $(dt_compat_on_bus,$(DT_COMPAT_GOLIOTH_POUCH_DEVICE),uart)
+    help
+      Enable the UART transport adapter for the Pouch serial device
+      protocol. The device runs on the node and communicates with a
+      broker over a point-to-point UART link.
+
+if POUCH_UART_DEVICE
+
+module = POUCH_UART_DEVICE
+module-str = Pouch UART Device
+source "subsys/logging/Kconfig.template.log_config"
+
+endif
+
+config POUCH_UART_BROKER
+    bool "Pouch UART broker transport"
+    depends on SERIAL
+    depends on POUCH_GATEWAY
+    select POUCH_UART
+    select UART_ASYNC_API
+    default $(dt_compat_on_bus,$(DT_COMPAT_GOLIOTH_POUCH_BROKER),uart)
+    help
+      Enable the UART transport adapter for the Pouch serial broker
+      protocol. The broker runs on the gateway and drives the exchange
+      sequence with a device over a point-to-point UART link.
+
+if POUCH_UART_BROKER
+
+module = POUCH_UART_BROKER
+module-str = Pouch UART Broker
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # POUCH_UART_BROKER
+
+if POUCH_UART
+
+config POUCH_UART_FRAME_SIZE
+    int "UART max frame size"
+    default 255
+    range 2 255
+    help
+      Maximum payload size in bytes for a single UART frame.
+
+config POUCH_UART_INTERFRAME_DELAY
+    int "Delay between each frame in milliseconds"
+    default 5
+    help
+      Time in milliseconds to wait between transmitted frames, to allow
+      the other device to set up its buffers.
+
+module = POUCH_UART
+module-str = Pouch UART common
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # POUCH_UART
+
 module = POUCH_SERIAL
 module-str = Pouch Serial Transport
 source "subsys/logging/Kconfig.template.log_config"

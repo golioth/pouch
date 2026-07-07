@@ -1,0 +1,12 @@
+# Copyright (c) 2026 Golioth, Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+title: Pouch UART Device transport adapter
+
+description: |
+  Declares a Pouch serial device that exchanges frames with a broker over a
+  point-to-point UART link.
+
+compatible: "golioth,pouch-device"
+
+include: uart-device.yaml

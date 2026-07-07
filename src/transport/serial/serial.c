@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <errno.h>
 #include <pouch/transport/serial/device.h>
 #include "packet.h"
 #include "serial.h"
@@ -97,7 +98,7 @@ int pouch_serial_recv(struct pouch_serial *s, const void *frame, size_t len)
     int err = pouch_serial_header_decode(bytes[0], &header);
     if (err)
     {
-        POUCH_LOG_INF("malformed header 0x%02x, ignoring (len=%zu)", bytes[0], len);
+        POUCH_LOG_ERR("malformed header 0x%02x, ignoring (len=%zu)", bytes[0], len);
         return err;
     }
 

@@ -4,3 +4,4 @@
 
 add_subdirectory(http)
 add_subdirectory(gatt)
+add_subdirectory(uart)

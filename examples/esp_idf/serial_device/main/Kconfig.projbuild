@@ -1,0 +1,20 @@
+# Copyright (c) 2026 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+menu "Example: Pouch UART Serial Device"
+
+config EXAMPLE_SYNC_PERIOD_S
+    int "Sync Period (s)"
+    default 20
+    help
+      The time, in seconds, after a sync to wait before requesting a
+      sync from a gateway.
+
+config EXAMPLE_FW_UPDATE_COMPONENT
+    string "OTA component to use for firmware update"
+    default "serial_device_example"
+    help
+      Name of component in OTA manifest to use for firmware update.
+
+endmenu

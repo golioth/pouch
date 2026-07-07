@@ -1,0 +1,24 @@
+# Copyright (c) 2026 Golioth, Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+title: Pouch UART Broker transport adapter
+
+description: |
+  Declares a Pouch serial broker that exchanges frames with a device over a
+  point-to-point UART link. The broker runs on the gateway and drives the
+  exchange sequence. The node is instantiated on a UART bus.
+
+  Example overlay:
+
+    &uart1 {
+        status = "okay";
+        current-speed = <115200>;
+
+        pouch_uart_broker: pouch-uart-broker {
+            compatible = "golioth,pouch-broker";
+        };
+    };
+
+compatible: "golioth,pouch-broker"
+
+include: uart-device.yaml
