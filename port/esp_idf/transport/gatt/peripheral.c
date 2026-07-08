@@ -273,7 +273,7 @@ static struct pouch_characteristic *char_find_by_val_handle(uint16_t val_handle)
  * GATT Service Definition (NimBLE)
  **************************************************/
 
-static const ble_uuid128_t pouch_svc_uuid = POUCH_GATT_UUID_SVC_VAL;
+static const ble_uuid16_t pouch_svc_uuid = POUCH_GATT_UUID_SVC_VAL;
 static const ble_uuid128_t pouch_downlink_uuid = POUCH_GATT_UUID_DOWNLINK_CHRC_VAL;
 static const ble_uuid128_t pouch_uplink_uuid = POUCH_GATT_UUID_UPLINK_CHRC_VAL;
 static const ble_uuid128_t pouch_info_uuid = POUCH_GATT_UUID_INFO_CHRC_VAL;

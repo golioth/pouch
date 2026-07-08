@@ -21,14 +21,14 @@
 
 #include "host/ble_uuid.h"
 
+#include <pouch/transport/bluetooth/gatt.h>
+
 #define BT_ATT_OVERHEAD 3 /* opcode (1) + handle (2) */
 
 /* clang-format off */
 
-/* Pouch GATT Service UUID: 89a316ae-89b7-4ef6-b1d3-5c9a6e27d272 */
-#define POUCH_GATT_UUID_SVC_VAL \
-    BLE_UUID128_INIT(0x72, 0xd2, 0x27, 0x6e, 0x9a, 0x5c, 0xd3, 0xb1, \
-                     0xf6, 0x4e, 0xb7, 0x89, 0xae, 0x16, 0xa3, 0x89)
+/* Pouch GATT Service UUID: 0xFC49 */
+#define POUCH_GATT_UUID_SVC_VAL BLE_UUID16_INIT(POUCH_GATT_UUID_SVC_VAL_16)
 
 /* Pouch Uplink Characteristic UUID: 89a316ae-89b7-4ef6-b1d3-5c9a6e27d273 */
 #define POUCH_GATT_UUID_UPLINK_CHRC_VAL \
