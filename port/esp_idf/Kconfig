@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+rsource "lib/zcbor/Kconfig"
+
 menu "Pouch"
 
 menuconfig POUCH
