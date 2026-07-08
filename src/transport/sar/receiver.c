@@ -227,9 +227,16 @@ void pouch_receiver_close(struct pouch_receiver *recv)
 
     pouch_work_cancel_delayable(&recv->work);
 
-    if (recv->state == STATE_ACTIVE || recv->state == STATE_READY)
+    switch ((enum state) recv->state)
     {
-        // If the transfer didn't finish properly, stop it and report it as failed:
-        end(recv, false);
+        case STATE_ACTIVE:
+        case STATE_READY:
+        case STATE_ENDED:
+            // If the transfer didn't finish properly, stop it and report it as failed:
+            end(recv, false);
+            break;
+        case STATE_IDLE:
+        case STATE_FAILED:
+            break;
     }
 }
