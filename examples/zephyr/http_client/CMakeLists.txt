@@ -10,12 +10,17 @@ project(http_transport)
 target_sources(app PRIVATE
   src/main.c
   src/credentials.c
+  src/net.c
 )
 
 if(CONFIG_EXAMPLE_FW_UPDATE_SHA256_VERIFY)
     target_sources(app PRIVATE src/fw_update_test.c)
 elseif(CONFIG_EXAMPLE_FW_UPDATE_FLASH)
     target_sources(app PRIVATE src/fw_update.c)
+endif()
+
+if(CONFIG_MODEM)
+    target_sources(app PRIVATE src/modem.c)
 endif()
 
 if(CONFIG_WIFI)

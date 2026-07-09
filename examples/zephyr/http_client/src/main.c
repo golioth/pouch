@@ -8,10 +8,7 @@
 LOG_MODULE_REGISTER(http_transport, CONFIG_EXAMPLE_HTTP_CLIENT_LOG_LEVEL);
 
 #include "credentials.h"
-
-#ifdef CONFIG_WIFI
-#include "wifi.h"
-#endif
+#include "net.h"
 
 #include <zephyr/net/socket.h>
 #include <zephyr/net/http/client.h>
@@ -96,7 +93,7 @@ int main(void)
         return 0;
     }
 
-    IF_ENABLED(CONFIG_WIFI, (wifi_connect()));
+    net_connect();
 
     err = pouch_http_client_init(CONFIG_EXAMPLE_HTTP_CLIENT_TLS_CREDENTIALS, K_FOREVER);
     if (0 != err)
