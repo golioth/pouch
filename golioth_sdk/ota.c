@@ -213,7 +213,13 @@ static void ota_receive_component_start(golioth_downlink_id_t id, const char *pa
     {
         component_download.downlink_id = id;
         size_t name_len = ((intptr_t) delimiter) - ((intptr_t) path_remainder);
-        strncpy(component_download.name, path_remainder, name_len);
+        if (name_len >= sizeof(component_download.name))
+        {
+            POUCH_LOG_ERR("Component name too large");
+            component_download.downlink_id = DOWNLINK_ID_INVALID;
+            return;
+        }
+        memcpy(component_download.name, path_remainder, name_len);
         component_download.name[name_len] = '\0';
         strncpy(component_download.version, delimiter + 1, sizeof(component_download.version));
         component_download.version[sizeof(component_download.version) - 1] = '\0';
