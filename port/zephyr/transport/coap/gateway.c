@@ -35,7 +35,7 @@ LOG_MODULE_REGISTER(pouch_coap_gateway, CONFIG_POUCH_COAP_CLIENT_LOG_LEVEL);
 
 /*
  * Push the cached server certificate to the gateway core so the
- * gateway can hand it out to BLE peripherals.  Safe to call multiple
+ * gateway can hand it out to BLE peripherals. Safe to call multiple
  * times; the gateway core deduplicates internally via a serial check.
  */
 static void publish_server_cert_to_gateway(void)
