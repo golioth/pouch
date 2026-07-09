@@ -437,10 +437,15 @@ int main(void)
     {
         wait_for_network();
 
-        err = pouch_gateway_cloud_ensure_ready();
-        if (err)
+        while (true)
         {
+            err = pouch_gateway_cloud_ensure_ready();
+            if (!err)
+            {
+                break;
+            }
             LOG_WRN("Initial cloud transport setup failed: %d, will retry", err);
+            k_sleep(K_SECONDS(5));
         }
     }
 
