@@ -75,8 +75,16 @@ jobs:
           # Install Pouch dependencies
           pip install -r requirements-ci-esp-idf.txt --require-hashes
 
-          # Enable shorter 10s sync delay for Hil testing
-          export SDKCONFIG_DEFAULTS="sdkconfig.defaults;pytest/sdkconfig.pytest.defaults"
+          # Prepare App Version
+          cd ${{ matrix.sample.dir }}
+          cat <<EOF > fw_update.defaults
+          CONFIG_EXAMPLE_FW_UPDATE_COMPONENT="hil_ota_${{ inputs.idf_target }}"
+          CONFIG_APP_PROJECT_VER="1.2.3"
+          EOF
+          cd -
+
+          # Shorter 10s sync delay for HIL testing and package name/version
+          export SDKCONFIG_DEFAULTS="sdkconfig.defaults;pytest/sdkconfig.pytest.defaults;fw_update.defaults"
 
           idf.py -C "${{ matrix.sample.dir }}" set-target "${{ inputs.idf_target }}"
           idf.py -C "${{ matrix.sample.dir }}" build
@@ -92,6 +100,35 @@ jobs:
           )
 
           tar -cf build-artifacts.tar "${artifact_files[@]}"
+
+      - name: Build update version of firmware
+        shell: bash
+        run: |
+          . "$IDF_PATH/export.sh"
+
+          # Ensure we can query the short hash
+          git config --global --add safe.directory $GITHUB_WORKSPACE
+
+          # Prepare App Update Version
+          cd ${{ matrix.sample.dir }}
+          cat <<EOF > fw_update.defaults
+          CONFIG_EXAMPLE_FW_UPDATE_COMPONENT="hil_ota_${{ inputs.idf_target }}"
+          CONFIG_APP_PROJECT_VER="$(git rev-parse --short HEAD)"
+          EOF
+          cd -
+
+          # Shorter 10s sync delay for HIL testing and package name/version
+          export SDKCONFIG_DEFAULTS="sdkconfig.defaults;pytest/sdkconfig.pytest.defaults;fw_update.defaults"
+
+          rm -f "${{ matrix.sample.dir }}/sdkconfig"
+          idf.py -C "${{ matrix.sample.dir }}" reconfigure
+          idf.py -C "${{ matrix.sample.dir }}" build
+
+          # Find the app update binary, rename, and include in the artifact upload
+          cd "${{ matrix.sample.dir }}"
+          APP_BIN=$(python3 -c "import json; print(json.load(open('build/flasher_args.json'))['app']['file'])")
+          cp "build/${APP_BIN}" "build/${{ matrix.sample.name }}_${{ inputs.idf_target }}_fwupdate.bin"
+          tar -rf build-artifacts.tar "build/${{ matrix.sample.name }}_${{ inputs.idf_target }}_fwupdate.bin"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
