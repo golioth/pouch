@@ -26,6 +26,7 @@ config POUCH_TRANSPORT_HTTP_CLIENT
   imply HTTP_CLIENT
   select EVENTS
   select NET_CONNECTION_MANAGER
+  select PSA_WANT_GENERATE_RANDOM if NRF_SECURITY
   help
     HTTP transport for Pouch
 

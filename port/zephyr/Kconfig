@@ -49,6 +49,7 @@ config POUCH_ENCRYPTION_SAEAD
   select MBEDTLS_X509_USE_C
   # nRF Connect SDK only:
   select MBEDTLS_X509_LIBRARY
+  select PSA_WANT_RSA_KEY_SIZE_4096 if NRF_SECURITY
   help
     Use a streaming AEAD encryption scheme for uplink Pouch transfers.
 
