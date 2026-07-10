@@ -217,6 +217,9 @@ jobs:
             exit 1
           fi
 
+          # Ensure we can query the short hash
+          git config --global --add safe.directory $GITHUB_WORKSPACE
+
           pytest -vv -rs -s                  \
             -c "$SAMPLE_DIR/pytest.ini"      \
             --rootdir "$SAMPLE_DIR"          \
@@ -225,6 +228,9 @@ jobs:
             --port "${!PORT_VAR}"            \
             --app-path "$SAMPLE_DIR"         \
             --build-dir build                \
+            --fw-update-bin "$SAMPLE_DIR/build/${{ matrix.sample.name }}_${{ inputs.idf_target }}_fwupdate.bin" \
+            --fw-update-ver "$(git rev-parse --short HEAD)" \
+            --fw-update-pkg-name "hil_ota_$IDF_TARGET"      \
             --erase-all n                    \
             --api-url "$GOLIOTH_API_URL"     \
             --api-key "$GOLIOTH_API_KEY"     \
