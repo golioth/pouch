@@ -1,0 +1,35 @@
+#include <nrf52840/nrf9160dk_uart1_on_if0_3.dtsi>
+
+/ {
+	aliases {
+		modem = &modem;
+	};
+
+	fstab {
+		compatible = "zephyr,fstab";
+		lfs1: lfs1 {
+			compatible = "zephyr,fstab,littlefs";
+			mount-point = "/lfs1";
+			partition = <&storage_partition>;
+			automount;
+			read-size = <16>;
+			prog-size = <16>;
+			cache-size = <64>;
+			lookahead-size = <32>;
+			block-cycles = <512>;
+		};
+	};
+};
+
+&uart1 {
+	current-speed = <115200>;
+	hw-flow-control;
+
+	modem: modem {
+		compatible = "nordic,nrf91-slm";
+		status = "okay";
+		autostarts;
+		mdm-dtr-gpios = <&interface_to_nrf9160 4 GPIO_ACTIVE_LOW>;
+		mdm-ring-gpios = <&interface_to_nrf9160 5 (GPIO_ACTIVE_LOW | GPIO_PULL_DOWN)>;
+	};
+};

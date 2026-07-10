@@ -8,10 +8,7 @@
 LOG_MODULE_REGISTER(coap_transport, CONFIG_EXAMPLE_COAP_CLIENT_LOG_LEVEL);
 
 #include "credentials.h"
-
-#ifdef CONFIG_WIFI
-#include "wifi.h"
-#endif
+#include "net.h"
 
 #include <zephyr/net/socket.h>
 #include <zephyr/net/tls_credentials.h>
@@ -93,7 +90,7 @@ int main(void)
         return err;
     }
 
-    IF_ENABLED(CONFIG_WIFI, (wifi_connect()));
+    net_connect();
 
     err = pouch_coap_client_init(CONFIG_EXAMPLE_COAP_CLIENT_DTLS_CREDENTIALS);
     if (err)
