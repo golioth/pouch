@@ -22,6 +22,8 @@ SYNC_TIMEOUT_S = 180.0
 LED_TIMEOUT_S = 90.0
 REBOOT_TIMEOUT_S = 120.0
 BOOT_STATE_TIMEOUT_S = 90.0
+OTA_DOWNLOAD_TIMEOUT_S = 180.0
+OTA_REBOOT_TIMEOUT_S = 180.0
 STREAM_POLL_ATTEMPTS = 24
 STREAM_POLL_DELAY_S = 5.0
 BOOT_INITIALIZED_TEXT = "Pouch successfully initialized"
@@ -343,3 +345,31 @@ async def test_led_setting_downlink(connected_cloud_session):
     await _dut_expect(dut, expected_pattern, timeout=LED_TIMEOUT_S)
     elapsed = time.monotonic() - write_start
     print(f"Device received LED setting {int(next_led)} after {elapsed:.1f}s")
+
+
+async def test_ota_firmware_update(
+    connected_cloud_session,
+    ota_update,
+    fw_update_ver,
+):
+    dut = connected_cloud_session.dut
+
+    await _dut_expect(
+        dut, r".*Beginning package download", timeout=OTA_DOWNLOAD_TIMEOUT_S
+    )
+    await _dut_expect(
+        dut,
+        r".*Rebooting into new image in \d+ seconds",
+        timeout=OTA_REBOOT_TIMEOUT_S,
+    )
+    await _dut_expect(
+        dut,
+        rf".*App version:\s+{re.escape(fw_update_ver)}",
+        timeout=OTA_REBOOT_TIMEOUT_S,
+    )
+    await _dut_expect(
+        dut,
+        rf".*{re.escape(BOOT_INITIALIZED_TEXT)}",
+        timeout=OTA_REBOOT_TIMEOUT_S,
+    )
+    await _dut_expect(dut, r".*Sync successful", timeout=OTA_REBOOT_TIMEOUT_S)
