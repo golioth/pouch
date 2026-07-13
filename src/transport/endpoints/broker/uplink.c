@@ -7,6 +7,7 @@
 #include <pouch/gateway/uplink.h>
 #include <pouch/port.h>
 #include "gateway/types.h"
+#include "gateway/uplink.h"
 #include "transport/bearer.h"
 #include "endpoints.h"
 
@@ -21,6 +22,17 @@ static void uplink_end_cb(void *ctx, enum pouch_gateway_uplink_result res)
     if (POUCH_GATEWAY_UPLINK_SUCCESS != res)
     {
         pouch_bearer_close(bearer, false);
+    }
+}
+
+static void close_work_handler(pouch_work_t *work)
+{
+    struct pouch_gateway_node_info *node =
+        CONTAINER_OF(work, struct pouch_gateway_node_info, close_work);
+
+    if (node->uplink != NULL)
+    {
+        pouch_gateway_uplink_close(node->uplink);
     }
 }
 
@@ -40,6 +52,8 @@ static int start(struct pouch_bearer *bearer)
         return -ENOMEM;
     }
 
+    pouch_work_init(&node->close_work, close_work_handler);
+
     return 0;
 }
 
@@ -54,8 +68,9 @@ static void end(struct pouch_bearer *bearer, bool success)
 {
     struct pouch_gateway_node_info *node = bearer->ctx;
     POUCH_LOG_DBG("Uplink end: %s", success ? "success" : "fail");
-    pouch_gateway_uplink_close(node->uplink);
-    node->uplink = NULL;
+
+    /* node->uplink will be set to NULL by uplink_end_cb */
+    pouch_gateway_submit_close_work(&node->close_work);
 }
 
 const struct pouch_endpoint broker_endpoint_uplink = {

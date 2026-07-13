@@ -14,9 +14,13 @@
 #include <pouch/gateway/uplink.h>
 #include <pouch/port.h>
 
+#include "uplink.h"
 #include "../buf.h"
 
 POUCH_LOG_REGISTER(gw_uplink, CONFIG_POUCH_GATEWAY_LOG_LEVEL);
+
+POUCH_THREAD_STACK_DEFINE(gateway_work_q_stack, CONFIG_POUCH_GATEWAY_WORKQ_STACK_SIZE);
+static pouch_work_q_t gateway_work_q;
 
 enum pouch_flags
 {
@@ -231,6 +235,18 @@ void pouch_gateway_uplink_module_init(void)
     /* Cloud transport state is registered separately via
      * pouch_gateway_cloud_transport_register().
      */
+    pouch_work_queue_init(&gateway_work_q);
+
+    pouch_work_queue_start(&gateway_work_q,
+                           gateway_work_q_stack,
+                           CONFIG_POUCH_GATEWAY_WORKQ_STACK_SIZE,
+                           CONFIG_POUCH_GATEWAY_WORKQ_PRIORITY,
+                           "gw_workq");
+}
+
+void pouch_gateway_submit_close_work(pouch_work_t *work)
+{
+    pouch_work_submit_to_queue(&gateway_work_q, work);
 }
 
 struct pouch_gateway_uplink *pouch_gateway_uplink_open(

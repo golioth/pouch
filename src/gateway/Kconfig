@@ -49,6 +49,18 @@ config POUCH_GATEWAY_CLOUD
     bool "Send pouches to cloud"
     default y
 
+config POUCH_GATEWAY_WORKQ_STACK_SIZE
+    int "Gateway work queue stack size"
+    default 3072
+    help
+      Stack size for the internal gateway work queue.
+
+config POUCH_GATEWAY_WORKQ_PRIORITY
+    int "Gateway work queue priority"
+    default 5
+    help
+      Priority for the internal gateway work queue.
+
 config POUCH_GATEWAY_SERVER_CERT_BUILTIN
     bool
     default y if !POUCH_GATEWAY_CLOUD

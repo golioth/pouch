@@ -7,6 +7,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <pouch/port.h>
 #include "info.h"
 #include <pouch/gateway/uplink.h>
 #include "downlink.h"
@@ -21,4 +22,5 @@ struct pouch_gateway_node_info
     struct pouch_gateway_server_cert_context *server_cert_ctx;
     bool server_cert_provisioned;
     bool device_cert_provisioned;
+    pouch_work_t close_work;
 };
