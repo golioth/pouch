@@ -24,18 +24,31 @@ uv pip install --python "$IDF_PYTHON_ENV_PATH" -r requirements-ci-esp-idf.txt --
 uv pip install --python "$IDF_PYTHON_ENV_PATH" "golioth@git+https://github.com/golioth/python-golioth-tools@v0.8.1"
 ```
 
+4. Enable the required Golioth pipeline route for stream validation:
+
+   The stream test (`test_sensor_uplink_contains_temp`) expects JSON data
+   sent on `.s/sensor` to be routed into LightDB Stream. Enable the pipeline
+   from this file in your Golioth project before running the test:
+
+   - `examples/esp_idf/ble_gatt/pytest/json-sensor-path-to-lightdb-stream.txt`
+
 ## Build Firmware
 
 From the repository root (`pouch`):
 
 ```bash
 idf.py -C examples/esp_idf/ble_gatt set-target esp32s3
+export SDKCONFIG_DEFAULTS="sdkconfig.defaults;pytest/sdkconfig.pytest.defaults"
 idf.py -C examples/esp_idf/ble_gatt build
 ```
 
+This build command includes an overlay file that resets the sync
+interval to 10s. This may be omitted to use the default 30s period.
+
 ## Run Test
 
-Set required environment variables:
+Set required environment variables (test auto-provisions before cloud
+checks):
 
 ```bash
 export GOLIOTH_API_URL="https://api.golioth.io"
