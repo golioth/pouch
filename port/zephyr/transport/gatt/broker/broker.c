@@ -47,6 +47,15 @@ static void sub_complete(struct broker_bt_gatt_device *device, enum broker_bt_at
 static void link_complete(struct broker_bt_gatt_device *device, enum broker_bt_attr attr);
 static void close_subscriptions(struct broker_bt_gatt_device *device);
 
+static void broker_locks_init(void)
+{
+    for (size_t i = 0; i < CONFIG_BT_MAX_CONN; i++)
+    {
+        pouch_mutex_init(&devices[i].lock);
+    }
+}
+POUCH_APPLICATION_STARTUP_HOOK(broker_locks_init);
+
 static inline struct broker_bt_gatt_device *device_from_characteristic(struct characteristic *c)
 {
     ptrdiff_t diff = (intptr_t) c - (intptr_t) &devices[0];
@@ -107,29 +116,62 @@ static void bearer_close(struct pouch_bearer *bearer, bool success)
 static void bearer_ready(struct pouch_bearer *bearer)
 {
     struct characteristic *c = CONTAINER_OF(bearer, struct characteristic, bearer);
+    struct broker_bt_gatt_device *device = device_from_characteristic(c);
+    if (device == NULL)
+    {
+        return;
+    }
+
+    pouch_mutex_lock(&device->lock, POUCH_FOREVER);
     switch (c->type)
     {
         case CHAR_RECEIVER:
-            return pouch_receiver_ready(c->receiver);
+            pouch_receiver_ready(c->receiver);
+            break;
         case CHAR_SENDER:
-            return pouch_sender_ready(c->sender);
+            pouch_sender_ready(c->sender);
+            break;
     }
+    pouch_mutex_unlock(&device->lock);
 }
 
 static int open(struct characteristic *c)
 {
+    struct broker_bt_gatt_device *device = device_from_characteristic(c);
+    int ret = -EINVAL;
+
+    if (device == NULL)
+    {
+        return -ENOENT;
+    }
+
+    pouch_mutex_lock(&device->lock, POUCH_FOREVER);
     switch (c->type)
     {
         case CHAR_RECEIVER:
-            return pouch_receiver_open(c->receiver, &c->bearer, CONFIG_POUCH_GATT_WINDOW_SIZE);
+            ret = pouch_receiver_open(c->receiver, &c->bearer, CONFIG_POUCH_GATT_WINDOW_SIZE);
+            break;
         case CHAR_SENDER:
-            return pouch_sender_open(c->sender, &c->bearer);
+            ret = pouch_sender_open(c->sender, &c->bearer);
+            break;
     }
-    return -EINVAL;
+    pouch_mutex_unlock(&device->lock);
+    return ret;
 }
 
 static void close(struct characteristic *c)
 {
+    struct broker_bt_gatt_device *device = device_from_characteristic(c);
+
+    if (device == NULL)
+    {
+        return;
+    }
+
+    /* This must be a recursive lock to avoid a deadlock in a case where the recv() function has
+     * taken the lock, then sar.c calls end() which eventually calls this close() function
+     */
+    pouch_mutex_lock(&device->lock, POUCH_FOREVER);
     switch (c->type)
     {
         case CHAR_RECEIVER:
@@ -139,18 +181,31 @@ static void close(struct characteristic *c)
             pouch_sender_close(c->sender);
             break;
     }
+    pouch_mutex_unlock(&device->lock);
 }
 
 static int recv(struct characteristic *c, const void *data, size_t length)
 {
+    struct broker_bt_gatt_device *device = device_from_characteristic(c);
+    int ret = -EINVAL;
+
+    if (device == NULL)
+    {
+        return -ENOENT;
+    }
+
+    pouch_mutex_lock(&device->lock, POUCH_FOREVER);
     switch (c->type)
     {
         case CHAR_RECEIVER:
-            return pouch_receiver_recv(c->receiver, data, length);
+            ret = pouch_receiver_recv(c->receiver, data, length);
+            break;
         case CHAR_SENDER:
-            return pouch_sender_recv(c->sender, data, length);
+            ret = pouch_sender_recv(c->sender, data, length);
+            break;
     }
-    return -EINVAL;
+    pouch_mutex_unlock(&device->lock);
+    return ret;
 }
 
 static uint8_t notify_cb(struct bt_conn *conn,

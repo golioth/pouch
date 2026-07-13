@@ -8,6 +8,7 @@
 #include "transport/bearer.h"
 #include "gateway/types.h"
 #include <pouch/gateway/bt/connect.h>
+#include <pouch/port.h>
 #include <zephyr/bluetooth/gatt.h>
 
 struct broker_bt_gatt_device;
@@ -60,6 +61,7 @@ struct characteristic
 /** Representation of a Pouch device exposing a BLE GATT Pouch service.  */
 struct broker_bt_gatt_device
 {
+    pouch_mutex_t lock;
     struct characteristic chars[BROKER_BT_ATTRS];
     struct
     {
