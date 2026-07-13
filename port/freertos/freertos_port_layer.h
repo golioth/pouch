@@ -96,6 +96,7 @@ int32_t pouch_timeout_to_freertos_ticks(int32_t pouch_timeout);
  * Work Queue
  *------------------------------------------------*/
 
+/* Flag bit used for both work queue and delayable work queues */
 #define POUCH_FREERTOS_WORK_FLAG_QUEUED 0
 
 typedef struct pouch_freertos_work_q pouch_work_q_internal_t;
@@ -142,4 +143,5 @@ struct pouch_freertos_work_delayable
     pouch_work_delayable_handler_t handler;
     TimerHandle_t timer;
     StaticTimer_t timer_buf;
+    pouch_atomic_t flags;
 };
