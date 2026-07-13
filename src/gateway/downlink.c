@@ -66,8 +66,10 @@ int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_las
         return -ECANCELED;
     }
 
-    struct pouch_buf *block =
-        blockbuf_alloc(POUCH_SECONDS(CONFIG_POUCH_GATEWAY_DOWNLINK_BLOCK_TIMEOUT));
+    pouch_timepoint_t deadline =
+        pouch_timepoint_get(POUCH_SECONDS(CONFIG_POUCH_GATEWAY_DOWNLINK_BLOCK_TIMEOUT));
+
+    struct pouch_buf *block = blockbuf_alloc(pouch_timepoint_timeout(deadline));
     if (block == NULL)
     {
         POUCH_LOG_ERR("Failed to allocate block");
@@ -84,7 +86,7 @@ int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_las
         downlink->last_block = block;
     }
 
-    int err = pouch_msgq_put(&downlink->block_queue, &block, POUCH_NO_WAIT);
+    int err = pouch_msgq_put(&downlink->block_queue, &block, pouch_timepoint_timeout(deadline));
     if (err)
     {
         POUCH_LOG_ERR("Failed to enqueue block: %d", err);
