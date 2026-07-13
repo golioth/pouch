@@ -298,17 +298,17 @@ void pouch_yield(void)
 
 void pouch_mutex_init(pouch_mutex_t *mutex)
 {
-    *mutex = xSemaphoreCreateMutex();
+    *mutex = xSemaphoreCreateRecursiveMutex();
 }
 
 bool pouch_mutex_lock(pouch_mutex_t *mutex, pouch_timeout_t timeout)
 {
-    return xSemaphoreTake(*mutex, pouch_timeout_to_freertos_ticks(timeout));
+    return xSemaphoreTakeRecursive(*mutex, pouch_timeout_to_freertos_ticks(timeout));
 }
 
 bool pouch_mutex_unlock(pouch_mutex_t *mutex)
 {
-    return xSemaphoreGive(*mutex);
+    return xSemaphoreGiveRecursive(*mutex);
 }
 
 /*--------------------------------------------------
