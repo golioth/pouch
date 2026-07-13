@@ -472,7 +472,10 @@ static void dwork_task_fn(void *param)
         {
             if ((NULL != dwork) && (NULL != dwork->handler))
             {
-                dwork->handler(dwork);
+                if (pouch_atomic_test_and_clear_bit(&dwork->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED))
+                {
+                    dwork->handler(dwork);
+                }
             }
         }
     }
@@ -508,7 +511,20 @@ static void delayable_work_timer_cb(TimerHandle_t timer)
 
     if (NULL != dwork)
     {
-        xQueueSend(dwork_queue, &dwork, portMAX_DELAY);
+        if (true == pouch_atomic_test_and_set_bit(&dwork->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED))
+        {
+            /* Already queued, do nothing */
+            return;
+        }
+
+        if (xQueueSend(dwork_queue, &dwork, 0) != pdTRUE)
+        {
+            POUCH_LOG_ERR("Delayable work queue full; scheduled work dropped");
+
+            /* Queue is full — clear the queued flag that we just set in the check above so future
+             * submissions can try again. */
+            pouch_atomic_clear_bit(&dwork->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED);
+        }
     }
 }
 
@@ -516,6 +532,7 @@ void pouch_work_delayable_init(pouch_work_delayable_t *dwork,
                                pouch_work_delayable_handler_t handler)
 {
     dwork->handler = handler;
+    pouch_atomic_clear(&dwork->flags);
     dwork->timer = xTimerCreateStatic("pouch_dwork",
                                       1,       /* dummy period, changed on schedule */
                                       pdFALSE, /* one-shot */
@@ -531,8 +548,20 @@ static int do_work_schedule(pouch_work_delayable_t *dwork, pouch_timeout_t delay
 {
     if (POUCH_NO_WAIT == delay)
     {
-        /* Submit to work queue for immediate processing */
-        xQueueSend(dwork_queue, &dwork, portMAX_DELAY);
+        /* Submit to work queue for immediate processing; if already queued, do nothing. This
+         * matches Zephyr k_work_submit_to_queue() behavior
+         */
+        if (true == pouch_atomic_test_and_set_bit(&dwork->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED))
+        {
+            return 0;
+        }
+
+        if (xQueueSend(dwork_queue, &dwork, 0) != pdTRUE)
+        {
+            pouch_atomic_clear_bit(&dwork->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED);
+            return -ENOMEM;
+        }
+
         return 0;
     }
 
@@ -560,21 +589,23 @@ int pouch_work_schedule(pouch_work_delayable_t *dwork, pouch_timeout_t delay)
 
 int pouch_work_reschedule(pouch_work_delayable_t *dwork, pouch_timeout_t delay)
 {
-    xTimerStop(dwork->timer, portMAX_DELAY);
+    if (xTimerIsTimerActive(dwork->timer))
+    {
+        xTimerStop(dwork->timer, portMAX_DELAY);
+    }
     return do_work_schedule(dwork, delay);
 }
 
 /*
- * Note: Unlike Zephyr's k_work_cancel_delayable() which also removes work from
- * the queue if it has been submitted but not yet executed, this implementation
- * only cancels the pending timer. If the timer has already fired and the work
- * item is sitting in the queue awaiting execution, it will still run. In
- * practice this means a handler may execute once after cancel in the narrow
- * window between timer expiry and task processing.
+ * If the timer has already fired and the work item is sitting in the queue awaiting execution, the
+ * worker will dequeue it (by checking for a cleared QUEUED flag), and return. However, the worker
+ * still dereferences dwork before it reaches the flag test, so the caller must not free dwork until
+ * the worker has drained the queued entry.
  */
 void pouch_work_cancel_delayable(pouch_work_delayable_t *dwork)
 {
     xTimerStop(dwork->timer, portMAX_DELAY);
+    pouch_atomic_clear_bit(&dwork->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED);
 }
 
 #endif /* CONFIG_POUCH_DELAYABLE_WORK */

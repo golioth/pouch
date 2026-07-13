@@ -791,8 +791,20 @@ int pouch_work_reschedule(pouch_work_delayable_t *dwork, pouch_timeout_t delay);
 /**
  * @brief Cancel a pending delayable work item
  *
- * Cancels any pending scheduled execution of the work item. If the work is currently
- * executing, this function returns immediately without waiting for it to complete.
+ * Cancels any pending scheduled execution of the work item. This is an
+ * asynchronous operation: it stops the pending timer and marks the work
+ * item as cancelled so the worker skips the handler, but it does not wait
+ * for an already-queued instance to be dequeued, nor for a handler that
+ * is currently executing to finish.
+ *
+ * The caller MUST ensure @p dwork remains valid (not freed) until the
+ * worker has drained any already-queued instance. The worker may
+ * dereference @p dwork after this function returns. If the caller needs
+ * to free or reuse the work item's storage immediately, it must
+ * synchronize with the worker first (e.g. by sleeping long enough for
+ * the worker to process the queue, or by using a dedicated sync
+ * primitive). This mirrors the contract of Zephyr's
+ * k_work_cancel_delayable(), which the Zephyr port layer wraps directly.
  *
  * @param dwork Pointer to the delayable work item to cancel
  */
