@@ -1,7 +1,7 @@
 manifest:
   projects:
     - name: nrf
-      revision: v3.4.0
+      revision: f30459884d7f4c3769e5b61409d101d4baedc91e  # v3.4-branch
       url: http://github.com/nrfconnect/sdk-nrf
       import:
         name-allowlist:
