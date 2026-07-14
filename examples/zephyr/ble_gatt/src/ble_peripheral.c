@@ -9,6 +9,7 @@ LOG_MODULE_REGISTER(example_ble_peripheral);
 
 #include "ble_peripheral.h"
 
+#include <stdio.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 
