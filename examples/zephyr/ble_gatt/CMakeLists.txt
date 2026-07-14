@@ -11,6 +11,11 @@ target_sources(app PRIVATE
   src/main.c
   src/credentials.c
   src/fatal_error.c
-  src/fw_update.c
   src/ble_peripheral.c
 )
+
+if(CONFIG_EXAMPLE_FW_UPDATE_SHA256_VERIFY)
+    target_sources(app PRIVATE src/fw_update_test.c)
+elseif(CONFIG_EXAMPLE_FW_UPDATE_FLASH)
+    target_sources(app PRIVATE src/fw_update.c)
+endif()
