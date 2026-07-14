@@ -4,17 +4,18 @@ common:
   tags: bluetooth
   harness: pytest
   harness_config:
-    pytest_root:
-      - "../gateway/pytest"
     pytest_dut_scope: module
   sysbuild: true
   platform_allow:
     - nrf52_bsim
   integration_platforms:
     - nrf52_bsim
-  timeout: 180
 tests:
   pouch.gateway_custom_connect.lesc:
+    timeout: 180
+    harness_config:
+      pytest_root:
+        - ../gateway/pytest/test_sample.py
     extra_args:
       - SB_CONFIG_PERIPHERAL_MOUNT_CREDS=y
       - SB_CONFIG_GATEWAY_MOUNT_CREDS=y
@@ -23,6 +24,10 @@ tests:
       - peripheral_ble_gatt_example_0_CONFIG_EXAMPLE_SYNC_PERIOD_S=2
       - gateway_custom_connect_CONFIG_EXAMPLE_COAP_CLIENT_SYNC_PERIOD_S=2
   pouch.gateway_custom_connect.auth:
+    timeout: 180
+    harness_config:
+      pytest_root:
+        - ../gateway/pytest/test_sample.py
     extra_args:
       - SB_CONFIG_PERIPHERAL_MOUNT_CREDS=y
       - SB_CONFIG_GATEWAY_MOUNT_CREDS=y
@@ -31,3 +36,18 @@ tests:
       - peripheral_ble_gatt_example_0_CONFIG_EXAMPLE_SYNC_PERIOD_S=2
       - gateway_custom_connect_CONFIG_EXAMPLE_COAP_CLIENT_SYNC_PERIOD_S=2
       - gateway_custom_connect_CONFIG_POUCH_GATEWAY_GATT_SCAN_FILTER_BONDED=y
+  pouch.gateway_custom_connect.ota:
+    timeout: 300
+    harness_config:
+      pytest_root:
+        - ../gateway/pytest/test_ota.py
+    extra_args:
+      - SB_CONFIG_PERIPHERAL_MOUNT_CREDS=y
+      - SB_CONFIG_GATEWAY_MOUNT_CREDS=y
+      - peripheral_ble_gatt_example_0_CONFIG_PICOLIBC=y
+      - peripheral_ble_gatt_example_0_CONFIG_FILE_SYSTEM_NSIM_MOUNT=y
+      - peripheral_ble_gatt_example_0_CONFIG_EXAMPLE_SYNC_PERIOD_S=2
+      - peripheral_ble_gatt_example_0_CONFIG_EXAMPLE_FW_UPDATE_SHA256_VERIFY=y
+      - peripheral_ble_gatt_example_0_CONFIG_GOLIOTH_OTA_MAX_VERSION_LEN=64
+      - peripheral_ble_gatt_example_0_EXTRA_CONF_FILE=../gateway/overlay-ble_gatt-ci-ota.conf
+      - gateway_custom_connect_CONFIG_EXAMPLE_COAP_CLIENT_SYNC_PERIOD_S=2
