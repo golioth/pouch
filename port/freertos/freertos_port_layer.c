@@ -531,15 +531,24 @@ static void delayable_work_timer_cb(TimerHandle_t timer)
 void pouch_work_delayable_init(pouch_work_delayable_t *dwork,
                                pouch_work_delayable_handler_t handler)
 {
+    if (dwork->timer != NULL)
+    {
+        /* Already initialized, stop and reuse it */
+        xTimerStop(dwork->timer, portMAX_DELAY);
+    }
+    else
+    {
+        dwork->timer = xTimerCreateStatic("pouch_dwork",
+                                          1,       /* dummy period, changed on schedule */
+                                          pdFALSE, /* one-shot */
+                                          dwork,   /* timer ID = dwork pointer */
+                                          delayable_work_timer_cb,
+                                          &dwork->timer_buf);
+        configASSERT(NULL != dwork->timer);
+    }
+
     dwork->handler = handler;
     pouch_atomic_clear(&dwork->flags);
-    dwork->timer = xTimerCreateStatic("pouch_dwork",
-                                      1,       /* dummy period, changed on schedule */
-                                      pdFALSE, /* one-shot */
-                                      dwork,   /* timer ID = dwork pointer */
-                                      delayable_work_timer_cb,
-                                      &dwork->timer_buf);
-    configASSERT(NULL != dwork->timer);
 
     dwork_queue_init();
 }

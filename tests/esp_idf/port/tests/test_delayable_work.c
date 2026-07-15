@@ -117,6 +117,28 @@ void test_delayable_work_schedule_multiple(void)
     TEST_ASSERT_EQUAL_INT(1, ctx.call_count);
 }
 
+void test_delayable_work_reinit(void)
+{
+    struct test_dwork_ctx ctx = {.call_count = 0};
+
+    /* First init + schedule + fire */
+    pouch_work_delayable_init(&ctx.dwork, test_dwork_handler);
+    int ret = pouch_work_schedule(&ctx.dwork, POUCH_MSEC(20));
+    TEST_ASSERT_EQUAL_INT(0, ret);
+    vTaskDelay(pdMS_TO_TICKS(50));
+    TEST_ASSERT_EQUAL_INT(1, ctx.call_count);
+
+    /* Re-init on the same work item (must not orphan the old timer) */
+    pouch_work_delayable_init(&ctx.dwork, test_dwork_handler);
+
+    /* Schedule again — if the timer was orphaned, the daemon's list is
+     * corrupted and this may crash or fail to fire. */
+    ret = pouch_work_schedule(&ctx.dwork, POUCH_MSEC(20));
+    TEST_ASSERT_EQUAL_INT(0, ret);
+    vTaskDelay(pdMS_TO_TICKS(50));
+    TEST_ASSERT_EQUAL_INT(2, ctx.call_count);
+}
+
 TEST_CASE("Delayable Work", "[pouch][dwork]")
 {
     RUN_TEST(test_delayable_work_init);
@@ -125,4 +147,5 @@ TEST_CASE("Delayable Work", "[pouch][dwork]")
     RUN_TEST(test_delayable_work_reschedule);
     RUN_TEST(test_delayable_work_cancel);
     RUN_TEST(test_delayable_work_schedule_multiple);
+    RUN_TEST(test_delayable_work_reinit);
 }
