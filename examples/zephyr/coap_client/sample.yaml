@@ -2,8 +2,6 @@ sample:
   name: Pouch CoAP Client
 common:
   harness: pytest
-  harness_config:
-    pytest_dut_scope: module
   platform_allow:
     - native_sim
     - native_sim/native/64
@@ -16,6 +14,7 @@ tests:
     harness_config:
       pytest_root:
         - ../pytest/test_sample.py
+      pytest_dut_scope: module
     extra_configs:
       - CONFIG_FILE_SYSTEM_NSIM_MOUNT=y
       - 'CONFIG_NATIVE_EXTRA_CMDLINE_ARGS="-volume=./creds:/creds"'
@@ -25,6 +24,7 @@ tests:
     harness_config:
       pytest_root:
         - ../pytest/test_ota.py
+      pytest_dut_scope: module
     extra_configs:
       - CONFIG_FILE_SYSTEM_NSIM_MOUNT=y
       - 'CONFIG_NATIVE_EXTRA_CMDLINE_ARGS="-volume=./creds:/creds"'

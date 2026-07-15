@@ -3,8 +3,6 @@ sample:
 common:
   tags: bluetooth
   harness: pytest
-  harness_config:
-    pytest_dut_scope: module
   sysbuild: true
   platform_allow:
     - nrf52_bsim
@@ -15,7 +13,11 @@ tests:
     timeout: 180
     harness_config:
       pytest_root:
-        - pytest/test_sample.py
+        - ../pytest/test_sample.py
+      pytest_dut_scope: module
+      pytest_args:
+        - --gateway-cloud
+        - --target-domain=peripheral_ble_gatt_example_0
     extra_args:
       - SB_CONFIG_PERIPHERAL_MOUNT_CREDS=y
       - SB_CONFIG_GATEWAY_MOUNT_CREDS=y
@@ -27,7 +29,11 @@ tests:
     timeout: 180
     harness_config:
       pytest_root:
-        - pytest/test_sample.py
+        - ../pytest/test_sample.py
+      pytest_dut_scope: module
+      pytest_args:
+        - --gateway-cloud
+        - --target-domain=peripheral_ble_gatt_example_0
     extra_args:
       - SB_CONFIG_PERIPHERAL_MOUNT_CREDS=y
       - SB_CONFIG_GATEWAY_MOUNT_CREDS=y
@@ -40,7 +46,14 @@ tests:
     timeout: 300
     harness_config:
       pytest_root:
-        - pytest/test_ota.py
+        - ../pytest/test_ota.py
+      pytest_dut_scope: module
+      pytest_args:
+        - --gateway-cloud
+        - --target-domain=peripheral_ble_gatt_example_0
+        # Keep the image small: BLE-tunneled OTA is much slower than the
+        # direct coap/http_client tests.
+        - --ota-image-size=8192
     extra_args:
       - SB_CONFIG_PERIPHERAL_MOUNT_CREDS=y
       - SB_CONFIG_GATEWAY_MOUNT_CREDS=y

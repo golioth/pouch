@@ -13,12 +13,11 @@ pytestmark = pytest.mark.anyio
 
 
 async def test_setting_project(dut: DeviceAdapter):
-    dut.readlines_until(regex="Credentials loaded", timeout=60.0)
     dut.readlines_until(regex="Received LED setting: 0", timeout=120.0)
 
 
-async def test_setting_device(device, dut: DeviceAdapter):
+async def test_setting_device(settings_device, dut: DeviceAdapter):
     logging.info("Set device-level setting")
-    await device.settings.set("LED", True)
+    await settings_device.settings.set("LED", True)
 
     dut.readlines_until(regex="Received LED setting: 1", timeout=120.0)

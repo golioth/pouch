@@ -5,8 +5,11 @@ common:
   harness: pytest
   harness_config:
     pytest_root:
-      - "../gateway/pytest"
+      - "../pytest/test_sample.py"
     pytest_dut_scope: module
+    pytest_args:
+      - --gateway-cloud
+      - --target-domain=peripheral_ble_gatt_example_0
   sysbuild: true
   platform_allow:
     - nrf52_bsim
