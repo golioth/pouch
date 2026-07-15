@@ -21,7 +21,7 @@ config POUCH_COAP_GW_PORT
 
 config POUCH_COAP_REQUEST_TIMEOUT_S
     int "CoAP request timeout (seconds)"
-    default 300
+    default 10
     help
       Timeout for individual CoAP requests.
 
