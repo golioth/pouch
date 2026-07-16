@@ -9,7 +9,6 @@ import logging
 import os
 import random
 import secrets
-import shutil
 import string
 import sys
 from pathlib import Path
@@ -119,8 +118,8 @@ def target_build_dir(twister_harness_config: TwisterHarnessConfig, request):
     """Build tree of the Pouch DUT image.
 
     For sysbuild examples the sample.yaml passes --target-domain naming
-    the sub-image whose .config drives credentials, OTA package, and
-    whose creds/ directory is mounted at /creds inside the DUT.
+    the sub-image whose .config drives credentials, OTA package name,
+    and pouch identity DER filenames used in the shared creds/ tree.
     """
     build_dir = Path(twister_harness_config.devices[0].build_dir)
     domain = request.config.getoption("--target-domain")
@@ -128,38 +127,84 @@ def target_build_dir(twister_harness_config: TwisterHarnessConfig, request):
 
 
 @pytest.fixture(scope="module")
-def creds_dir(target_build_dir):
-    return target_build_dir / "creds"
+def gateway_build_dir(twister_harness_config: TwisterHarnessConfig):
+    """Build tree of the gateway sub-image, or None if none is present."""
+    build_dir = Path(twister_harness_config.devices[0].build_dir)
+    return next(
+        (
+            build_dir / name
+            for name in ("gateway", "gateway_custom_connect")
+            if (build_dir / name).exists()
+        ),
+        None,
+    )
 
 
 @pytest.fixture(scope="module")
-async def gateway_creds(
-    twister_harness_config: TwisterHarnessConfig,
-    gateway,
-    ca,
-    project,
-):
-    """Generate gateway DTLS credentials signed by the shared CA.
+def gateway_build_conf(gateway_build_dir):
+    """BuildConfiguration for the gateway sub-image, or None."""
+    if gateway_build_dir is None:
+        return None
+    return BuildConfiguration(str(gateway_build_dir))
+
+
+@pytest.fixture(scope="module")
+async def creds(creds_dir, ca, device, project, build_conf):
+    """Peripheral/device credentials, signed against the shared CA.
+
+    Overrides the plugin `creds` fixture to read the pouch identity DER
+    filenames from Kconfig so multiple devices can coexist in one
+    shared creds/ directory without stepping on each other's DER files.
+    Falls back to the plugin defaults (crt.der / key.der) when the
+    Kconfigs are absent.
+    """
+    crt_name = build_conf.get("CONFIG_EXAMPLE_POUCH_DEVICE_CRT_FILENAME", "crt.der")
+    key_name = build_conf.get("CONFIG_EXAMPLE_POUCH_DEVICE_KEY_FILENAME", "key.der")
+
+    generate_device_credentials(
+        creds_dir,
+        device.name,
+        project.id,
+        ca.key,
+        ca.cert,
+        crt_der_name=crt_name,
+        key_der_name=key_name,
+    )
+
+    logging.info("Upload root public key to Golioth server")
+    with open(ca.cert, "rb") as f:
+        cert_pem = f.read()
+    root_cert = await project.certificates.add(cert_pem, "root")
+    yield root_cert["data"]["id"]
+    await project.certificates.delete(root_cert["data"]["id"])
+
+
+@pytest.fixture(scope="module")
+async def gateway_creds(gateway, ca, creds_dir, project, gateway_build_conf):
+    """Gateway DTLS credentials signed by the shared CA, into the shared
+    creds/ directory under gateway-specific DER filenames.
 
     Runs only when a gateway cloud identity is enabled.
     """
     if gateway is None:
         return
 
-    build_dir = Path(twister_harness_config.devices[0].build_dir)
-    gateway_dir = next(
-        (
-            build_dir / name / "creds"
-            for name in ("gateway", "gateway_custom_connect")
-            if (build_dir / name).exists()
-        ),
-        build_dir / "gateway" / "creds",
+    crt_name = gateway_build_conf.get(
+        "CONFIG_EXAMPLE_POUCH_DEVICE_CRT_FILENAME", "crt.der"
+    )
+    key_name = gateway_build_conf.get(
+        "CONFIG_EXAMPLE_POUCH_DEVICE_KEY_FILENAME", "key.der"
     )
 
-    generate_device_credentials(gateway_dir, gateway.name, project.id, ca.key, ca.cert)
-
-    logging.info("Copy CA (DER) into gateway creds directory")
-    shutil.copy2(ca.der, gateway_dir / "ca.der")
+    generate_device_credentials(
+        creds_dir,
+        gateway.name,
+        project.id,
+        ca.key,
+        ca.cert,
+        crt_der_name=crt_name,
+        key_der_name=key_name,
+    )
 
 
 async def delete_led_setting(device):

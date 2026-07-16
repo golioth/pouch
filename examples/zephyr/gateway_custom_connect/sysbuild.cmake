@@ -27,10 +27,17 @@ if(BOARD MATCHES "bsim")
   # Mount gateway DTLS credentials (device cert + key for mTLS).
   # The CA used to verify the server is taken from the built-in ISRG
   # Root X1 unless EXAMPLE_COAP_CLIENT_DTLS_LOAD_CA_FROM_FILESYSTEM is set.
+  # The sample.yaml selects the host-side directory via
+  # SB_CONFIG_GATEWAY_MOUNT_CREDS. DER filenames are derived from the
+  # sub-image name so a shared creds/ directory does not collide.
   if(SB_CONFIG_GATEWAY_MOUNT_CREDS)
     set_config_bool(${DEFAULT_IMAGE} CONFIG_FILE_SYSTEM_NSIM_MOUNT y)
-    set_config_string(${DEFAULT_IMAGE} CONFIG_NATIVE_EXTRA_CMDLINE_ARGS "-volume=creds:/creds")
+    set_config_string(${DEFAULT_IMAGE} CONFIG_NATIVE_EXTRA_CMDLINE_ARGS "-volume=${SB_CONFIG_GATEWAY_MOUNT_CREDS}:/creds")
     set_config_string(${DEFAULT_IMAGE} CONFIG_EXAMPLE_CREDENTIALS_DIR "/creds")
+    set_config_string(${DEFAULT_IMAGE} CONFIG_EXAMPLE_POUCH_DEVICE_CRT_FILENAME "${DEFAULT_IMAGE}_crt.der")
+    set_config_string(${DEFAULT_IMAGE} CONFIG_EXAMPLE_POUCH_DEVICE_KEY_FILENAME "${DEFAULT_IMAGE}_key.der")
+    set_config_string(${DEFAULT_IMAGE} CONFIG_EXAMPLE_COAP_CLIENT_GW_DEVICE_CRT_FILENAME "${DEFAULT_IMAGE}_crt.der")
+    set_config_string(${DEFAULT_IMAGE} CONFIG_EXAMPLE_COAP_CLIENT_GW_DEVICE_KEY_FILENAME "${DEFAULT_IMAGE}_key.der")
   endif()
 
   function(add_peripheral name path)
@@ -52,10 +59,16 @@ if(BOARD MATCHES "bsim")
         # Override boot banner string for easier identification
         set_config_string(${target_name} CONFIG_BOOT_BANNER_STRING "Booting ${target_name}")
 
-        # Mount /creds, which need to be generated before running BabbleSim
+        # Mount /creds, which need to be generated before running BabbleSim.
+        # The sample.yaml selects the host-side directory via
+        # SB_CONFIG_PERIPHERAL_MOUNT_CREDS. DER filenames are derived
+        # from the sub-image name so a shared creds/ directory does not
+        # collide with other sub-images.
         if(SB_CONFIG_PERIPHERAL_MOUNT_CREDS)
-          set_config_string(${target_name} CONFIG_NATIVE_EXTRA_CMDLINE_ARGS "-volume=creds:/creds")
+          set_config_string(${target_name} CONFIG_NATIVE_EXTRA_CMDLINE_ARGS "-volume=${SB_CONFIG_PERIPHERAL_MOUNT_CREDS}:/creds")
           set_config_string(${target_name} CONFIG_EXAMPLE_CREDENTIALS_DIR "/creds")
+          set_config_string(${target_name} CONFIG_EXAMPLE_POUCH_DEVICE_CRT_FILENAME "${target_name}_crt.der")
+          set_config_string(${target_name} CONFIG_EXAMPLE_POUCH_DEVICE_KEY_FILENAME "${target_name}_key.der")
         endif()
 
         if(name STREQUAL "ble_gatt_example" AND

@@ -68,14 +68,19 @@ config PERIPHERAL_BLE_GATT_EXAMPLE_NUM
 endmenu
 
 config PERIPHERAL_MOUNT_CREDS
-	bool "Mount peripheral credentials under /creds directory"
+	string "Peripheral /creds mount source"
+	default ""
 	help
-	  Mount credentials located ${BUILD_DIR}/creds under /creds mountpoint in Zephyr.
+	  When set to a non-empty value, mount that host-side path (resolved
+	  relative to each peripheral sub-image's runtime cwd) at /creds
+	  inside the peripheral image. Leave empty to disable the mount.
 
 config GATEWAY_MOUNT_CREDS
-	bool "Mount gateway credentials under /creds directory"
+	string "Gateway /creds mount source"
+	default ""
 	help
-	  Mount gateway DTLS credentials located ${BUILD_DIR}/gateway/creds
-	  under /creds mountpoint in the gateway application.
+	  When set to a non-empty value, mount that host-side path (resolved
+	  relative to the gateway sub-image's runtime cwd) at /creds inside
+	  the gateway image. Leave empty to disable the mount.
 
 source "share/sysbuild/Kconfig"

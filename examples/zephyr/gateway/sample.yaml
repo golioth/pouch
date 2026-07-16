@@ -19,8 +19,8 @@ tests:
         - --gateway-cloud
         - --target-domain=peripheral_ble_gatt_example_0
     extra_args:
-      - SB_CONFIG_PERIPHERAL_MOUNT_CREDS=y
-      - SB_CONFIG_GATEWAY_MOUNT_CREDS=y
+      - 'SB_CONFIG_PERIPHERAL_MOUNT_CREDS="../creds"'
+      - 'SB_CONFIG_GATEWAY_MOUNT_CREDS="../creds"'
       - peripheral_ble_gatt_example_0_CONFIG_PICOLIBC=y
       - peripheral_ble_gatt_example_0_CONFIG_FILE_SYSTEM_NSIM_MOUNT=y
       - peripheral_ble_gatt_example_0_CONFIG_EXAMPLE_SYNC_PERIOD_S=2
@@ -35,8 +35,8 @@ tests:
         - --gateway-cloud
         - --target-domain=peripheral_ble_gatt_example_0
     extra_args:
-      - SB_CONFIG_PERIPHERAL_MOUNT_CREDS=y
-      - SB_CONFIG_GATEWAY_MOUNT_CREDS=y
+      - 'SB_CONFIG_PERIPHERAL_MOUNT_CREDS="../creds"'
+      - 'SB_CONFIG_GATEWAY_MOUNT_CREDS="../creds"'
       - peripheral_ble_gatt_example_0_CONFIG_PICOLIBC=y
       - peripheral_ble_gatt_example_0_CONFIG_FILE_SYSTEM_NSIM_MOUNT=y
       - peripheral_ble_gatt_example_0_CONFIG_EXAMPLE_SYNC_PERIOD_S=2
@@ -55,8 +55,8 @@ tests:
         # direct coap/http_client tests.
         - --ota-image-size=8192
     extra_args:
-      - SB_CONFIG_PERIPHERAL_MOUNT_CREDS=y
-      - SB_CONFIG_GATEWAY_MOUNT_CREDS=y
+      - 'SB_CONFIG_PERIPHERAL_MOUNT_CREDS="../creds"'
+      - 'SB_CONFIG_GATEWAY_MOUNT_CREDS="../creds"'
       - peripheral_ble_gatt_example_0_CONFIG_PICOLIBC=y
       - peripheral_ble_gatt_example_0_CONFIG_FILE_SYSTEM_NSIM_MOUNT=y
       - peripheral_ble_gatt_example_0_CONFIG_EXAMPLE_SYNC_PERIOD_S=2
