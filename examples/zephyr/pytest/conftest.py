@@ -9,8 +9,8 @@ import logging
 import os
 import random
 import secrets
+import shutil
 import string
-import subprocess
 import sys
 from pathlib import Path
 from typing import Generator
@@ -28,6 +28,7 @@ pytest_plugins = ["pytest_pouch.plugin"]
 
 import pytest  # noqa: E402
 
+from pytest_pouch.plugin import generate_device_credentials  # noqa: E402
 from runners.core import BuildConfiguration  # noqa: E402
 from twister_harness.device.device_adapter import DeviceAdapter  # noqa: E402
 from twister_harness.twister_harness_config import TwisterHarnessConfig  # noqa: E402
@@ -135,15 +136,12 @@ def creds_dir(target_build_dir):
 async def gateway_creds(
     twister_harness_config: TwisterHarnessConfig,
     gateway,
-    creds_dir,
-    creds,
+    ca,
     project,
 ):
     """Generate gateway DTLS credentials signed by the shared CA.
 
-    Runs only when a gateway cloud identity is enabled. Depends on
-    `creds` so the peripheral CA files already exist in `creds_dir`
-    before we sign against them.
+    Runs only when a gateway cloud identity is enabled.
     """
     if gateway is None:
         return
@@ -157,33 +155,11 @@ async def gateway_creds(
         ),
         build_dir / "gateway" / "creds",
     )
-    gateway_dir.mkdir(mode=0o755, exist_ok=True, parents=True)
 
-    ca_key = creds_dir / "ca.key.pem"
-    ca_cert = creds_dir / "ca.crt.pem"
+    generate_device_credentials(gateway_dir, gateway.name, project.id, ca.key, ca.cert)
 
-    def openssl(cmd):
-        subprocess.run(cmd, check=True, shell=True, cwd=gateway_dir)
-
-    logging.info("Generate gateway device private key and cert (signed by shared CA)")
-    openssl(
-        f"openssl ecparam -name prime256v1 -genkey -noout -out {gateway.name}.key.pem"
-    )
-    openssl(
-        f"openssl req -new -key {gateway.name}.key.pem "
-        f'-subj "/C=US/O={project.id}/CN={gateway.name}" '
-        f"-out {gateway.name}.csr.pem"
-    )
-    openssl(
-        f'openssl x509 -req -in "{gateway.name}.csr.pem" -CA "{ca_cert}" '
-        f'-CAkey "{ca_key}" -CAcreateserial -out "{gateway.name}.crt.pem" '
-        "-days 500 -sha256"
-    )
-
-    logging.info("Convert gateway key and cert to DER format")
-    openssl(f"openssl x509 -in {gateway.name}.crt.pem -outform DER -out crt.der")
-    openssl(f"openssl ec -in {gateway.name}.key.pem -outform DER -out key.der")
-    openssl(f"openssl x509 -in {ca_cert} -outform DER -out ca.der")
+    logging.info("Copy CA (DER) into gateway creds directory")
+    shutil.copy2(ca.der, gateway_dir / "ca.der")
 
 
 async def delete_led_setting(device):
