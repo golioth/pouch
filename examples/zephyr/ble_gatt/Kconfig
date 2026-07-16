@@ -21,6 +21,18 @@ config EXAMPLE_CREDENTIALS_DIR
     help
       Directory on mounted file system containing credentials.
 
+config EXAMPLE_POUCH_DEVICE_CRT_FILENAME
+    string "Pouch device crt filename in filesystem"
+    default "crt.der"
+    help
+      The filename used to store the pouch device certificate in the filesystem.
+
+config EXAMPLE_POUCH_DEVICE_KEY_FILENAME
+    string "Pouch device key filename in filesystem"
+    default "key.der"
+    help
+      The filename used to store the pouch device private key in the filesystem.
+
 config EXAMPLE_FW_UPDATE_COMPONENT
     string "OTA component to use for firmware update"
     default "ble_gatt_example"
