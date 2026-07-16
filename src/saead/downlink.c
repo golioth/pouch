@@ -153,6 +153,12 @@ struct pouch_buf *saead_downlink_block_buf_alloc(void)
 
 int saead_downlink_block_decrypt(const struct pouch_buf *block, struct pouch_buf *decrypted)
 {
+    if (!pouch_atomic_test_bit(&downlink.flags, SESSION_ACTIVE))
+    {
+        POUCH_LOG_ERR("Not in a session");
+        return -ENOTCONN;
+    }
+
     int err = session_decrypt_block(&downlink, block, decrypted);
     if (0 != err)
     {
