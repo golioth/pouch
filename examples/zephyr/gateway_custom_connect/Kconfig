@@ -55,4 +55,16 @@ config EXAMPLE_COAP_CLIENT_GW_DEVICE_KEY_FILENAME
 	help
 	  The filename used to store the mTLS device private key in the filesystem.
 
+config EXAMPLE_POUCH_DEVICE_CRT_FILENAME
+	string "Pouch device crt filename in filesystem"
+	default "crt.der"
+	help
+	  The filename used to store the pouch device certificate in the filesystem.
+
+config EXAMPLE_POUCH_DEVICE_KEY_FILENAME
+	string "Pouch device key filename in filesystem"
+	default "key.der"
+	help
+	  The filename used to store the pouch device private key in the filesystem.
+
 source "Kconfig.zephyr"
