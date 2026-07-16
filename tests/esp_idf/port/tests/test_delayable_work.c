@@ -23,7 +23,7 @@ static void test_dwork_handler(pouch_work_delayable_t *dwork)
 
 void test_delayable_work_init(void)
 {
-    struct test_dwork_ctx ctx = {.call_count = 0};
+    static struct test_dwork_ctx ctx = {.call_count = 0};
 
     pouch_work_delayable_init(&ctx.dwork, test_dwork_handler);
 
@@ -33,7 +33,7 @@ void test_delayable_work_init(void)
 
 void test_delayable_work_schedule_no_wait(void)
 {
-    struct test_dwork_ctx ctx = {.call_count = 0};
+    static struct test_dwork_ctx ctx = {.call_count = 0};
 
     pouch_work_delayable_init(&ctx.dwork, test_dwork_handler);
 
@@ -48,7 +48,7 @@ void test_delayable_work_schedule_no_wait(void)
 
 void test_delayable_work_schedule_delayed(void)
 {
-    struct test_dwork_ctx ctx = {.call_count = 0};
+    static struct test_dwork_ctx ctx = {.call_count = 0};
 
     pouch_work_delayable_init(&ctx.dwork, test_dwork_handler);
 
@@ -66,7 +66,7 @@ void test_delayable_work_schedule_delayed(void)
 
 void test_delayable_work_reschedule(void)
 {
-    struct test_dwork_ctx ctx = {.call_count = 0};
+    static struct test_dwork_ctx ctx = {.call_count = 0};
 
     pouch_work_delayable_init(&ctx.dwork, test_dwork_handler);
 
@@ -84,7 +84,7 @@ void test_delayable_work_reschedule(void)
 
 void test_delayable_work_cancel(void)
 {
-    struct test_dwork_ctx ctx = {.call_count = 0};
+    static struct test_dwork_ctx ctx = {.call_count = 0};
 
     pouch_work_delayable_init(&ctx.dwork, test_dwork_handler);
 
@@ -101,7 +101,7 @@ void test_delayable_work_cancel(void)
 
 void test_delayable_work_schedule_multiple(void)
 {
-    struct test_dwork_ctx ctx = {.call_count = 0};
+    static struct test_dwork_ctx ctx = {.call_count = 0};
 
     pouch_work_delayable_init(&ctx.dwork, test_dwork_handler);
 

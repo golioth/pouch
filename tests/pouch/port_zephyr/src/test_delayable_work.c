@@ -22,7 +22,7 @@ static void test_handler(pouch_work_delayable_t *dwork)
 
 ZTEST(delayable_work, test_delayable_work_init)
 {
-    struct test_work_ctx ctx = {.call_count = 0};
+    static struct test_work_ctx ctx = {.call_count = 0};
 
     pouch_work_delayable_init(&ctx.dwork, test_handler);
 
@@ -32,7 +32,7 @@ ZTEST(delayable_work, test_delayable_work_init)
 
 ZTEST(delayable_work, test_delayable_work_schedule_no_wait)
 {
-    struct test_work_ctx ctx = {.call_count = 0};
+    static struct test_work_ctx ctx = {.call_count = 0};
 
     pouch_work_delayable_init(&ctx.dwork, test_handler);
 
@@ -47,7 +47,7 @@ ZTEST(delayable_work, test_delayable_work_schedule_no_wait)
 
 ZTEST(delayable_work, test_delayable_work_schedule_delayed)
 {
-    struct test_work_ctx ctx = {.call_count = 0};
+    static struct test_work_ctx ctx = {.call_count = 0};
 
     pouch_work_delayable_init(&ctx.dwork, test_handler);
 
@@ -65,7 +65,7 @@ ZTEST(delayable_work, test_delayable_work_schedule_delayed)
 
 ZTEST(delayable_work, test_delayable_work_reschedule)
 {
-    struct test_work_ctx ctx = {.call_count = 0};
+    static struct test_work_ctx ctx = {.call_count = 0};
 
     pouch_work_delayable_init(&ctx.dwork, test_handler);
 
@@ -83,7 +83,7 @@ ZTEST(delayable_work, test_delayable_work_reschedule)
 
 ZTEST(delayable_work, test_delayable_work_cancel)
 {
-    struct test_work_ctx ctx = {.call_count = 0};
+    static struct test_work_ctx ctx = {.call_count = 0};
 
     pouch_work_delayable_init(&ctx.dwork, test_handler);
 
@@ -100,7 +100,7 @@ ZTEST(delayable_work, test_delayable_work_cancel)
 
 ZTEST(delayable_work, test_delayable_work_schedule_multiple)
 {
-    struct test_work_ctx ctx = {.call_count = 0};
+    static struct test_work_ctx ctx = {.call_count = 0};
 
     pouch_work_delayable_init(&ctx.dwork, test_handler);
 
