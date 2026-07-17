@@ -98,6 +98,8 @@ static void device_found(const bt_addr_le_t *addr,
     struct tf_data tf = {
         .addr = addr,
         .is_tf = false,
+        /* When filtering bonded devices is disabled, treat all devices as bonded */
+        .is_bonded = IS_ENABLED(CONFIG_POUCH_GATEWAY_GATT_SCAN_FILTER_BONDED) ? false : true,
     };
     int err;
 
