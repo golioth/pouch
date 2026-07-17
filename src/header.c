@@ -22,7 +22,7 @@
 // CBOR array start + version
 #define POUCH_HEADER_OVERHEAD 2
 
-#if defined(CONFIG_POUCH_ENCRYPTION_NONE)
+#if defined(CONFIG_POUCH_ENCRYPTION_MOCK)
 
 /* CBOR encryption_type + 32 byte string declaration. Assumes that the device ID max length is less
  * than 256 bytes.

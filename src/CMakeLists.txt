@@ -17,9 +17,9 @@ target_sources(${_pouch_target} PRIVATE
     ${_pouch_src_root}/downlink.c
 )
 
-pouch_config_enabled(_pouch_encryption_none CONFIG_POUCH_ENCRYPTION_NONE)
-if(_pouch_encryption_none)
-    target_sources(${_pouch_target} PRIVATE ${_pouch_src_root}/crypto_none.c)
+pouch_config_enabled(_pouch_encryption_mock CONFIG_POUCH_ENCRYPTION_MOCK)
+if(_pouch_encryption_mock)
+    target_sources(${_pouch_target} PRIVATE ${_pouch_src_root}/crypto_mock.c)
 endif()
 
 pouch_config_enabled(_pouch_encryption_saead CONFIG_POUCH_ENCRYPTION_SAEAD)
