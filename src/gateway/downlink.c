@@ -84,7 +84,14 @@ int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_las
         downlink->last_block = block;
     }
 
-    int err = pouch_msgq_put(&downlink->block_queue, &block, POUCH_NO_WAIT);
+    /* Wait for queue space with the same timeout used for buffer allocation
+     * so the CoAP producer applies backpressure instead of aborting the
+     * whole transfer the moment a slow consumer (e.g. BLE bearer) falls
+     * behind.
+     */
+    int err = pouch_msgq_put(&downlink->block_queue,
+                             &block,
+                             POUCH_SECONDS(CONFIG_POUCH_GATEWAY_DOWNLINK_BLOCK_TIMEOUT));
     if (err)
     {
         POUCH_LOG_ERR("Failed to enqueue block: %d", err);

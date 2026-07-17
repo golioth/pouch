@@ -7,6 +7,7 @@
 import logging
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -49,7 +50,12 @@ def creds_dir(request: pytest.FixtureRequest):
 
 
 @pytest.fixture(scope="module")
-async def creds(creds_dir, device, project):
+def ca(creds_dir):
+    """Shared CA key and certificate in ``creds_dir``.
+
+    Emits ca.key.pem, ca.crt.pem, and ca.der so downstream fixtures can
+    sign device certs (PEM) and firmware can load the CA in DER form.
+    """
     creds_dir.mkdir(mode=0o755, exist_ok=True, parents=True)
 
     logging.info("Generate CA private key and cert")
@@ -70,57 +76,99 @@ async def creds(creds_dir, device, project):
         shell=True,
         cwd=creds_dir,
     )
-
-    logging.info("Generate edge node private key, csr and cert")
-
     subprocess.run(
-        f"openssl ecparam -name prime256v1 -genkey -noout -out {device.name}.key.pem",
+        "openssl x509 -in ca.crt.pem -outform DER -out ca.der",
         check=True,
         shell=True,
         cwd=creds_dir,
+    )
+
+    return SimpleNamespace(
+        key=creds_dir / "ca.key.pem",
+        cert=creds_dir / "ca.crt.pem",
+        der=creds_dir / "ca.der",
+    )
+
+
+def generate_device_credentials(
+    dest_dir: Path,
+    device_name: str,
+    project_id: str,
+    ca_key: Path,
+    ca_cert: Path,
+    *,
+    crt_der_name: str = "crt.der",
+    key_der_name: str = "key.der",
+) -> None:
+    """Sign a device key + cert against ``ca_*`` and write PEM+DER into ``dest_dir``.
+
+    Writes:
+      - ``{device_name}.key.pem``, ``.csr.pem``, ``.crt.pem``
+      - ``<crt_der_name>`` (device cert, DER)
+      - ``<key_der_name>`` (device key, DER)
+
+    Does not emit ``ca.der``; the ``ca`` fixture writes that once into
+    ``creds_dir``. Callers that place device DER files into a directory
+    other than ``creds_dir`` are responsible for making the CA file
+    available at their target path.
+    """
+    dest_dir.mkdir(mode=0o755, exist_ok=True, parents=True)
+
+    logging.info("Generate device private key, csr and cert for '%s'", device_name)
+
+    subprocess.run(
+        f"openssl ecparam -name prime256v1 -genkey -noout -out {device_name}.key.pem",
+        check=True,
+        shell=True,
+        cwd=dest_dir,
     )
     subprocess.run(
         f"""\
     openssl req -new \
-        -key {device.name}.key.pem \
-        -subj "/C=US/O={project.id}/CN={device.name}" \
-        -out {device.name}.csr.pem""",
+        -key {device_name}.key.pem \
+        -subj "/C=US/O={project_id}/CN={device_name}" \
+        -out {device_name}.csr.pem""",
         check=True,
         shell=True,
-        cwd=creds_dir,
+        cwd=dest_dir,
     )
     subprocess.run(
         f"""\
     openssl x509 -req \
-        -in "{device.name}.csr.pem" \
-        -CA "ca.crt.pem" \
-        -CAkey "ca.key.pem" \
+        -in "{device_name}.csr.pem" \
+        -CA "{ca_cert}" \
+        -CAkey "{ca_key}" \
         -CAcreateserial \
-        -out "{device.name}.crt.pem" \
+        -out "{device_name}.crt.pem" \
         -days 500 -sha256""",
         check=True,
         shell=True,
-        cwd=creds_dir,
+        cwd=dest_dir,
     )
 
-    logging.info("Convert key and cert to DER format")
+    logging.info("Convert device key and cert to DER format")
 
     subprocess.run(
-        f"openssl x509 -in {device.name}.crt.pem -outform DER -out crt.der",
+        f"openssl x509 -in {device_name}.crt.pem -outform DER -out {crt_der_name}",
         check=True,
         shell=True,
-        cwd=creds_dir,
+        cwd=dest_dir,
     )
     subprocess.run(
-        f"openssl ec -in {device.name}.key.pem -outform DER -out key.der",
+        f"openssl ec -in {device_name}.key.pem -outform DER -out {key_der_name}",
         check=True,
         shell=True,
-        cwd=creds_dir,
+        cwd=dest_dir,
     )
+
+
+@pytest.fixture(scope="module")
+async def creds(creds_dir, ca, device, project):
+    generate_device_credentials(creds_dir, device.name, project.id, ca.key, ca.cert)
 
     logging.info("Upload root public key to Golioth server")
 
-    with open(creds_dir / "ca.crt.pem", "rb") as f:
+    with open(ca.cert, "rb") as f:
         cert_pem = f.read()
 
     root_cert = await project.certificates.add(cert_pem, "root")
