@@ -22,27 +22,16 @@ if POUCH
 # Pouch
 rsource "../../src/Kconfig"
 
-choice
-  prompt "Pouch uplink encryption scheme"
-  help
-    Select the encryption method to use for uplink Pouch transfers.
-
 config POUCH_ENCRYPTION_SAEAD
-  bool "Streaming AEAD"
+  bool
+  default y
   select MBEDTLS_ECDSA_C
   select MBEDTLS_ECP_C
   select MBEDTLS_HKDF_C
   help
     Use a streaming AEAD encryption scheme for uplink Pouch transfers.
 
-config POUCH_ENCRYPTION_NONE
-  bool "Plaintext"
-  help
-    No encryption.
-
-endchoice
-
-menu "Streaming AEAD encryption"
+menu "Encryption"
   depends on POUCH_ENCRYPTION_SAEAD
 
 choice

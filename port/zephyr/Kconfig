@@ -23,13 +23,9 @@ if POUCH
 # Pouch common
 rsource "../../src/Kconfig"
 
-choice
-  prompt "Pouch uplink encryption scheme"
-  help
-    Select the encryption method to use for uplink Pouch transfers.
-
 config POUCH_ENCRYPTION_SAEAD
-  bool "Streaming AEAD"
+  bool
+  default y if !POUCH_ENCRYPTION_MOCK
   select PSA_WANT_ALG_ECDSA
   select PSA_WANT_ALG_ECDH
   select PSA_WANT_ALG_HKDF
@@ -53,14 +49,13 @@ config POUCH_ENCRYPTION_SAEAD
   help
     Use a streaming AEAD encryption scheme for uplink Pouch transfers.
 
-config POUCH_ENCRYPTION_NONE
-  bool "Plaintext"
+config POUCH_ENCRYPTION_MOCK
+  bool "Mock encryption"
+  depends on ZTEST
   help
-    No encryption.
+    Mock encryption. Only available for tests. Cannot be used on target.
 
-endchoice
-
-menu "Streaming AEAD encryption"
+menu "Encryption"
   depends on POUCH_ENCRYPTION_SAEAD
 
 choice

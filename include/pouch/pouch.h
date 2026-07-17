@@ -29,7 +29,7 @@ struct pouch_config
      * The ID of the device's private key in the PSA key store.
      */
     psa_key_id_t private_key;
-#elif CONFIG_POUCH_ENCRYPTION_NONE
+#elif CONFIG_POUCH_ENCRYPTION_MOCK
     /**
      * The device ID. The length must not exceed @ref POUCH_DEVICE_ID_MAX_LEN.
      *
