@@ -7,6 +7,7 @@
 #pragma once
 
 #include <pouch/port.h>
+#include <stdint.h>
 
 /** Initial state of the buffer */
 #define POUCH_BUF_STATE_INITIAL ((pouch_buf_state_t) 0)
@@ -110,16 +111,16 @@ size_t pouch_bufview_memcpy(struct pouch_bufview *v, void *dst, size_t bytes);
 const void *pouch_bufview_read(struct pouch_bufview *v, size_t bytes);
 
 /** Read a byte from the buffer view */
-uint8_t pouch_bufview_read_byte(struct pouch_bufview *v);
+int pouch_bufview_read_byte(struct pouch_bufview *v, uint8_t *dst);
 
 /** Read a big endian uint16_t from the buffer view */
-uint16_t pouch_bufview_read_be16(struct pouch_bufview *v);
+int pouch_bufview_read_be16(struct pouch_bufview *v, uint16_t *dst);
 
 /** Read a big endian uint32_t from the buffer view */
-uint32_t pouch_bufview_read_be32(struct pouch_bufview *v);
+int pouch_bufview_read_be32(struct pouch_bufview *v, uint32_t *dst);
 
 /** Read a big endian uint64_t from the buffer view */
-uint64_t pouch_bufview_read_be64(struct pouch_bufview *v);
+int pouch_bufview_read_be64(struct pouch_bufview *v, uint64_t *dst);
 
 /** Get the number of bytes available for reading */
 size_t pouch_bufview_available(const struct pouch_bufview *v);
