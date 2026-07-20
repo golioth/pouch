@@ -117,6 +117,7 @@ async def ota_update(
             pouch_ota_package,
             fw_update_ver,
         )
+        artifacts_to_cleanup.append(artifact.id)
     else:
         logging.info(
             "Uploading OTA artifact: %s, version=%s, package=%s",
