@@ -22,6 +22,7 @@ static int start(struct pouch_bearer *bearer)
         POUCH_LOG_ERR("Failed to start server cert process");
         return -ENOMEM;
     }
+    POUCH_LOG_INF("Server cert process started");
 
     return 0;
 }

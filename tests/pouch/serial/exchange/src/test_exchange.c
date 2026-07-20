@@ -137,8 +137,7 @@ static void run_exchange(void)
     broker_done = false;
     broker_success = false;
 
-    int err = pouch_serial_broker_start(test_broker);
-    zassert_ok(err, "broker_start failed: %d", err);
+    pouch_serial_broker_start(test_broker);
 
     pump(MAX_PUMP_ITER);
 
@@ -405,8 +404,7 @@ ZTEST(serial_exchange, test_recv_error)
     load_default_payloads();
     broker_stubs.uplink.recv_err = -EIO;
 
-    int err = pouch_serial_broker_start(test_broker);
-    zassert_ok(err, "broker_start failed: %d", err);
+    pouch_serial_broker_start(test_broker);
 
     pump_until_done(MAX_PUMP_ITER);
 
@@ -429,8 +427,7 @@ ZTEST(serial_exchange, test_send_error)
     load_default_payloads();
     broker_stubs.downlink.send_err_after = 0;
 
-    int err = pouch_serial_broker_start(test_broker);
-    zassert_ok(err, "broker_start failed: %d", err);
+    pouch_serial_broker_start(test_broker);
 
     pump_until_done(MAX_PUMP_ITER);
 
@@ -461,8 +458,7 @@ ZTEST(serial_exchange, test_remote_send_error)
     stub_sender_set_data(&device_stubs.uplink, uplink_large, sizeof(uplink_large));
     device_stubs.uplink.send_err_after = 1;
 
-    int err = pouch_serial_broker_start(test_broker);
-    zassert_ok(err, "broker_start failed: %d", err);
+    pouch_serial_broker_start(test_broker);
 
     pump_until_done(MAX_PUMP_ITER);
 

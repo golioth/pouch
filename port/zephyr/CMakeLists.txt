@@ -76,6 +76,9 @@ if(CONFIG_POUCH)
     endif()
 endif()
 
+zephyr_library_sources_ifdef(CONFIG_POUCH_SPI_BROKER transport/serial/spi_broker.c)
+zephyr_library_sources_ifdef(CONFIG_POUCH_SPI_DEVICE transport/serial/spi_device.c)
+
 if(CONFIG_POUCH_GATEWAY)
     zephyr_include_directories(${CMAKE_CURRENT_LIST_DIR}/../../include)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../src/gateway gateway)
