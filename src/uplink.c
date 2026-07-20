@@ -224,13 +224,13 @@ int pouch_wait_for_queue(struct pouch_uplink *uplink, pouch_timeout_t timeout)
 
 enum pouch_result pouch_uplink_fill(struct pouch_uplink *uplink, uint8_t *dst, size_t *len)
 {
+    size_t maxlen = *len;
+    *len = 0;
+
     if (!session_is_active())
     {
         return POUCH_ERROR;
     }
-
-    size_t maxlen = *len;
-    *len = 0;
 
     while (*len < maxlen)
     {

@@ -173,6 +173,7 @@ int pouch_gateway_downlink_get_data(struct pouch_gateway_downlink_context *downl
 
     if (pouch_gateway_downlink_is_complete(downlink))
     {
+        *dst_len = 0;
         return -ENODATA;
     }
 
