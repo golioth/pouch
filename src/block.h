@@ -23,12 +23,12 @@
 /** Maximum ciphertext size without the length of the size field */
 #define MAX_BLOCK_SIZE_FIELD_VALUE (MAX_CIPHERTEXT_BLOCK_SIZE - sizeof(uint16_t))
 
-void block_decode_hdr(struct pouch_bufview *v,
-                      uint16_t *block_size,
-                      uint8_t *stream_id,
-                      bool *is_stream,
-                      bool *is_first,
-                      bool *is_last);
+int block_decode_hdr(struct pouch_bufview *v,
+                     uint16_t *block_size,
+                     uint8_t *stream_id,
+                     bool *is_stream,
+                     bool *is_first,
+                     bool *is_last);
 
 struct pouch_buf *block_alloc(pouch_timeout_t timeout);
 

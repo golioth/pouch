@@ -6,6 +6,7 @@
 
 #include "block.h"
 #include <pouch/blockbuf.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pouch/port.h>
@@ -34,23 +35,35 @@
 /** Mask for ID field indicating that this is the last block in the stream */
 #define LAST_DATA_MASK 0x80
 
-void block_decode_hdr(struct pouch_bufview *v,
-                      uint16_t *block_size,
-                      uint8_t *stream_id,
-                      bool *is_stream,
-                      bool *is_first,
-                      bool *is_last)
+int block_decode_hdr(struct pouch_bufview *v,
+                     uint16_t *block_size,
+                     uint8_t *stream_id,
+                     bool *is_stream,
+                     bool *is_first,
+                     bool *is_last)
 {
     __ASSERT_NO_MSG(v->offset == 0);
 
-    *block_size = pouch_bufview_read_be16(v);
+    int err;
+    uint8_t id;
 
-    uint8_t id = pouch_bufview_read_byte(v);
+    err = pouch_bufview_read_be16(v, block_size);
+    if (err)
+    {
+        return err;
+    }
+
+    err = pouch_bufview_read_byte(v, &id);
+    if (err)
+    {
+        return err;
+    }
 
     *stream_id = id & BLOCK_ID_MASK;
     *is_stream = (*stream_id) != BLOCK_ID_ENTRY;
     *is_first = id & FIRST_DATA_MASK;
     *is_last = id & LAST_DATA_MASK;
+    return 0;
 }
 
 static void update_block_header(struct pouch_buf *block, size_t size, uint8_t flags)

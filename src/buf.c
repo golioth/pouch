@@ -5,6 +5,8 @@
  */
 
 #include "buf.h"
+#include <errno.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pouch/port.h>
@@ -168,24 +170,44 @@ const void *pouch_bufview_read(struct pouch_bufview *v, size_t bytes)
     return bufview_read(v, bytes);
 }
 
-uint8_t pouch_bufview_read_byte(struct pouch_bufview *v)
+int pouch_bufview_read_byte(struct pouch_bufview *v, uint8_t *dst)
 {
-    return *bufview_read(v, 1);
+    if (pouch_bufview_available(v) < sizeof(uint8_t))
+    {
+        return -ENODATA;
+    }
+    *dst = *bufview_read(v, sizeof(uint8_t));
+    return 0;
 }
 
-uint16_t pouch_bufview_read_be16(struct pouch_bufview *v)
+int pouch_bufview_read_be16(struct pouch_bufview *v, uint16_t *dst)
 {
-    return pouch_get_be16(bufview_read(v, sizeof(uint16_t)));
+    if (pouch_bufview_available(v) < sizeof(uint16_t))
+    {
+        return -ENODATA;
+    }
+    *dst = pouch_get_be16(bufview_read(v, sizeof(uint16_t)));
+    return 0;
 }
 
-uint32_t pouch_bufview_read_be32(struct pouch_bufview *v)
+int pouch_bufview_read_be32(struct pouch_bufview *v, uint32_t *dst)
 {
-    return pouch_get_be32(bufview_read(v, sizeof(uint32_t)));
+    if (pouch_bufview_available(v) < sizeof(uint32_t))
+    {
+        return -ENODATA;
+    }
+    *dst = pouch_get_be32(bufview_read(v, sizeof(uint32_t)));
+    return 0;
 }
 
-uint64_t pouch_bufview_read_be64(struct pouch_bufview *v)
+int pouch_bufview_read_be64(struct pouch_bufview *v, uint64_t *dst)
 {
-    return pouch_get_be64(bufview_read(v, sizeof(uint64_t)));
+    if (pouch_bufview_available(v) < sizeof(uint64_t))
+    {
+        return -ENODATA;
+    }
+    *dst = pouch_get_be64(bufview_read(v, sizeof(uint64_t)));
+    return 0;
 }
 
 size_t pouch_bufview_available(const struct pouch_bufview *v)

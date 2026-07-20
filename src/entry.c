@@ -83,8 +83,9 @@ static void downlink_data(unsigned int stream_id, const void *data, size_t len, 
     }
 }
 
-static void pouch_downlink_entries_push(struct pouch_bufview *v)
+static int pouch_downlink_entries_push(struct pouch_bufview *v)
 {
+    int err = 0;
     const uint8_t *path;
     uint8_t path_len;
     const uint8_t *data;
@@ -94,9 +95,23 @@ static void pouch_downlink_entries_push(struct pouch_bufview *v)
 
     while (pouch_bufview_available(v))
     {
-        data_len = pouch_bufview_read_be16(v);
-        content_type = pouch_bufview_read_be16(v);
-        path_len = pouch_bufview_read_byte(v);
+        err = pouch_bufview_read_be16(v, &data_len);
+        if (err)
+        {
+            return err;
+        }
+
+        err = pouch_bufview_read_be16(v, &content_type);
+        if (err)
+        {
+            return err;
+        }
+
+        err = pouch_bufview_read_byte(v, &path_len);
+        if (err)
+        {
+            return err;
+        }
 
         POUCH_LOG_DBG("data_len %u", (unsigned int) data_len);
         POUCH_LOG_DBG("content_type %s (%u)",
@@ -105,7 +120,16 @@ static void pouch_downlink_entries_push(struct pouch_bufview *v)
         POUCH_LOG_DBG("path_len %u", (unsigned int) path_len);
 
         path = pouch_bufview_read(v, path_len);
+        if (NULL == path)
+        {
+            return -ENODATA;
+        }
+
         data = pouch_bufview_read(v, data_len);
+        if (NULL == data)
+        {
+            return -ENODATA;
+        }
 
         /* Copy path to add NULL terminator */
         memcpy(path_null_term, path, path_len);
@@ -114,13 +138,16 @@ static void pouch_downlink_entries_push(struct pouch_bufview *v)
         downlink_start(0, (char *) path_null_term, content_type);
         downlink_data(0, data, data_len, true);
     }
+
+    return err;
 }
 
-static void pouch_downlink_stream_push(struct pouch_bufview *v,
-                                       unsigned int stream_id,
-                                       bool is_first,
-                                       bool is_last)
+static int pouch_downlink_stream_push(struct pouch_bufview *v,
+                                      unsigned int stream_id,
+                                      bool is_first,
+                                      bool is_last)
 {
+    int err = 0;
     const uint8_t *data;
     uint16_t data_len;
 
@@ -131,8 +158,17 @@ static void pouch_downlink_stream_push(struct pouch_bufview *v,
         uint16_t content_type;
         uint8_t path_null_term[256];
 
-        content_type = pouch_bufview_read_be16(v);
-        path_len = pouch_bufview_read_byte(v);
+        err = pouch_bufview_read_be16(v, &content_type);
+        if (err)
+        {
+            return err;
+        }
+
+        err = pouch_bufview_read_byte(v, &path_len);
+        if (err)
+        {
+            return err;
+        }
 
         POUCH_LOG_DBG("content_type %s (%d)",
                       entry_content_format_str(content_type),
@@ -140,6 +176,10 @@ static void pouch_downlink_stream_push(struct pouch_bufview *v,
         POUCH_LOG_DBG("path_len %u", path_len);
 
         path = pouch_bufview_read(v, path_len);
+        if (NULL == path)
+        {
+            return -ENODATA;
+        }
 
         /* Copy path to add NULL terminator */
         memcpy(path_null_term, path, path_len);
@@ -152,30 +192,37 @@ static void pouch_downlink_stream_push(struct pouch_bufview *v,
     data = pouch_bufview_read(v, data_len);
 
     downlink_data(stream_id, data, data_len, is_last);
+    return err;
 }
 
-void pouch_downlink_block_push(struct pouch_buf *pouch_buf)
+int pouch_downlink_block_push(struct pouch_buf *pouch_buf)
 {
     struct pouch_bufview v;
     pouch_bufview_init(&v, pouch_buf);
 
+    int err;
     uint16_t block_size;
     uint8_t stream_id;
     bool is_stream;
     bool is_first;
     bool is_last;
-    block_decode_hdr(&v, &block_size, &stream_id, &is_stream, &is_first, &is_last);
+    err = block_decode_hdr(&v, &block_size, &stream_id, &is_stream, &is_first, &is_last);
+    if (err)
+    {
+        return err;
+    }
 
     POUCH_LOG_HEXDUMP(pouch_bufview_read(&v, 0), pouch_bufview_available(&v), "block bufview");
 
     if (is_stream)
     {
-        pouch_downlink_stream_push(&v, stream_id, is_first, is_last);
+        err = pouch_downlink_stream_push(&v, stream_id, is_first, is_last);
     }
     else
     {
-        pouch_downlink_entries_push(&v);
+        err = pouch_downlink_entries_push(&v);
     }
+    return err;
 }
 
 static int write_entry(struct pouch_buf *block, const struct pouch_entry *entry)

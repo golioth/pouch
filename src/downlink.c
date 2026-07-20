@@ -55,11 +55,12 @@ static void decrypt_blocks(pouch_work_t *work)
 
     while ((encrypted_block = buf_queue_get(&decrypt.queue)) != NULL)
     {
+        int err;
         // Reset the target buffer
         buf_restore(decrypted_block, POUCH_BUF_STATE_INITIAL);
 
         /* Decrypt this block */
-        int err = crypto_decrypt_block(encrypted_block, decrypted_block);
+        err = crypto_decrypt_block(encrypted_block, decrypted_block);
 
         /* Encrypted block was consumed; free buffer no matter the outcome */
         /* buffers were allocated then enqueued in pouch_downlink_push() */
@@ -73,7 +74,13 @@ static void decrypt_blocks(pouch_work_t *work)
             break;
         }
 
-        pouch_downlink_block_push(decrypted_block);
+        err = pouch_downlink_block_push(decrypted_block);
+        if (err)
+        {
+            POUCH_LOG_ERR("Failed to push block: %d", err);
+            // TODO: Abort the downlink
+            break;
+        }
 
         pouch_yield();  // let other threads run
     }
@@ -185,7 +192,13 @@ int pouch_downlink_push(const void *buf, size_t buf_len)
 
         if (pouch_bufview_available(&v) > sizeof(uint16_t))
         {
-            uint16_t block_size = pouch_bufview_read_be16(&v);
+            uint16_t block_size;
+            int err = pouch_bufview_read_be16(&v, &block_size);
+            if (err)
+            {
+                POUCH_LOG_ERR("Failed to read block size: %d", err);
+                return err;
+            }
 
             if (block_size > MAX_BLOCK_SIZE_FIELD_VALUE)
             {
@@ -224,7 +237,7 @@ int pouch_downlink_push(const void *buf, size_t buf_len)
                 }
 
                 /* buffers pushed to queue are freed in decrypt_blocks(). */
-                int err = block_downlink_push(encrypted_block);
+                err = block_downlink_push(encrypted_block);
                 if (0 > err)
                 {
                     POUCH_LOG_ERR("Failed to enqueue block: %d", err);
