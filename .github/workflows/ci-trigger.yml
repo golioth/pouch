@@ -46,7 +46,8 @@ jobs:
     uses: ./.github/workflows/test-esp-idf.yml
     secrets: inherit
   trigger-esp-idf-hil:
-    name: Run ESP-IDF HTTP Client HIL
+    name: Run ESP-IDF HIL
+    needs: trigger-build-gateway
     permissions:
       contents: read
       actions: write

@@ -1,4 +1,4 @@
-name: ESP-IDF HTTP Client HIL
+name: ESP-IDF HIL
 
 on:
   workflow_dispatch:
@@ -50,6 +50,8 @@ jobs:
         include:
           - name: http_client
             dir: examples/esp_idf/http_client
+          - name: ble_gatt
+            dir: examples/esp_idf/ble_gatt
     # ESP-IDF v6.0.1
     container: espressif/idf@sha256:efc19fae2f52fc6873630c668da26aa834139a063b5fb73a46ebc0dbd217b587
     steps:
@@ -142,6 +144,7 @@ jobs:
     runs-on:
       - is_active
       - has_${{ inputs.hil_board }}
+      - has_frdm_rw612
 
     container:
       image: golioth/golioth-hil-base:latest
@@ -182,8 +185,45 @@ jobs:
         run: |
           tar -xf "esp-idf-${{ matrix.name }}/build-artifacts.tar" -C "$SAMPLE_DIR"
 
+      - name: Download gateway firmware
+        if: matrix.name == 'ble_gatt'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: gateway-frdm_rw612-ethernet
+          path: gateway-frdm_rw612
+
       - name: Power On USB Hub
         run: python3 /opt/golioth-scripts/usb_hub_power.py on
+
+      - name: Flash gateway firmware to frdm_rw612
+        if: matrix.name == 'ble_gatt'
+        shell: bash
+        run: |
+          source /opt/credentials/runner_env.sh
+          export PATH=$PATH:/opt/SEGGER/JLink
+          export SNR_VAR=CI_FRDM_RW612_SNR
+
+          if [ -z "${!SNR_VAR}" ]; then
+            echo "Runner environment variable '$SNR_VAR' is not set"
+            exit 1
+          fi
+
+          cat <<EOF > flash_frdm_rw612.jlink
+          r
+          h
+          loadfile gateway-frdm_rw612/zephyr.hex
+          r
+          sleep 3
+          q
+          EOF
+
+          JLinkExe \
+            -nogui 1 \
+            -if swd \
+            -speed auto \
+            -device RW612 \
+            -CommanderScript flash_frdm_rw612.jlink \
+            -SelectEmuBySN "${!SNR_VAR}"
 
       - name: Install pytest dependencies
         run: |
@@ -194,8 +234,12 @@ jobs:
           uv pip install \
             "golioth@git+https://github.com/golioth/python-golioth-tools@v0.8.1"
 
-      - name: Run HTTP client HIL pytest
+      - name: Run HIL pytest
         shell: bash
+        env:
+          SAMPLE_NAME: ${{ matrix.name }}
+          WIFI_SSID: ${{ matrix.name != 'ble_gatt' && secrets[format('{0}_WIFI_SSID', runner.name)] || '' }}
+          WIFI_PSK: ${{ matrix.name != 'ble_gatt' && secrets[format('{0}_WIFI_PSK', runner.name)] || '' }}
         run: |
           # Config so we can use tee to keep a copy of pytest logs
           set -o pipefail
@@ -209,6 +253,19 @@ jobs:
 
           # Ensure we can query the short hash
           git config --global --add safe.directory $GITHUB_WORKSPACE
+
+          WIFI_ARGS=""
+          if [ "$SAMPLE_NAME" != "ble_gatt" ]; then
+            WIFI_ARGS="--wifi-ssid $WIFI_SSID --wifi-psk $WIFI_PSK"
+          fi
+
+          GATEWAY_PORT_ARG=""
+          if [ "$SAMPLE_NAME" == "ble_gatt" ]; then
+            GW_PORT_VAR=CI_FRDM_RW612_PORT
+            if [ -n "${!GW_PORT_VAR}" ]; then
+              GATEWAY_PORT_ARG="--gateway-port ${!GW_PORT_VAR}"
+            fi
+          fi
 
           pytest -vv -rs -s                  \
             -c "$SAMPLE_DIR/pytest.ini"      \
@@ -224,8 +281,8 @@ jobs:
             --erase-all n                    \
             --api-url "$GOLIOTH_API_URL"     \
             --api-key "$GOLIOTH_API_KEY"     \
-            --wifi-ssid "${{ secrets[format('{0}_WIFI_SSID', runner.name)] }}" \
-            --wifi-psk "${{ secrets[format('{0}_WIFI_PSK', runner.name)] }}"   \
+            $WIFI_ARGS                       \
+            $GATEWAY_PORT_ARG                \
             --generate-certs                 \
             --junit-xml "$UNITY_REPORT_NAME" \
             "$SAMPLE_DIR/pytest/test_sample.py" | tee pytest-${{ matrix.name }}-hil.log
@@ -264,6 +321,38 @@ jobs:
             exit 1
           fi
           esptool.py --port "${!PORT_VAR}" erase_flash
+
+      - name: Erase gateway flash
+        if: always() && matrix.name == 'ble_gatt'
+        shell: bash
+        run: |
+          source /opt/credentials/runner_env.sh
+          export PATH=$PATH:/opt/SEGGER/JLink
+          export SNR_VAR=CI_FRDM_RW612_SNR
+
+          if [ -z "${!SNR_VAR}" ]; then
+            echo "Runner environment variable '$SNR_VAR' is not set"
+            exit 1
+          fi
+
+          cat <<EOF > erase_frdm_rw612.jlink
+          r
+          h
+          exec EnableEraseAllFlashBanks
+          erase 0x8000000 0x8624000
+          sleep 30
+          r
+          sleep 3
+          q
+          EOF
+
+          JLinkExe \
+            -nogui 1 \
+            -if swd \
+            -speed auto \
+            -device RW612 \
+            -CommanderScript erase_frdm_rw612.jlink \
+            -SelectEmuBySN "${!SNR_VAR}"
 
       - name: Power Off USB Hub
         if: always()
