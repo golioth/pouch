@@ -26,6 +26,7 @@ static enum pouch_result send(struct pouch_bearer *bearer, void *dst, size_t *ds
 {
     if (uplink == NULL)
     {
+        *dst_len = 0;
         return POUCH_ERROR;
     }
 

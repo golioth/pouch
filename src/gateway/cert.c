@@ -151,6 +151,7 @@ int pouch_gateway_server_cert_get_data(struct pouch_gateway_server_cert_context 
 
     if (context->offset >= len)
     {
+        *dst_len = 0;
         return -ENODATA;
     }
 
