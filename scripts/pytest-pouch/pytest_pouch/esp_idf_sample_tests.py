@@ -372,4 +372,6 @@ async def test_ota_firmware_update(
         rf".*{re.escape(BOOT_INITIALIZED_TEXT)}",
         timeout=OTA_REBOOT_TIMEOUT_S,
     )
-    await _dut_expect(dut, r".*Sync successful", timeout=OTA_REBOOT_TIMEOUT_S)
+    await _dut_expect(
+        dut, r".*Received LED setting: [0-1]", timeout=OTA_REBOOT_TIMEOUT_S
+    )
