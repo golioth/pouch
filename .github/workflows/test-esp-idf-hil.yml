@@ -69,7 +69,7 @@ jobs:
           # Prepare App Version
           cd ${{ matrix.dir }}
           cat <<EOF > fw_update.defaults
-          CONFIG_EXAMPLE_FW_UPDATE_COMPONENT="hil_ota_${{ inputs.idf_target }}"
+          CONFIG_EXAMPLE_FW_UPDATE_COMPONENT="hil_ota_${{ inputs.idf_target }}_${{ matrix.name }}"
           CONFIG_APP_PROJECT_VER="1.2.3"
           EOF
           cd -
@@ -103,7 +103,7 @@ jobs:
           # Prepare App Update Version
           cd ${{ matrix.dir }}
           cat <<EOF > fw_update.defaults
-          CONFIG_EXAMPLE_FW_UPDATE_COMPONENT="hil_ota_${{ inputs.idf_target }}"
+          CONFIG_EXAMPLE_FW_UPDATE_COMPONENT="hil_ota_${{ inputs.idf_target }}_${{ matrix.name }}"
           CONFIG_APP_PROJECT_VER="$(git rev-parse --short HEAD)"
           EOF
           cd -
@@ -220,7 +220,7 @@ jobs:
             --build-dir build                \
             --fw-update-bin "$SAMPLE_DIR/build/${{ matrix.name }}_${{ inputs.idf_target }}_fwupdate.bin" \
             --fw-update-ver "$(git rev-parse --short HEAD)" \
-            --fw-update-pkg-name "hil_ota_$IDF_TARGET"      \
+            --fw-update-pkg-name "hil_ota_${IDF_TARGET}_${{ matrix.name }}"      \
             --erase-all n                    \
             --api-url "$GOLIOTH_API_URL"     \
             --api-key "$GOLIOTH_API_KEY"     \
