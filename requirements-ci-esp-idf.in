@@ -4,6 +4,7 @@ esptool==5.3.0
 pyparsing>=3.1.0,<3.3
 rich<16
 anyio>=4.0.0,<5
+smpmgr>=0.18.0
 
 # Workaround for anyio dependency:
 # https://github.com/agronholm/anyio/blob/2370032396438b0279bacb3ff2f5c4ae2886f0d0/pyproject.toml#L32

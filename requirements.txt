@@ -1,4 +1,4 @@
 cbor2<6.0.0
-typer<0.24.0
-click<8.2.0
+typer==0.24.2
+click>=8.2.0
 zcbor==0.9.1
