@@ -13,7 +13,12 @@ sys.path.insert(
     0, str(Path(__file__).resolve().parents[4] / "scripts" / "pytest-pouch")
 )
 
-pytest_plugins = ["pytest_pouch.plugin", "pytest_pouch.esp_idf_harness"]
+pytest_plugins = [
+    "pytest_pouch.plugin",
+    "pytest_pouch.esp_idf_harness",
+    "pytest_pouch.ota_harness",
+    "pytest_pouch.gateway_provision",
+]
 
 
 @pytest.fixture(scope="module")
