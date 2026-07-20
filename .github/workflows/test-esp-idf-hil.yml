@@ -39,26 +39,17 @@ on:
         type: string
 
 jobs:
-  prepare-matrix:
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - name: Set sample matrix
-        id: set-matrix
-        run: |
-          echo 'matrix={"sample":[{"name":"http_client","dir":"examples/esp_idf/http_client"}]}' >> "$GITHUB_OUTPUT"
-
   build:
     permissions:
       contents: read
       actions: write
     runs-on: ubuntu-24.04
-    needs: prepare-matrix
     strategy:
-      matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+      fail-fast: false
+      matrix: &hil-matrix
+        include:
+          - name: http_client
+            dir: examples/esp_idf/http_client
     # ESP-IDF v6.0.1
     container: espressif/idf@sha256:efc19fae2f52fc6873630c668da26aa834139a063b5fb73a46ebc0dbd217b587
     steps:
@@ -76,7 +67,7 @@ jobs:
           pip install -r requirements-ci-esp-idf.txt --require-hashes
 
           # Prepare App Version
-          cd ${{ matrix.sample.dir }}
+          cd ${{ matrix.dir }}
           cat <<EOF > fw_update.defaults
           CONFIG_EXAMPLE_FW_UPDATE_COMPONENT="hil_ota_${{ inputs.idf_target }}"
           CONFIG_APP_PROJECT_VER="1.2.3"
@@ -86,11 +77,11 @@ jobs:
           # Shorter 10s sync delay for HIL testing and package name/version
           export SDKCONFIG_DEFAULTS="sdkconfig.defaults;pytest/sdkconfig.pytest.defaults;fw_update.defaults"
 
-          idf.py -C "${{ matrix.sample.dir }}" set-target "${{ inputs.idf_target }}"
-          idf.py -C "${{ matrix.sample.dir }}" build
-          idf.py -C "${{ matrix.sample.dir }}" merge-bin -o merged.bin
+          idf.py -C "${{ matrix.dir }}" set-target "${{ inputs.idf_target }}"
+          idf.py -C "${{ matrix.dir }}" build
+          idf.py -C "${{ matrix.dir }}" merge-bin -o merged.bin
 
-          cd "${{ matrix.sample.dir }}"
+          cd "${{ matrix.dir }}"
           shopt -s globstar nullglob
 
           artifact_files=(
@@ -110,7 +101,7 @@ jobs:
           git config --global --add safe.directory $GITHUB_WORKSPACE
 
           # Prepare App Update Version
-          cd ${{ matrix.sample.dir }}
+          cd ${{ matrix.dir }}
           cat <<EOF > fw_update.defaults
           CONFIG_EXAMPLE_FW_UPDATE_COMPONENT="hil_ota_${{ inputs.idf_target }}"
           CONFIG_APP_PROJECT_VER="$(git rev-parse --short HEAD)"
@@ -120,21 +111,21 @@ jobs:
           # Shorter 10s sync delay for HIL testing and package name/version
           export SDKCONFIG_DEFAULTS="sdkconfig.defaults;pytest/sdkconfig.pytest.defaults;fw_update.defaults"
 
-          rm -f "${{ matrix.sample.dir }}/sdkconfig"
-          idf.py -C "${{ matrix.sample.dir }}" reconfigure
-          idf.py -C "${{ matrix.sample.dir }}" build
+          rm -f "${{ matrix.dir }}/sdkconfig"
+          idf.py -C "${{ matrix.dir }}" reconfigure
+          idf.py -C "${{ matrix.dir }}" build
 
           # Find the app update binary, rename, and include in the artifact upload
-          cd "${{ matrix.sample.dir }}"
+          cd "${{ matrix.dir }}"
           APP_BIN=$(python3 -c "import json; print(json.load(open('build/flasher_args.json'))['app']['file'])")
-          cp "build/${APP_BIN}" "build/${{ matrix.sample.name }}_${{ inputs.idf_target }}_fwupdate.bin"
-          tar -rf build-artifacts.tar "build/${{ matrix.sample.name }}_${{ inputs.idf_target }}_fwupdate.bin"
+          cp "build/${APP_BIN}" "build/${{ matrix.name }}_${{ inputs.idf_target }}_fwupdate.bin"
+          tar -rf build-artifacts.tar "build/${{ matrix.name }}_${{ inputs.idf_target }}_fwupdate.bin"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: esp-idf-${{ matrix.sample.name }}-${{ inputs.idf_target }}-build
-          path: ${{ matrix.sample.dir }}/build-artifacts.tar
+          name: esp-idf-${{ matrix.name }}-${{ inputs.idf_target }}-build
+          path: ${{ matrix.dir }}/build-artifacts.tar
 
   hil-test:
     permissions:
@@ -142,12 +133,11 @@ jobs:
       actions: write
 
     needs:
-      - prepare-matrix
       - build
 
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+      matrix: *hil-matrix
 
     runs-on:
       - is_active
@@ -165,8 +155,8 @@ jobs:
       GOLIOTH_API_URL: ${{ inputs.api_url }}
       GOLIOTH_API_KEY: ${{ secrets[inputs.api_key_id] }}
       IDF_TARGET: ${{ inputs.idf_target }}
-      SAMPLE_DIR: ${{ matrix.sample.dir }}
-      UNITY_REPORT_NAME: integration-esp-idf-${{ matrix.sample.name }}-hil.xml
+      SAMPLE_DIR: ${{ matrix.dir }}
+      UNITY_REPORT_NAME: integration-esp-idf-${{ matrix.name }}-hil.xml
 
     steps:
       - name: Checkout repository
@@ -180,17 +170,17 @@ jobs:
       - name: Clean stale run assets
         run: |
           rm -rf "$SAMPLE_DIR/build"
-          rm -f "$UNITY_REPORT_NAME" "pytest-${{ matrix.sample.name }}-hil.log"
+          rm -f "$UNITY_REPORT_NAME" "pytest-${{ matrix.name }}-hil.log"
 
       - name: Download build artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: esp-idf-${{ matrix.sample.name }}-${{ inputs.idf_target }}-build
-          path: esp-idf-${{ matrix.sample.name }}
+          name: esp-idf-${{ matrix.name }}-${{ inputs.idf_target }}-build
+          path: esp-idf-${{ matrix.name }}
 
       - name: Extract build artifact
         run: |
-          tar -xf "esp-idf-${{ matrix.sample.name }}/build-artifacts.tar" -C "$SAMPLE_DIR"
+          tar -xf "esp-idf-${{ matrix.name }}/build-artifacts.tar" -C "$SAMPLE_DIR"
 
       - name: Power On USB Hub
         run: python3 /opt/golioth-scripts/usb_hub_power.py on
@@ -228,7 +218,7 @@ jobs:
             --port "${!PORT_VAR}"            \
             --app-path "$SAMPLE_DIR"         \
             --build-dir build                \
-            --fw-update-bin "$SAMPLE_DIR/build/${{ matrix.sample.name }}_${{ inputs.idf_target }}_fwupdate.bin" \
+            --fw-update-bin "$SAMPLE_DIR/build/${{ matrix.name }}_${{ inputs.idf_target }}_fwupdate.bin" \
             --fw-update-ver "$(git rev-parse --short HEAD)" \
             --fw-update-pkg-name "hil_ota_$IDF_TARGET"      \
             --erase-all n                    \
@@ -238,7 +228,7 @@ jobs:
             --wifi-psk "${{ secrets[format('{0}_WIFI_PSK', runner.name)] }}"   \
             --generate-certs                 \
             --junit-xml "$UNITY_REPORT_NAME" \
-            "$SAMPLE_DIR/pytest/test_sample.py" | tee pytest-${{ matrix.sample.name }}-hil.log
+            "$SAMPLE_DIR/pytest/test_sample.py" | tee pytest-${{ matrix.name }}-hil.log
 
       - name: Post-process JUnit XML
         if: success() || failure()
@@ -250,7 +240,7 @@ jobs:
         if: success() || failure()
         with:
           secrets-json: ${{ toJson(secrets) }}
-          name: ci-summary-integration-esp-idf-${{ matrix.sample.name }}-hil
+          name: ci-summary-integration-esp-idf-${{ matrix.name }}-hil
           path: ${{ env.UNITY_REPORT_NAME }}
 
       - name: Upload HIL run artifacts
@@ -258,9 +248,9 @@ jobs:
         if: success() || failure()
         with:
           secrets-json: ${{ toJson(secrets) }}
-          name: esp-idf-${{ matrix.sample.name }}-hil-artifacts
+          name: esp-idf-${{ matrix.name }}-hil-artifacts
           path: |
-            pytest-${{ matrix.sample.name }}-hil.log
+            pytest-${{ matrix.name }}-hil.log
             ${{ env.UNITY_REPORT_NAME }}
 
       - name: Erase flash
