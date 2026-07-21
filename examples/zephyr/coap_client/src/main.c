@@ -10,6 +10,7 @@ LOG_MODULE_REGISTER(coap_transport, CONFIG_EXAMPLE_COAP_CLIENT_LOG_LEVEL);
 #include "credentials.h"
 #include "net.h"
 
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/net/socket.h>
 #include <zephyr/net/tls_credentials.h>
 
@@ -19,6 +20,8 @@ LOG_MODULE_REGISTER(coap_transport, CONFIG_EXAMPLE_COAP_CLIENT_LOG_LEVEL);
 #include <pouch/transport/coap/client.h>
 
 #include <golioth/settings_callbacks.h>
+
+static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET_OR(DT_ALIAS(led0), gpios, {});
 
 static void do_uplink(void)
 {
@@ -35,10 +38,29 @@ static int led_setting_cb(bool new_value)
 {
     LOG_INF("Received LED setting: %d", (int) new_value);
 
+    if (DT_HAS_ALIAS(led0))
+    {
+        gpio_pin_set_dt(&led, new_value ? 1 : 0);
+    }
+
     return 0;
 }
 
 GOLIOTH_SETTINGS_HANDLER(LED, led_setting_cb);
+
+static void setup_led(void)
+{
+    if (!DT_HAS_ALIAS(led0))
+    {
+        return;
+    }
+
+    int err = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
+    if (err < 0)
+    {
+        LOG_WRN("Could not initialize LED");
+    }
+}
 
 int main(void)
 {
@@ -89,6 +111,8 @@ int main(void)
         LOG_ERR("Failed to load device key (err %d)", err);
         return err;
     }
+
+    setup_led();
 
     net_connect();
 
