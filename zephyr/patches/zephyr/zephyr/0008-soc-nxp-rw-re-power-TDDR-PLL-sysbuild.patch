@@ -1,0 +1,38 @@
+From 12f5228460b0996c18b7394938319b5b50d0be8f Mon Sep 17 00:00:00 2001
+From: Mike Szczys <michael.szczys@canonical.com>
+Date: Tue, 21 Jul 2026 13:48:43 -0500
+Subject: [PATCH] soc: nxp: rw: re-power TDDR PLL when enabling Ethernet after
+ MCUboot
+
+MCUboot's soc_early_init_hook() calls CLOCK_DeinitTddrRefClk() even when
+not using Ethernet, which clears the TDDR_PDB bit and powers down the
+TDDR PLL. When the application later boots and re-initializes Ethernet,
+the NXP SDK's clock enable functions re-enable the peripheral clock
+outputs but never re-set the PLL power-down-bypass bit.
+
+Add an explicit write of the TDDR_PDB bit to PLL_CTRL before resetting
+the ENET peripherals. This is a no-op on cold boot since the bit is
+already set, but fixes Ethernet after any scenario where
+CLOCK_DeinitTddrRefClk() was called (sysbuild).
+
+Fixes: zephyrproject-rtos/zephyr#108399
+
+Signed-off-by: Mike Szczys <michael.szczys@canonical.com>
+---
+ soc/nxp/rw/soc.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/soc/nxp/rw/soc.c b/soc/nxp/rw/soc.c
+index 49700a41761..a88e993e9a1 100644
+--- a/soc/nxp/rw/soc.c
++++ b/soc/nxp/rw/soc.c
+@@ -306,6 +306,7 @@ __weak __ramfunc void clock_init(void)
+ #endif
+
+ #if DT_NODE_HAS_STATUS_OKAY(DT_NODELABEL(enet)) && CONFIG_NET_L2_ETHERNET && CONFIG_ETH_DRIVER
++	SYSCTL2->PLL_CTRL |= SYSCTL2_PLL_CTRL_TDDR_PDB_MASK;
+ 	RESET_PeripheralReset(kENET_IPG_RST_SHIFT_RSTn);
+ 	RESET_PeripheralReset(kENET_IPG_S_RST_SHIFT_RSTn);
+ #else
+--
+2.55.0
