@@ -20,7 +20,8 @@ tables describe device and broker transport support across platforms.
 
 | Transport       | Zephyr | ESP-IDF |
 |-----------------|--------|---------|
-| BLE GATT Server | ✅     |         |
+| BLE GATT Server | ✅     | ✅      |
+| CoAP Client     | ✅     |         |
 | HTTP Client     | ✅     | ✅      |
 
 **Broker**
@@ -28,6 +29,7 @@ tables describe device and broker transport support across platforms.
 | Transport       | Zephyr | ESP-IDF |
 |-----------------|--------|---------|
 | BLE GATT Client | ✅     |         |
+| CoAP Gateway    | ✅     |         |
 
 
 Documentation for each supported platform is provided below. While
@@ -69,7 +71,7 @@ Zephyr, using the same steps described above.
 
 **Supported Versions**
 
-- `v3.4.0-rc2`
+- `v3.4-branch`
 
 ### ESP-IDF
 
