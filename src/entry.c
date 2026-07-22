@@ -139,7 +139,7 @@ static int pouch_downlink_entries_push(struct pouch_bufview *v)
         downlink_data(0, data, data_len, true);
     }
 
-    return err;
+    return 0;
 }
 
 static int pouch_downlink_stream_push(struct pouch_bufview *v,
@@ -192,7 +192,7 @@ static int pouch_downlink_stream_push(struct pouch_bufview *v,
     data = pouch_bufview_read(v, data_len);
 
     downlink_data(stream_id, data, data_len, is_last);
-    return err;
+    return 0;
 }
 
 int pouch_downlink_block_push(struct pouch_buf *pouch_buf)
