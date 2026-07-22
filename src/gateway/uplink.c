@@ -249,6 +249,38 @@ void pouch_gateway_submit_close_work(pouch_work_t *work)
     pouch_work_submit_to_queue(&gateway_work_q, work);
 }
 
+struct workq_sync_ctx
+{
+    pouch_work_t work;
+    void (*fn)(void *arg);
+    void *arg;
+    pouch_sem_t done;
+};
+
+static void workq_sync_handler(pouch_work_t *work)
+{
+    struct workq_sync_ctx *ctx = CONTAINER_OF(work, struct workq_sync_ctx, work);
+
+    ctx->fn(ctx->arg);
+    pouch_sem_give(&ctx->done);
+}
+
+void pouch_gateway_workq_run_sync(void (*fn)(void *arg), void *arg)
+{
+    /* Lives on the caller's stack; stays valid because we block on the semaphore below until the
+     * handler has run to completion.
+     */
+    struct workq_sync_ctx ctx = {
+        .fn = fn,
+        .arg = arg,
+    };
+
+    pouch_sem_init(&ctx.done, 0, 1);
+    pouch_work_init(&ctx.work, workq_sync_handler);
+    pouch_work_submit_to_queue(&gateway_work_q, &ctx.work);
+    pouch_sem_take(&ctx.done, POUCH_FOREVER);
+}
+
 struct pouch_gateway_uplink *pouch_gateway_uplink_open(
     struct pouch_gateway_downlink_context *downlink,
     pouch_gateway_uplink_end_cb end_cb,

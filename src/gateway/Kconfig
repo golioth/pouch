@@ -51,9 +51,14 @@ config POUCH_GATEWAY_CLOUD
 
 config POUCH_GATEWAY_WORKQ_STACK_SIZE
     int "Gateway work queue stack size"
-    default 3072
+    default 8192
     help
       Stack size for the internal gateway work queue.
+
+      This queue runs the blocking cloud (CoAP/DTLS) operations for the
+      gateway, including the peripheral device-certificate upload and the
+      pouch uplink forward. It must be large enough to hold a full mbedtls
+      DTLS handshake when the connection needs to be (re)established.
 
 config POUCH_GATEWAY_WORKQ_PRIORITY
     int "Gateway work queue priority"
