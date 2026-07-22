@@ -110,16 +110,36 @@ size_t pouch_bufview_memcpy(struct pouch_bufview *v, void *dst, size_t bytes);
 /** Read available data, if the requested amount is available. */
 const void *pouch_bufview_read(struct pouch_bufview *v, size_t bytes);
 
-/** Read a byte from the buffer view */
+/**
+ * Read a byte from the buffer view.
+ *
+ * @return 0 on success, or -ENODATA if fewer bytes remain than requested. On
+ *         failure @p dst is left unmodified.
+ */
 int pouch_bufview_read_byte(struct pouch_bufview *v, uint8_t *dst);
 
-/** Read a big endian uint16_t from the buffer view */
+/**
+ * Read a big endian uint16_t from the buffer view.
+ *
+ * @return 0 on success, or -ENODATA if fewer bytes remain than requested. On
+ *         failure @p dst is left unmodified.
+ */
 int pouch_bufview_read_be16(struct pouch_bufview *v, uint16_t *dst);
 
-/** Read a big endian uint32_t from the buffer view */
+/**
+ * Read a big endian uint32_t from the buffer view.
+ *
+ * @return 0 on success, or -ENODATA if fewer bytes remain than requested. On
+ *         failure @p dst is left unmodified.
+ */
 int pouch_bufview_read_be32(struct pouch_bufview *v, uint32_t *dst);
 
-/** Read a big endian uint64_t from the buffer view */
+/**
+ * Read a big endian uint64_t from the buffer view.
+ *
+ * @return 0 on success, or -ENODATA if fewer bytes remain than requested. On
+ *         failure @p dst is left unmodified.
+ */
 int pouch_bufview_read_be64(struct pouch_bufview *v, uint64_t *dst);
 
 /** Get the number of bytes available for reading */
