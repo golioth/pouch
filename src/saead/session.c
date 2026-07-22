@@ -225,7 +225,7 @@ struct pouch_buf *session_encrypt_block(struct session *session, struct pouch_bu
 
     if (plaintext_len != pouch_bufview_available(&plaintext))
     {
-        POUCH_LOG_ERR("Invalid plaintext length: %zu", plaintext_len);
+        POUCH_LOG_ERR("Invalid plaintext length: %u", (unsigned int) plaintext_len);
         buf_free(encrypted);
         return NULL;
     }
@@ -293,7 +293,7 @@ int session_decrypt_block(struct session *session,
 
     if (ciphertext_len <= AUTH_TAG_LEN || ciphertext_len != pouch_bufview_available(&ciphertext))
     {
-        POUCH_LOG_ERR("Invalid ciphertext length: %zu", ciphertext_len);
+        POUCH_LOG_ERR("Invalid ciphertext length: %u", (unsigned int) ciphertext_len);
         return -EINVAL;
     }
 
