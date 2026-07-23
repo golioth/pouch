@@ -17,8 +17,10 @@ static struct pouch_serial serial = {
     .channels =
         {
             [POUCH_SERIAL_CH_INFO] = CHANNEL(&pouch_device_endpoint_info),
+#if defined(CONFIG_POUCH_ENCRYPTION_SAEAD)
             [POUCH_SERIAL_CH_SERVER_CERT] = CHANNEL(&pouch_device_endpoint_server_cert),
             [POUCH_SERIAL_CH_DEVICE_CERT] = CHANNEL(&pouch_device_endpoint_device_cert),
+#endif
             [POUCH_SERIAL_CH_DOWNLINK] = CHANNEL(&pouch_device_endpoint_downlink),
             [POUCH_SERIAL_CH_UPLINK] = CHANNEL(&pouch_device_endpoint_uplink),
         },

@@ -122,6 +122,14 @@ int pouch_serial_ch_recv(struct pouch_serial_channel *ch,
                          const void *payload,
                          size_t len)
 {
+    /* A channel with no endpoint is not configured on this build (e.g. the
+     * certificate channels when SAEAD encryption is disabled). Ignore any
+     * frames that arrive for it rather than dereferencing a NULL endpoint. */
+    if (ch->endpoint == NULL)
+    {
+        return 0;
+    }
+
     if (header->is_data)
     {
         return handle_data(ch, header, payload, len);
