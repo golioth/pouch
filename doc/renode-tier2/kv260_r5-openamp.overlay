@@ -19,3 +19,13 @@
 &rpu0_ipi {
 	status = "okay";
 };
+
+/*
+ * remoteproc loads the R5 firmware into the DDR rproc carve-out (0x3ed00000,
+ * 256K) rather than TCM: the openamp image (~155K) does not fit the 64K TCM
+ * that device-address 0x0 maps to. This node is in r5f_0's memory-region, so
+ * the Xilinx R5 remoteproc driver maps it.
+ */
+&sram0 {
+	reg = <0x3ed00000 0x40000>;
+};

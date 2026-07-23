@@ -40,6 +40,24 @@ demo is the most mature.
   (`rpu0`) — see `smoke_r5_boot.robot`. Console is **uart1** on this board.
 - The Zephyr **`openamp_rsc_table`** sample builds for `kv260_r5` using the
   overlay/conf here.
+- Linux **`remoteproc` loads and starts** that firmware on the R5
+  (`state` → `running`) — see `remoteproc_load.robot`. The firmware is injected
+  into a copy of the demo rootfs with `debugfs` (no root needed):
+
+  ```sh
+  debugfs -w -R "write build/zephyr/zephyr_openamp_rsc_table.elf \
+    /lib/firmware/rpmsg-echo.out" rootfs.ext2
+  POUCH_ROOTFS=$PWD/rootfs.ext2 ./renode-test <pouch>/doc/renode-tier2/remoteproc_load.robot
+  ```
+
+### Firmware placement note
+
+`device-address 0x0` maps to the R5 **TCM (64 KiB)**; the openamp image
+(~155 KiB) does not fit, so `remoteproc` rejects a `da 0x0` segment
+(`bad phdr da 0x0`). The overlay therefore relocates `&sram0` to the DDR
+`rproc` carve-out at `0x3ed00000` (256 KiB), which the Xilinx R5 remoteproc
+driver maps (it is in `r5f_0`'s `memory-region`). Small firmwares that fit TCM
+can keep the default `0x0` link address.
 
 ## The OpenAMP memory map (from the demo's Linux DTB)
 
@@ -82,9 +100,11 @@ hangs headless. The R5 core is `rpu0`; reference it after
 
 ## Remaining work
 
-1. Load the built R5 OpenAMP firmware via **Linux `remoteproc`** in the demo
-   (inject it into the guest `/lib/firmware`) and confirm rpmsg channels come
-   up (IPI reg offsets and resource-table alignment may need tuning).
+1. Confirm the **rpmsg channel** comes up end to end (e.g.
+   `modprobe rpmsg_client_sample` ping-pong) — the firmware loads and starts;
+   the virtio-rpmsg handshake (IPI reg offsets, resource-table alignment) is
+   the next thing to verify/tune. The R5 firmware console currently collides
+   with Linux on `uart1`; route it to `uart0`.
 2. Swap the echo app for the **Pouch device + rpmsg adapter** firmware.
 3. Replace the demo's Buildroot rootfs with an **Ubuntu userspace** rootfs.
 4. Add a **mock broker** on the Linux side and a Robot test asserting a Pouch
