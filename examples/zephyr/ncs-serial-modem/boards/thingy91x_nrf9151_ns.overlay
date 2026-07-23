@@ -5,9 +5,26 @@
  */
 
 / {
+	rtt0: rtt_chan0 {
+		compatible = "segger,rtt-uart";
+		status = "okay";
+	};
+
 	chosen {
 		ncs,sm-uart = &dtr_uart1;
+		/*
+		 * Route console/shell to RTT. The nRF9151's UART0 and UART1
+		 * data pins (P0.00/P0.01) are used by the inter-chip
+		 * serial-modem link, so UART0 cannot also drive the console.
+		 */
+		zephyr,console = &rtt0;
+		zephyr,shell-uart = &rtt0;
 	};
+};
+
+/* UART0 is disabled to release P0.00/P0.01 for the modem UART1. */
+&uart0 {
+	status = "disabled";
 };
 
 &uart1 {
