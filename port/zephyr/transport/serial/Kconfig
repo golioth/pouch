@@ -58,6 +58,49 @@ source "subsys/logging/Kconfig.template.log_config"
 
 endif # POUCH_RPMSG_DEVICE
 
+menuconfig POUCH_SERIAL_UART_DEVICE
+    bool "Pouch UART device transport adapter"
+    depends on POUCH_TRANSPORT_SERIAL_DEVICE
+    depends on SERIAL && UART_INTERRUPT_DRIVEN
+    help
+        Enable the interrupt-driven UART device adapter for the Pouch Serial
+        device protocol. It carries Pouch Serial frames over the UART referenced
+        by the "golioth,pouch-serial-uart" chosen node, using a minimal
+        length-delimited framing. Intended for development and native_sim
+        end-to-end testing over a host pty (via the native-tty UART driver),
+        with the broker running as a host process on the other end of the link.
+
+if POUCH_SERIAL_UART_DEVICE
+
+config POUCH_SERIAL_UART_DEVICE_FRAME_SIZE
+    int "Maximum serial frame size"
+    default 496
+    range 2 4096
+    help
+        Maximum size in bytes of a single Pouch Serial frame (1-byte header plus
+        payload) carried over the UART link.
+
+config POUCH_SERIAL_UART_DEVICE_RX_RING_SIZE
+    int "RX ring buffer size"
+    default 1024
+    help
+        Size in bytes of the ring buffer that decouples the UART RX ISR from the
+        frame-parsing thread.
+
+config POUCH_SERIAL_UART_DEVICE_RX_THREAD_STACK_SIZE
+    int "RX thread stack size"
+    default 2048
+
+config POUCH_SERIAL_UART_DEVICE_RX_THREAD_PRIORITY
+    int "RX thread priority"
+    default 5
+
+module = POUCH_SERIAL_UART_DEVICE
+module-str = Pouch UART Device
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # POUCH_SERIAL_UART_DEVICE
+
 module = POUCH_SERIAL
 module-str = Pouch Serial Transport
 source "subsys/logging/Kconfig.template.log_config"
