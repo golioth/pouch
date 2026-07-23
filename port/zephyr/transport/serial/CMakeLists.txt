@@ -13,4 +13,5 @@ endif()
 
 if(CONFIG_POUCH_SERIAL_UART_DEVICE)
     zephyr_library_sources(${CMAKE_CURRENT_LIST_DIR}/uart_device.c)
+    zephyr_library_sources(${CMAKE_CURRENT_LIST_DIR}/uart_framing.c)
 endif()

@@ -14,6 +14,8 @@
 
 #include <pouch/transport/serial/device.h>
 
+#include "uart_framing.h"
+
 #include <errno.h>
 #include <stdint.h>
 
@@ -23,19 +25,13 @@ LOG_MODULE_REGISTER(pouch_uart_device, CONFIG_POUCH_SERIAL_UART_DEVICE_LOG_LEVEL
  * Interrupt-driven UART device adapter for the Pouch Serial transport.
  *
  * The Pouch Serial core produces and consumes whole frames (a 1-byte serial
- * header plus payload). A UART is a raw byte stream, so this adapter adds a
- * minimal length-delimited framing to recover frame boundaries on the wire:
- *
- *     [ SOF=0xA5 ][ len_hi ][ len_lo ][ serial frame bytes ... ]
- *
- * This is the device-side adapter used for development and native_sim
- * end-to-end testing (over a host pty via the native-tty UART driver), where
- * the broker runs as a host process attached to the other end of the link.
- * The reliable, ordered link means no retransmission is required; the SOF byte
- * only provides cheap resynchronization if framing is ever lost.
+ * header plus payload). A UART is a raw byte stream, so frames are wrapped in
+ * the length-delimited framing implemented by uart_framing.[ch]. This is the
+ * device-side adapter used for development and native_sim end-to-end testing
+ * (over a host pty via the native-tty UART driver), where the broker runs on
+ * the other end of the link. The reliable, ordered link means no
+ * retransmission is required.
  */
-
-#define UART_FRAME_SOF 0xA5
 
 #define POUCH_UART_NODE DT_CHOSEN(golioth_pouch_serial_uart)
 
@@ -95,25 +91,16 @@ static void rx_thread_fn(void *a, void *b, void *c)
     ARG_UNUSED(c);
 
     static uint8_t frame[CONFIG_POUCH_SERIAL_UART_DEVICE_FRAME_SIZE];
+    struct pouch_uart_framer framer;
+
+    pouch_uart_framer_init(&framer, frame, sizeof(frame));
 
     while (true)
     {
-        /* Scan for start of frame. */
-        if (rx_byte() != UART_FRAME_SOF)
+        size_t len = pouch_uart_framer_feed(&framer, rx_byte());
+        if (len == 0)
         {
             continue;
-        }
-
-        size_t len = ((size_t) rx_byte() << 8) | rx_byte();
-        if (len == 0 || len > sizeof(frame))
-        {
-            LOG_WRN("Bad frame length %zu, resyncing", len);
-            continue;
-        }
-
-        for (size_t i = 0; i < len; i++)
-        {
-            frame[i] = rx_byte();
         }
 
         int err = pouch_serial_device_recv(frame, len);
@@ -132,6 +119,7 @@ static void tx_process(struct k_work *work)
     ARG_UNUSED(work);
 
     uint8_t frame[CONFIG_POUCH_SERIAL_UART_DEVICE_FRAME_SIZE];
+    uint8_t framed[CONFIG_POUCH_SERIAL_UART_DEVICE_FRAME_SIZE + POUCH_UART_FRAME_OVERHEAD];
 
     k_mutex_lock(&tx_mutex, K_FOREVER);
 
@@ -143,12 +131,10 @@ static void tx_process(struct k_work *work)
             break;
         }
 
-        uart_poll_out(uart_dev, UART_FRAME_SOF);
-        uart_poll_out(uart_dev, (uint8_t) (len >> 8));
-        uart_poll_out(uart_dev, (uint8_t) (len & 0xff));
-        for (size_t i = 0; i < len; i++)
+        size_t framed_len = pouch_uart_frame_encode(framed, sizeof(framed), frame, len);
+        for (size_t i = 0; i < framed_len; i++)
         {
-            uart_poll_out(uart_dev, frame[i]);
+            uart_poll_out(uart_dev, framed[i]);
         }
     }
 
