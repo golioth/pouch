@@ -18,7 +18,7 @@ jobs:
 
       - name: Install clang-format
         shell: bash
-        run: pip install clang-format
+        run: pip install -r requirements-lint.txt --require-hashes
 
       - name: Run linter
         shell: bash
@@ -45,7 +45,7 @@ jobs:
 
       - name: Install ruff
         shell: bash
-        run: pip install ruff
+        run: pip install -r requirements-lint.txt --require-hashes
 
       - name: Run ruff check
         shell: bash
