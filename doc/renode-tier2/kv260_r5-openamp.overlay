@@ -1,0 +1,21 @@
+/*
+ * OpenAMP config for kv260_r5 matching the Renode ZynqMP OpenAMP demo /
+ * Linux DTB carve-out: vrings @0x3ed40000/0x3ed44000, rpmsg buffers
+ * @0x3ed48000 (1MB). Firmware runs from TCM (board default @0x0); the shared
+ * ring/buffer memory lives in DDR.
+ */
+/ {
+	chosen {
+		zephyr,ipc_shm = &shram;
+		zephyr,ipc = &rpu0_ipi;
+	};
+
+	shram: memory@3ed40000 {
+		compatible = "mmio-sram";
+		reg = <0x3ed40000 0x108000>;
+	};
+};
+
+&rpu0_ipi {
+	status = "okay";
+};
