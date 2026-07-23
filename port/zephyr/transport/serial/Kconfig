@@ -21,6 +21,43 @@ config POUCH_TRANSPORT_SERIAL_DEVICE
         runs on the node device and communicates with a gateway running the
         broker implementation.
 
+menuconfig POUCH_RPMSG_DEVICE
+    bool "Pouch rpmsg device transport adapter"
+    depends on POUCH_TRANSPORT_SERIAL_DEVICE
+    depends on IPC_SERVICE
+    help
+        Enable the rpmsg (OpenAMP) device transport adapter for the Pouch Serial
+        device protocol. It carries the Pouch Serial channels over a single
+        rpmsg endpoint provided by the ipc_service instance referenced by the
+        "golioth,pouch-rpmsg-ipc" chosen node. Each rpmsg message carries one
+        Pouch Serial frame, so no additional framing or segmentation is used.
+        Intended for MCU cores on heterogeneous MPU+MCU SoCs that reach a Linux
+        gateway over OpenAMP.
+
+if POUCH_RPMSG_DEVICE
+
+config POUCH_RPMSG_DEVICE_EPT_NAME
+    string "rpmsg endpoint name"
+    default "pouch"
+    help
+        Name of the rpmsg endpoint announced to the broker via the rpmsg name
+        service. Must match the endpoint the broker binds to.
+
+config POUCH_RPMSG_DEVICE_FRAME_SIZE
+    int "Maximum rpmsg frame size"
+    default 496
+    range 2 496
+    help
+        Maximum size in bytes of a single Pouch Serial frame carried in one
+        rpmsg message (1-byte header plus payload). The default matches the
+        payload available in the standard 512-byte rpmsg buffers.
+
+module = POUCH_RPMSG_DEVICE
+module-str = Pouch rpmsg Device
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # POUCH_RPMSG_DEVICE
+
 module = POUCH_SERIAL
 module-str = Pouch Serial Transport
 source "subsys/logging/Kconfig.template.log_config"
