@@ -13,6 +13,10 @@
  */
 
 / {
+	chosen {
+		zephyr,code-partition = &slot0_partition;
+	};
+
 	aliases {
 		modem = &modem;
 	};
@@ -29,6 +33,20 @@
 			cache-size = <64>;
 			lookahead-size = <32>;
 			block-cycles = <512>;
+		};
+	};
+};
+
+/delete-node/ &boot_partition;
+/delete-node/ &slot0_partition;
+/delete-node/ &slot1_partition;
+
+&flash0 {
+	partitions {
+		slot0_partition: partition@0 {
+			compatible = "zephyr,mapped-partition";
+			label = "image-0";
+			reg = <0x00000000 0x000f8000>;
 		};
 	};
 };
