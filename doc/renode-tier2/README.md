@@ -113,15 +113,30 @@ firmware, `virtio_rpmsg_bus` comes online, and `/dev/rpmsg_ctrl0` +
 `/sys/bus/rpmsg/devices/{rpmsg_ctrl,rpmsg_ns}` appear — the RFC's exact
 interface. The R5 now **executes** the firmware (prints on `uart0`).
 
-**Open blocker:** the trimmed OpenAMP firmware faults during its IPM/IPI setup
-(`ipm_set_enabled` → prefetch abort), so it does not yet complete the rpmsg
-handshake. This is R5-side OpenAMP/interrupt bring-up specific to
-kv260/ZynqMP + Renode (no upstream `openamp_rsc_table` overlay exists for this
-board); under investigation.
+**R5-side bring-up fix chain** (each step found the next fault; all real
+ZynqMP-R5-OpenAMP requirements this board did not have out of the box):
+
+1. **TCM link** — firmware must be TCM-resident (above).
+2. **`zephyr,ipc = &rpu0_apu_mailbox`** — the `ipm_xlnx_ipi` driver puts the IPM
+   API on the *child* mailbox device; the parent `rpu0_ipi` has a NULL api.
+   Pointing `zephyr,ipc` at the parent faults in `ipm_set_enabled`.
+3. **MPU region for the shared memory** — the ZynqMP SoC uses a *static* MPU
+   table (`soc/xlnx/zynqmp/arm_mpu_regions.c`) that does not map the DDR
+   OpenAMP carve-out, so `zephyr,memory-attr` is ignored and the R5 data-aborts
+   in `virtqueue`/`rpmsg_init_vdev`. See `zynqmp-r5-openamp-mpu.patch` (a
+   non-cacheable region for the carve-out; candidate to upstream or move to a
+   board-level MPU region).
+
+With all three, the R5 no longer faults and runs the OpenAMP firmware.
+
+**Open blocker:** after `remoteproc start` the emulation nearly stalls (very
+little virtual time advances) and no R5-announced rpmsg channel has been
+observed yet — consistent with an IPI notify / interrupt-storm issue in the
+R5↔A53 handshake. Under investigation.
 
 Then:
-1. Complete the R5 rpmsg handshake (fix the IPM-init fault; verify a channel
-   appears on the Linux side).
+1. Complete the R5 rpmsg handshake (resolve the post-start stall; verify a
+   channel appears on the Linux side).
 2. Swap the echo app for the **Pouch device + rpmsg adapter** firmware (which
    must also fit TCM).
 3. Replace the demo's Buildroot rootfs with an **Ubuntu userspace** rootfs.
