@@ -1,0 +1,15 @@
+/ {
+	chosen {
+		zephyr,ipc_shm = &shram;
+		zephyr,ipc = &rpu0_apu_mailbox;
+		zephyr,console = &uart0;
+		zephyr,shell-uart = &uart0;
+	};
+	shram: memory@3ed40000 {
+		compatible = "mmio-sram";
+		reg = <0x3ed40000 0x108000>;
+	};
+};
+&rpu0_ipi { status = "okay"; };
+&rpu0_apu_mailbox { status = "okay"; };
+&uart0 { status = "okay"; current-speed = <115200>; clock-frequency = <99999901>; };
