@@ -15,12 +15,14 @@ config SAMPLE_POUCH_GATEWAY_BT_AUTO_BOND
 	bool
 	default y if BOARD_NRF52_BSIM_NATIVE
 	default y if BOARD_NRF9160DK_NRF52840
+	default y if BOARD_THINGY91X_NRF5340_CPUAPP_NS
 
 # This option is used only for automated tests
 config SAMPLE_POUCH_GATEWAY_BT_AUTO_CONFIRM
 	bool
 	default y if BOARD_NRF52_BSIM_NATIVE
 	default y if BOARD_NRF9160DK_NRF52840
+	default y if BOARD_THINGY91X_NRF5340_CPUAPP_NS
 
 config EXAMPLE_COAP_CLIENT_SYNC_PERIOD_S
 	int "CoAP client sync period (s)"
