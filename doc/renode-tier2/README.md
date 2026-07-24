@@ -50,14 +50,22 @@ demo is the most mature.
   POUCH_ROOTFS=$PWD/rootfs.ext2 ./renode-test <pouch>/doc/renode-tier2/remoteproc_load.robot
   ```
 
-### Firmware placement note
+### Firmware placement note (important)
 
-`device-address 0x0` maps to the R5 **TCM (64 KiB)**; the openamp image
-(~155 KiB) does not fit, so `remoteproc` rejects a `da 0x0` segment
-(`bad phdr da 0x0`). The overlay therefore relocates `&sram0` to the DDR
-`rproc` carve-out at `0x3ed00000` (256 KiB), which the Xilinx R5 remoteproc
-driver maps (it is in `r5f_0`'s `memory-region`). Small firmwares that fit TCM
-can keep the default `0x0` link address.
+The ZynqMP R5 **boots and executes from TCM** (reset vector at address `0`), not
+from DDR. Firmware must therefore be **TCM-resident** — the known-good
+`rpmsg-echo.out` links to `0x0` (ATCM) + `0x20000` (BTCM), ~87 KiB total, with
+only its resource table in DDR. A firmware relinked entirely into the DDR
+`rproc` carve-out loads (remoteproc reports `running`) but never executes — the
+R5 boots into empty TCM and sits silent. Confirmed both ways: a TCM-linked
+`hello_world` prints over remoteproc; a DDR-linked one is silent.
+
+Consequently the overlay keeps the default `0x0` (TCM) link address and only
+places the vrings/buffers in DDR (`zephyr,ipc_shm` @ `0x3ed40000`). The OpenAMP
+sample must be trimmed to fit TCM: with `CONFIG_SHELL=n`, `CONFIG_LOG=n`,
+`CONFIG_BOOT_BANNER=n` it drops from ~155 KiB to **~45 KiB**, which fits ATCM as
+a single segment. The eventual Pouch device firmware must likewise fit TCM
+(~128 KiB across ATCM+BTCM) — a real constraint to design around.
 
 ## The OpenAMP memory map (from the demo's Linux DTB)
 
@@ -98,14 +106,24 @@ Renode must be driven via `renode-test`/robot; a bare `renode script.resc`
 hangs headless. The R5 core is `rpu0`; reference it after
 `using sysbus.cluster1`.
 
-## Remaining work
+## Current status / remaining work
 
-1. Confirm the **rpmsg channel** comes up end to end (e.g.
-   `modprobe rpmsg_client_sample` ping-pong) — the firmware loads and starts;
-   the virtio-rpmsg handshake (IPI reg offsets, resource-table alignment) is
-   the next thing to verify/tune. The R5 firmware console currently collides
-   with Linux on `uart1`; route it to `uart0`.
-2. Swap the echo app for the **Pouch device + rpmsg adapter** firmware.
+The Linux side is fully up: `remoteproc` loads the (TCM-linked, trimmed) R5
+firmware, `virtio_rpmsg_bus` comes online, and `/dev/rpmsg_ctrl0` +
+`/sys/bus/rpmsg/devices/{rpmsg_ctrl,rpmsg_ns}` appear — the RFC's exact
+interface. The R5 now **executes** the firmware (prints on `uart0`).
+
+**Open blocker:** the trimmed OpenAMP firmware faults during its IPM/IPI setup
+(`ipm_set_enabled` → prefetch abort), so it does not yet complete the rpmsg
+handshake. This is R5-side OpenAMP/interrupt bring-up specific to
+kv260/ZynqMP + Renode (no upstream `openamp_rsc_table` overlay exists for this
+board); under investigation.
+
+Then:
+1. Complete the R5 rpmsg handshake (fix the IPM-init fault; verify a channel
+   appears on the Linux side).
+2. Swap the echo app for the **Pouch device + rpmsg adapter** firmware (which
+   must also fit TCM).
 3. Replace the demo's Buildroot rootfs with an **Ubuntu userspace** rootfs.
 4. Add a **mock broker** on the Linux side and a Robot test asserting a Pouch
-   telemetry/settings round-trip over real rpmsg.
+   round-trip over real rpmsg.
