@@ -13,10 +13,20 @@ It complements the in-repo native_sim tests (`tests/pouch/rpmsg/exchange`),
 which validate the serial-core protocol + UART framing but cannot exercise the
 `ipc_service`/OpenAMP adapter. This tier exercises the actual on-die rpmsg path.
 
-> Status: **work in progress.** The mechanism is validated and the Zephyr R5
-> firmware builds and boots; wiring the Pouch device firmware + a mock broker
-> into an automated end-to-end test is ongoing. This cannot run in the pouch
-> CI (no OpenAMP/ZynqMP there); it is validated locally in Renode.
+> Status: **mechanism validated; full R5-side rpmsg deferred to hardware.**
+> In Renode we have proven the real Linux `remoteproc` + `virtio-rpmsg` stack
+> (the RFC's `/dev/rpmsg_ctrl0` interface) and worked out the complete Zephyr
+> R5 firmware bring-up (below). The last step — a fault-free R5 OpenAMP endpoint
+> announcing an rpmsg channel — is blocked by an emulator-model limitation (an
+> IPI interrupt-storm/stall after `remoteproc start`), so the end-to-end Pouch
+> round-trip over rpmsg is left to be finished on real MPU+MCU hardware, where
+> the IPI is not a partial model. This cannot run in the pouch CI (no
+> OpenAMP/ZynqMP there); it is validated locally in Renode.
+>
+> What this establishes: the Linux/gateway side of the RFC works exactly as
+> designed against a real kernel rpmsg stack, and the Zephyr R5 firmware
+> placement, IPM wiring, and MPU requirements for ZynqMP are documented and
+> captured — a concrete head start for the hardware bring-up.
 
 ## Platform: AMD Kria KV260 (ZynqMP), Cortex-R5
 
@@ -129,16 +139,22 @@ ZynqMP-R5-OpenAMP requirements this board did not have out of the box):
 
 With all three, the R5 no longer faults and runs the OpenAMP firmware.
 
-**Open blocker:** after `remoteproc start` the emulation nearly stalls (very
-little virtual time advances) and no R5-announced rpmsg channel has been
-observed yet — consistent with an IPI notify / interrupt-storm issue in the
-R5↔A53 handshake. Under investigation.
+**Known limitation (why the last step is deferred to hardware):** after
+`remoteproc start` the emulation nearly stalls — only ~12 s of virtual time
+advances and then it makes essentially no progress (a subsequent `ls` cannot
+complete), consistent with an IPI notify / interrupt-storm in Renode's
+`ZynqMP_IPI` model rather than a firmware config error (the R5 no longer
+faults). Because the stall also prevents observing/iterating, no R5-announced
+rpmsg channel is confirmed. On real MPU+MCU silicon the IPI is not a partial
+model, so this is the natural point to continue on hardware.
 
-Then:
-1. Complete the R5 rpmsg handshake (resolve the post-start stall; verify a
-   channel appears on the Linux side).
-2. Swap the echo app for the **Pouch device + rpmsg adapter** firmware (which
-   must also fit TCM).
+Remaining work to finish on hardware (or a higher-fidelity model):
+1. Complete the R5 rpmsg handshake (a channel appears on the Linux side; an
+   echo/round-trip succeeds).
+2. Swap the echo app for the **Pouch device + rpmsg adapter** firmware. Note the
+   firmware must fit the R5 TCM (~128 KiB across ATCM+BTCM); the Pouch stack +
+   OpenAMP may need aggressive trimming or a DDR-execution setup — validate the
+   size budget early.
 3. Replace the demo's Buildroot rootfs with an **Ubuntu userspace** rootfs.
-4. Add a **mock broker** on the Linux side and a Robot test asserting a Pouch
-   round-trip over real rpmsg.
+4. Add a **mock broker** (or connect-agent) on the Linux side and an automated
+   test asserting a Pouch round-trip over real rpmsg.
