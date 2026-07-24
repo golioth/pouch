@@ -56,6 +56,11 @@ static void send_ack(pouch_work_delayable_t *dwork)
     {
         // try again later:
         POUCH_LOG_ERR("TX failed (%d)", err);
+        if (err == -ENOTCONN || err == -ECONNRESET)
+        {
+            end(p, false);
+            return;
+        }
         schedule_ack(p);
         return;
     }
@@ -113,6 +118,11 @@ int pouch_receiver_open(struct pouch_receiver *recv, struct pouch_bearer *bearer
 int pouch_receiver_recv(struct pouch_receiver *recv, const uint8_t *buf, size_t len)
 {
     struct pouch_sar_tx_pkt pkt;
+
+    if (recv->state == STATE_IDLE || recv->state == STATE_FAILED)
+    {
+        return -ENOTCONN;
+    }
 
     int err = pouch_sar_tx_pkt_decode(buf, len, &pkt);
     if (err)
