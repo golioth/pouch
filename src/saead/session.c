@@ -199,6 +199,12 @@ static void nonce_generate(const struct session *session,
 
 struct pouch_buf *session_encrypt_block(struct session *session, struct pouch_buf *block)
 {
+    if (session->pouch.block_index == UINT16_MAX)
+    {
+        POUCH_LOG_ERR("Block index space exhausted; session must rotate");
+        return NULL;
+    }
+
     struct pouch_buf *encrypted = buf_alloc(MAX_CIPHERTEXT_BLOCK_SIZE);
     if (encrypted == NULL)
     {
@@ -277,6 +283,12 @@ int session_decrypt_block(struct session *session,
                           const struct pouch_buf *block,
                           struct pouch_buf *decrypted)
 {
+    if (session->pouch.block_index == UINT16_MAX)
+    {
+        POUCH_LOG_ERR("Block index space exhausted; session must rotate");
+        return -ERANGE;
+    }
+
     uint8_t nonce[NONCE_LEN];
     nonce_generate(session, POUCH_ROLE_SERVER, nonce);
 
