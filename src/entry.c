@@ -9,6 +9,7 @@
 #include "uplink.h"
 
 #include <errno.h>
+#include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -228,6 +229,10 @@ int pouch_downlink_block_push(struct pouch_buf *pouch_buf)
 static int write_entry(struct pouch_buf *block, const struct pouch_entry *entry)
 {
     size_t pathlen = strlen(entry->path);
+    if (pathlen > UINT8_MAX)
+    {
+        return -EINVAL;
+    }
     if (block == NULL || block_space_get(block) < ENTRY_HEADER_OVERHEAD + pathlen + entry->data_len)
     {
         return -ENOMEM;
