@@ -102,8 +102,7 @@ int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_las
             downlink->last_block = block;
         }
 
-        int err =
-            pouch_msgq_put(&downlink->block_queue, &block, pouch_timepoint_timeout(deadline));
+        int err = pouch_msgq_put(&downlink->block_queue, &block, pouch_timepoint_timeout(deadline));
         if (err)
         {
             POUCH_LOG_ERR("Failed to enqueue block: %d", err);
