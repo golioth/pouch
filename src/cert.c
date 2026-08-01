@@ -246,6 +246,7 @@ int cert_server_set(const struct pouch_cert *certbuf)
     {
         POUCH_LOG_ERR("Unexpected server certificate serial number size: %zu",
                       cert_chain.serial.len);
+        err = -EINVAL;
         goto exit;
     }
 
