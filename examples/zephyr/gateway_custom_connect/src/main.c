@@ -42,7 +42,9 @@ LOG_MODULE_REGISTER(main);
 struct sync_data
 {
     struct k_work_delayable work;
-    struct bt_conn *conn;
+    struct k_mutex lock;
+    struct bt_conn *active_conn;
+    struct bt_conn *pending_conn; /* Owns a reference while non-NULL. */
     int counter;
 };
 
@@ -61,6 +63,54 @@ static struct bt_conn *default_conn;
 static const k_timeout_t bonding_timeout = K_SECONDS(30);
 static const bt_security_t bt_security =
     IS_ENABLED(CONFIG_POUCH_GATEWAY_GATT_SCAN_FILTER_BONDED) ? BT_SECURITY_L4 : BT_SECURITY_L2;
+
+static int schedule_sync(struct bt_conn *conn, k_timeout_t delay)
+{
+    struct bt_conn *owned_conn;
+    int ret;
+
+    owned_conn = bt_conn_ref(conn);
+    if (owned_conn == NULL)
+    {
+        return -ENOTCONN;
+    }
+
+    k_mutex_lock(&sync_data.lock, K_FOREVER);
+
+    if (conn != sync_data.active_conn)
+    {
+        ret = -ENOTCONN;
+        goto out;
+    }
+
+    if (sync_data.pending_conn != NULL)
+    {
+        ret = -EBUSY;
+        goto out;
+    }
+
+    ret = k_work_schedule(&sync_data.work, delay);
+    if (ret <= 0)
+    {
+        ret = (ret == 0) ? -EBUSY : ret;
+        goto out;
+    }
+
+    /* Hand the reference over to the pending slot; the work handler releases it. */
+    sync_data.pending_conn = owned_conn;
+    owned_conn = NULL;
+    ret = 0;
+
+out:
+    k_mutex_unlock(&sync_data.lock);
+
+    if (owned_conn != NULL)
+    {
+        bt_conn_unref(owned_conn);
+    }
+
+    return ret;
+}
 
 static void button_pressed(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
@@ -206,8 +256,27 @@ static void bt_connected(struct bt_conn *conn, uint8_t err)
 static void bt_disconnected(struct bt_conn *conn, uint8_t reason)
 {
     char addr[BT_ADDR_LE_STR_LEN];
+    struct bt_conn *pending_conn = NULL;
 
     default_conn = NULL;
+
+    k_mutex_lock(&sync_data.lock, K_FOREVER);
+    if (sync_data.active_conn == conn)
+    {
+        sync_data.active_conn = NULL;
+    }
+    if (sync_data.pending_conn == conn)
+    {
+        pending_conn = sync_data.pending_conn;
+        sync_data.pending_conn = NULL;
+    }
+    k_mutex_unlock(&sync_data.lock);
+
+    if (pending_conn != NULL)
+    {
+        (void) k_work_cancel_delayable(&sync_data.work);
+        bt_conn_unref(pending_conn);
+    }
 
     bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
     LOG_INF("Disconnected: %s, reason 0x%02x %s", addr, reason, bt_hci_err_to_str(reason));
@@ -219,9 +288,13 @@ static void bt_disconnected(struct bt_conn *conn, uint8_t reason)
 
 static void on_gateway_end(struct bt_conn *conn)
 {
-    sync_data.counter++;
+    int counter;
 
-    if (sync_data.counter > 1)
+    k_mutex_lock(&sync_data.lock, K_FOREVER);
+    counter = ++sync_data.counter;
+    k_mutex_unlock(&sync_data.lock);
+
+    if (counter > 1)
     {
         LOG_INF("Disconnecting");
         bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
@@ -229,13 +302,49 @@ static void on_gateway_end(struct bt_conn *conn)
     else
     {
         LOG_INF("Start sync once again in 5s");
-        k_work_schedule(&sync_data.work, K_SECONDS(5));
+        int ret = schedule_sync(conn, K_SECONDS(5));
+        if (ret < 0)
+        {
+            LOG_ERR("Failed to schedule Pouch gateway (%d)", ret);
+            bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+        }
     }
 }
 
 static void sync_start_handler(struct k_work *work)
 {
-    pouch_gateway_bt_start(sync_data.conn, on_gateway_end);
+    struct bt_conn *conn;
+    bool active;
+    int ret;
+
+    ARG_UNUSED(work);
+
+    k_mutex_lock(&sync_data.lock, K_FOREVER);
+    conn = sync_data.pending_conn;
+    sync_data.pending_conn = NULL;
+    active = (conn == sync_data.active_conn);
+    k_mutex_unlock(&sync_data.lock);
+
+    if (conn == NULL)
+    {
+        return;
+    }
+
+    if (!active)
+    {
+        /* The peer disconnected while the restart was pending. */
+        bt_conn_unref(conn);
+        return;
+    }
+
+    ret = pouch_gateway_bt_start(conn, on_gateway_end);
+    if (ret < 0)
+    {
+        LOG_ERR("Failed to start Pouch gateway (%d)", ret);
+        bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+    }
+
+    bt_conn_unref(conn);
 }
 
 static void security_changed(struct bt_conn *conn, bt_security_t level, enum bt_security_err err)
@@ -257,10 +366,17 @@ static void security_changed(struct bt_conn *conn, bt_security_t level, enum bt_
     {
         LOG_INF("BT security changed to level %u", level);
 
-        sync_data.conn = conn;
+        k_mutex_lock(&sync_data.lock, K_FOREVER);
+        sync_data.active_conn = conn;
         sync_data.counter = 0;
+        k_mutex_unlock(&sync_data.lock);
 
-        k_work_schedule(&sync_data.work, K_NO_WAIT);
+        int ret = schedule_sync(conn, K_NO_WAIT);
+        if (ret < 0)
+        {
+            LOG_ERR("Failed to schedule Pouch gateway (%d)", ret);
+            bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+        }
     }
 }
 
@@ -345,6 +461,7 @@ int main(void)
     LOG_INF("Pouch BLE Transport Protocol Version: %d", POUCH_GATT_VERSION);
 
     k_work_init_delayable(&sync_data.work, sync_start_handler);
+    k_mutex_init(&sync_data.lock);
 
     /* Load the Pouch device's identity (cert + key). */
     struct pouch_config config = {0};

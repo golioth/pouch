@@ -232,7 +232,12 @@ static void security_changed(struct bt_conn *conn, bt_security_t level, enum bt_
     {
         LOG_INF("BT security changed to level %u", level);
 
-        pouch_gateway_bt_start(conn, on_gateway_end);
+        int ret = pouch_gateway_bt_start(conn, on_gateway_end);
+        if (ret < 0)
+        {
+            LOG_ERR("Failed to start Pouch gateway (%d)", ret);
+            bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+        }
     }
 }
 

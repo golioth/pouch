@@ -34,7 +34,13 @@ BUILD_ASSERT(ARRAY_SIZE(char_uuids) == BROKER_BT_ATTRS, "Missing characteristic 
 
 static void complete(struct broker_bt_gatt_device *device, bool success)
 {
-    device->discover.callback(device, success);
+    broker_bt_gatt_discover_callback_t callback = device->discover.callback;
+
+    device->discover.callback = NULL;
+    if (callback != NULL)
+    {
+        callback(device, success);
+    }
 }
 
 static uint8_t discover_descriptors(struct bt_conn *conn,
@@ -42,6 +48,16 @@ static uint8_t discover_descriptors(struct bt_conn *conn,
                                     struct bt_gatt_discover_params *params)
 {
     struct broker_bt_gatt_device *device = broker_bt_gatt_device(conn);
+    if (device->conn != conn)
+    {
+        return BT_GATT_ITER_STOP;
+    }
+    if (!broker_bt_discovery_active(device, conn))
+    {
+        complete(device, false);
+        return BT_GATT_ITER_STOP;
+    }
+
     if (attr)
     {
         int attr_idx = BROKER_BT_ATTRS;
@@ -82,6 +98,16 @@ static uint8_t discover_characteristics(struct bt_conn *conn,
                                         struct bt_gatt_discover_params *params)
 {
     struct broker_bt_gatt_device *device = broker_bt_gatt_device(conn);
+    if (device->conn != conn)
+    {
+        return BT_GATT_ITER_STOP;
+    }
+    if (!broker_bt_discovery_active(device, conn))
+    {
+        complete(device, false);
+        return BT_GATT_ITER_STOP;
+    }
+
     if (attr)
     {
         struct bt_gatt_chrc *chrc = attr->user_data;
@@ -136,6 +162,16 @@ static uint8_t discover_services(struct bt_conn *conn,
                                  struct bt_gatt_discover_params *params)
 {
     struct broker_bt_gatt_device *device = broker_bt_gatt_device(conn);
+    if (device->conn != conn)
+    {
+        return BT_GATT_ITER_STOP;
+    }
+    if (!broker_bt_discovery_active(device, conn))
+    {
+        complete(device, false);
+        return BT_GATT_ITER_STOP;
+    }
+
     if (!attr)
     {
         if (params->uuid == &golioth_svc_uuid_16.uuid)

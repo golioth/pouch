@@ -7,20 +7,27 @@
 import logging
 import os
 import random
+import secrets
 import string
 import subprocess
 import sys
 from pathlib import Path
 from typing import Generator
 
+import west.configuration
+
 sys.path.insert(
     0, str(Path(__file__).resolve().parents[4] / "scripts" / "pytest-pouch")
 )
+
+WEST_TOPDIR = Path(west.configuration.west_dir()).parent
+sys.path.insert(0, str(WEST_TOPDIR / "zephyr" / "scripts" / "west_commands"))
 
 pytest_plugins = ["pytest_pouch.plugin"]
 
 import pytest  # noqa: E402
 
+from runners.core import BuildConfiguration  # noqa: E402
 from twister_harness.device.device_adapter import DeviceAdapter  # noqa: E402
 from twister_harness.twister_harness_config import TwisterHarnessConfig  # noqa: E402
 
@@ -210,3 +217,119 @@ async def setup(project, device, gateway, creds):
     for setting in gw_settings:
         if "deviceId" in setting and setting["key"] == "LED":
             await gateway.settings.delete(setting["key"])
+
+
+@pytest.fixture(scope="module")
+def test_id():
+    """Unique random slug for this test module's cloud resources.
+
+    Generated freshly per pytest module so that parallel CI pipelines,
+    sequential retries, and concurrent local runs never collide on
+    shared Golioth resources (cohorts, deployments, OTA artifacts).
+    """
+    return secrets.token_hex(8)
+
+
+@pytest.fixture(scope="module")
+def artifacts_to_cleanup():
+    return []
+
+
+@pytest.fixture(scope="module")
+async def cohort(project, device, test_id, artifacts_to_cleanup):
+    """Create a per-device, per-test cohort so OTA deployments are isolated.
+
+    In the gateway example the `device` fixture resolves to the peripheral
+    Golioth device (the OTA target). The gateway proxies OTA traffic
+    between the peripheral and Golioth over the Pouch BLE tunnel.
+    """
+    cohort_name = f"{device.name.lower().replace('-', '_')}_{test_id}"
+    logging.info("Creating cohort '%s' for device '%s'", cohort_name, device.name)
+    cohort = await project.cohorts.create(cohort_name)
+    await device.update_cohort(cohort.id)
+
+    yield cohort
+
+    try:
+        await device.remove_cohort()
+    except Exception:
+        pass
+
+    try:
+        await project.cohorts.delete(cohort.id)
+    except Exception:
+        logging.warning("Cohort %s could not be deleted", cohort_name)
+        pass
+
+    for artifact_id in artifacts_to_cleanup:
+        try:
+            await project.artifacts.delete(artifact_id)
+        except Exception:
+            logging.warning("Artifact %s could not be deleted", artifact_id)
+
+
+@pytest.fixture(scope="module")
+def build_conf(twister_harness_config: TwisterHarnessConfig):
+    """BuildConfiguration for the ble_gatt peripheral sub-image.
+
+    In the gateway sample the OTA target is the peripheral, so the .config
+    of interest lives under <build_dir>/peripheral_ble_gatt_example_0
+    rather than under the sysbuild default domain (which is the gateway
+    itself).
+    """
+    build_dir = Path(twister_harness_config.devices[0].build_dir)
+    app_build_dir = build_dir / "peripheral_ble_gatt_example_0"
+    return BuildConfiguration(str(app_build_dir))
+
+
+@pytest.fixture(scope="module")
+def fw_update_component(build_conf):
+    """Package name for the OTA artifact, as configured on the peripheral."""
+    return build_conf["CONFIG_EXAMPLE_FW_UPDATE_COMPONENT"]
+
+
+@pytest.fixture(scope="module")
+async def ota_firmware(
+    project,
+    device,
+    cohort,
+    test_id,
+    tmp_path_factory,
+    artifacts_to_cleanup,
+    fw_update_component,
+):
+    """Generate a random firmware image, upload as artifact, deploy to cohort."""
+    import hashlib
+
+    # Version includes test_id (a random slug) so parallel pipelines,
+    # retries, and concurrent local runs never collide on this artifact.
+    version = f"2.0.0-{device.name}-{test_id}"
+
+    # Keep the image small: BLE-tunneled OTA is much slower than the direct
+    # coap/http_client tests. 8 KiB is enough to exercise multi-block download
+    # while staying comfortably within the test timeout.
+    image_size = 8 * 1024
+    image_data = os.urandom(image_size)
+    expected_sha256 = hashlib.sha256(image_data).hexdigest()
+
+    tmp_path = tmp_path_factory.mktemp("ota")
+    image_path = tmp_path / "firmware.bin"
+    image_path.write_bytes(image_data)
+
+    logging.info(
+        "Uploading OTA artifact: %d bytes, SHA256=%s", image_size, expected_sha256
+    )
+
+    artifact = await project.artifacts.upload(
+        path=image_path,
+        version=version,
+        package=fw_update_component,
+    )
+
+    artifacts_to_cleanup.append(artifact.id)
+
+    logging.info("Creating deployment on cohort '%s'", cohort.name)
+
+    await cohort.deployments.create(f"ota-test-{device.name}-{test_id}", [artifact.id])
+
+    yield expected_sha256

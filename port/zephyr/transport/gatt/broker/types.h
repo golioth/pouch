@@ -10,6 +10,8 @@
 #include <pouch/gateway/bt/connect.h>
 #include <pouch/port.h>
 #include <zephyr/bluetooth/gatt.h>
+#include <zephyr/kernel.h>
+#include <zephyr/sys/atomic.h>
 
 struct broker_bt_gatt_device;
 
@@ -28,6 +30,36 @@ enum characteristic_type
 {
     CHAR_RECEIVER,
     CHAR_SENDER,
+};
+
+enum broker_session_state
+{
+    BROKER_SESSION_IDLE,
+    BROKER_SESSION_DISCOVERING,
+    BROKER_SESSION_RUNNING,
+    BROKER_SESSION_CLOSING,
+};
+
+enum broker_characteristic_flag
+{
+    BROKER_CHAR_BEARER_OPEN,
+    BROKER_CHAR_TRANSFER_SUCCESS,
+    BROKER_CHAR_GATT_ACTIVE,
+    BROKER_CHAR_UNSUBSCRIBE_PENDING,
+    BROKER_CHAR_AUTO_UNSUBSCRIBE_PENDING,
+    BROKER_CHAR_CCC_SUBSCRIBE_PENDING,
+    BROKER_CHAR_CCC_UNSUBSCRIBE_PENDING,
+    BROKER_CHAR_CCC_RECONCILE_PENDING,
+    BROKER_CHAR_GATT_TERMINATED,
+};
+
+enum broker_device_flag
+{
+    BROKER_DEVICE_NOTIFY_END,
+    BROKER_DEVICE_DISCOVER_PENDING,
+    BROKER_DEVICE_DISCOVER_CANCEL_REQUESTED,
+    BROKER_DEVICE_DISCONNECTED,
+    BROKER_DEVICE_CLEANUP_CALL_ACTIVE,
 };
 
 typedef void (*broker_bt_gatt_char_done_t)(struct broker_bt_gatt_device *device,
@@ -49,7 +81,7 @@ struct characteristic
     } handle;
 
     broker_bt_gatt_char_done_t callback;
-    bool subscribed;
+    atomic_t flags;
     enum characteristic_type type;
     union
     {
@@ -71,4 +103,8 @@ struct broker_bt_gatt_device
     struct pouch_gateway_node_info node;
     struct bt_conn *conn;
     pouch_gateway_bt_end_t callback;
+    atomic_t state;
+    atomic_t flags;
+    struct k_work_delayable cleanup_work;
+    bool cleanup_work_initialized;
 };
