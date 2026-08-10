@@ -54,10 +54,7 @@ static void open_channel(struct pouch_serial_broker *broker, enum pouch_serial_c
     if (err)
     {
         POUCH_LOG_ERR("Failed to open channel %u: %d", ch, err);
-        if (broker->adapter->end)
-        {
-            broker->adapter->end(broker, false);
-        }
+        // don't call end callback - we never started.
         return;
     }
 
