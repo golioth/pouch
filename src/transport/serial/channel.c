@@ -184,8 +184,15 @@ size_t pouch_serial_ch_frame_get(struct pouch_serial_channel *ch, uint8_t *buf, 
     enum pouch_result result = ch->endpoint->send(&ch->bearer, &buf[POUCH_SERIAL_HEADER_LEN], &len);
     if (len == 0 && result == POUCH_MORE_DATA)
     {
-        // Endpoint has no data ready to send, but expects to be called again later.
-        // Don't send an empty frame; just wait for the next call.
+        /* Endpoint has no data ready to send, but expects to be called again
+         * later. CH_FLAG_PENDING was consumed on entry, so it must be restored
+         * here or the channel is never polled again: the device uplink
+         * endpoint produces its data asynchronously (the pouch work queue
+         * encrypts a block a few hundred ms after the broker's prompt) and
+         * never calls bearer_ready(). Without this the uplink transfer stalls
+         * forever and the broker times out.
+         */
+        pouch_serial_ch_ready(ch);
         return 0;
     }
 
@@ -231,7 +238,13 @@ void pouch_serial_ch_close(struct pouch_serial_channel *ch, bool success)
         pouch_atomic_set_bit(&ch->flags, CH_FLAG_ERROR);
     }
 
-    ch->endpoint->end(&ch->bearer, success);
+    /* end is optional, like in the SAR sender/receiver: endpoints that have
+     * nothing to tear down (e.g. the device info endpoint) leave it NULL.
+     */
+    if (ch->endpoint->end)
+    {
+        ch->endpoint->end(&ch->bearer, success);
+    }
     if (ch->closed_cb)
     {
         ch->closed_cb(ch, success);
