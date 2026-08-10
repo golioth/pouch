@@ -234,6 +234,7 @@ int pouch_serial_broker_recv(struct pouch_serial_broker *broker, const void *fra
         POUCH_LOG_ERR("Failed to process received frame (%d)", err);
         // Start from the top again:
         pouch_serial_broker_start(broker);
+        return err;
     }
 
     return 0;

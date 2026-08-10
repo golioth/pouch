@@ -96,6 +96,10 @@ void pouch_serial_broker_start(struct pouch_serial_broker *broker);
  * device. The first byte of @p frame is the encoded header; the remaining
  * bytes are the payload.
  *
+ * On a protocol error the broker restarts the exchange from the top before
+ * returning, so the adapter does not need to drive recovery itself. The error
+ * code is still returned, for logging and diagnostics.
+ *
  * @param broker  Broker instance.
  * @param frame   Frame bytes, starting with the 1-byte header.
  * @param len     Total frame length in bytes (header + payload).
