@@ -58,6 +58,94 @@ source "subsys/logging/Kconfig.template.log_config"
 
 endif # POUCH_RPMSG_DEVICE
 
+menuconfig POUCH_RPMSG_RSC_DEVICE
+    bool "Pouch rpmsg device transport adapter (resource table)"
+    depends on POUCH_TRANSPORT_SERIAL_DEVICE
+    depends on OPENAMP_RSC_TABLE
+    depends on IPM
+    help
+        Enable the rpmsg (OpenAMP) device transport adapter for the Pouch
+        Serial device protocol on parts where a Linux host drives
+        virtio-rpmsg through remoteproc and a resource table (i.MX 8M/9x,
+        ZynqMP, RZ/G, ...). Unlike POUCH_RPMSG_DEVICE, which fronts a Zephyr
+        ipc_service instance (a vring layout the Linux kernel's
+        virtio_rpmsg_bus does not speak), this adapter publishes the vdev via
+        the resource table exactly like the openamp_rsc_table sample, and
+        announces a single endpoint carrying one Pouch Serial frame per rpmsg
+        message. Requires the zephyr,ipc_shm / zephyr,ipc_rsc_table /
+        zephyr,ipc chosen nodes.
+
+if POUCH_RPMSG_RSC_DEVICE
+
+config POUCH_RPMSG_RSC_DEVICE_EPT_NAME
+    string "rpmsg endpoint name"
+    default "rpmsg-raw"
+    help
+        Name of the rpmsg endpoint announced to the host via the rpmsg name
+        service. The default "rpmsg-raw" binds the Linux rpmsg_char driver,
+        exposing the endpoint to a userspace broker as /dev/rpmsgN with no
+        extra kernel or ioctl plumbing.
+
+config POUCH_RPMSG_RSC_DEVICE_FRAME_SIZE
+    int "Maximum rpmsg frame size"
+    default 496
+    range 2 496
+    help
+        Maximum size in bytes of a single Pouch Serial frame carried in one
+        rpmsg message (1-byte header plus payload). The default matches the
+        payload available in the standard 512-byte rpmsg buffers.
+
+config POUCH_RPMSG_RSC_DEVICE_STACK_SIZE
+    int "Adapter thread stack sizes"
+    default 2048
+
+config POUCH_RPMSG_RSC_DEVICE_TX_THREAD_PRIORITY
+    int "Transmit thread priority"
+    default 4
+    help
+        Must be above the management thread so the firmware channel keeps
+        draining while the receive callback is stalled waiting for it.
+
+config POUCH_RPMSG_RSC_DEVICE_RX_STALL_MS
+    int "How long the receive path stalls on firmware relay pressure (ms)"
+    default 5000
+    help
+        While the firmware relay buffer is more than half full the receive
+        callback waits rather than taking more downlink off the wire, which
+        makes the host's write(2) block and pushes the backpressure back to
+        the broker. Capped so a broker that never collects the firmware
+        channel cannot wedge the link.
+
+config POUCH_RPMSG_RSC_DEVICE_TX_WAIT_MS
+    int "How long to wait for a free rpmsg TX buffer (ms)"
+    default 2000
+    help
+        The transmit thread retries rpmsg_trysend() for this long while the
+        host has no free receive buffers, then drops the frame. Retrying
+        outside the rpmsg device lock keeps the management thread free to
+        return receive buffers to the host; the blocking rpmsg_send() holds
+        that lock and deadlocks against a host that is mid-write.
+
+config POUCH_RPMSG_RSC_DEVICE_TX_POLL_MS
+    int "TX poll interval (ms)"
+    default 10
+    help
+        How often the transmit thread re-checks the serial core for a frame
+        while waiting on an endpoint that reported POUCH_MORE_DATA with no
+        bytes available yet. The uplink endpoint produces its data
+        asynchronously and never calls bearer_ready(), so a purely
+        event-driven transmit path stalls the session.
+
+config POUCH_RPMSG_RSC_DEVICE_THREAD_PRIORITY
+    int "Adapter thread priority"
+    default 5
+
+module = POUCH_RPMSG_RSC_DEVICE
+module-str = Pouch rpmsg rsc-table Device
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # POUCH_RPMSG_RSC_DEVICE
+
 menuconfig POUCH_SERIAL_UART_DEVICE
     bool "Pouch UART device transport adapter"
     depends on POUCH_TRANSPORT_SERIAL_DEVICE

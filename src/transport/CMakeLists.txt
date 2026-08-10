@@ -82,6 +82,7 @@ if(_pouch_transport_serial)
     if (_pouch_transport_serial_device)
         target_sources(${_pouch_target} PRIVATE
             serial/device.c
+            ${_pouch_transport_root}/endpoints/device/fw.c
         )
     endif()
 endif()

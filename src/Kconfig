@@ -15,6 +15,15 @@ config POUCH_BLOCK_COUNT
   help
     Number of blocks that are allocated for assembling pouch packets.
 
+config POUCH_SERIAL_FW_BUF_SIZE
+  int "Firmware relay buffer size"
+  default 8192
+  help
+    Bytes of the firmware image held in RAM while relaying it to the broker
+    over the serial firmware channel. The buffer only drains when the broker
+    prompts the firmware channel, which happens after the downlink verb, so
+    it has to absorb everything one session's downlink delivers.
+
 config POUCH_THREAD_STACK_SIZE
   int "Pouch thread stack size"
   default 2048

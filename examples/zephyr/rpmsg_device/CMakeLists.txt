@@ -10,4 +10,5 @@ project(rpmsg_device)
 target_sources(app PRIVATE
   src/main.c
   src/credentials.c
+  src/fw_relay.c
 )

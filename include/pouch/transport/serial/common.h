@@ -15,6 +15,8 @@ enum pouch_serial_channel_id
     POUCH_SERIAL_CH_DEVICE_CERT, /**< Device -> Broker: device leaf certificate */
     POUCH_SERIAL_CH_DOWNLINK,    /**< Broker -> Device: inbound pouches */
     POUCH_SERIAL_CH_UPLINK,      /**< Device -> Broker: outbound pouches */
+    POUCH_SERIAL_CH_FW_STATUS,   /**< Broker -> Device: firmware apply result */
+    POUCH_SERIAL_CH_FW,          /**< Device -> Broker: firmware image relay */
 
     POUCH_SERIAL_CHANNEL_COUNT,
 };
