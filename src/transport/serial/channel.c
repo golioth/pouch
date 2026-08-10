@@ -103,7 +103,7 @@ static int handle_data(struct pouch_serial_channel *ch,
         {
             POUCH_LOG_ERR("ch %d: recv on send endpoint", channel_id(ch));
             pouch_serial_ch_close(ch, false);
-            return -ENODEV;
+            return -EINVAL;
         }
 
         int err = ch->endpoint->recv(&ch->bearer, payload, len);
