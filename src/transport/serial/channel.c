@@ -87,7 +87,14 @@ static int handle_data(struct pouch_serial_channel *ch,
 
     if (hdr->first)
     {
-        POUCH_LOG_INF("ch %d: opening receiver channel", channel_id(ch));
+        if (pouch_atomic_test_bit(&ch->flags, CH_FLAG_OPEN)
+            && !pouch_atomic_test_bit(&ch->flags, CH_FLAG_OPENING))
+        {
+            POUCH_LOG_ERR("ch %d: already open", channel_id(ch));
+            return -EBUSY;
+        }
+
+        POUCH_LOG_DBG("ch %d: opening receiver channel", channel_id(ch));
         int err = pouch_serial_ch_open(ch);
         if (err)
         {
@@ -95,6 +102,11 @@ static int handle_data(struct pouch_serial_channel *ch,
         }
 
         pouch_atomic_clear_bit(&ch->flags, CH_FLAG_OPENING);
+    }
+    else if (!pouch_atomic_test_bit(&ch->flags, CH_FLAG_OPEN))
+    {
+        POUCH_LOG_ERR("ch %d: not open", channel_id(ch));
+        return -EINVAL;
     }
 
     if (len > 0)
