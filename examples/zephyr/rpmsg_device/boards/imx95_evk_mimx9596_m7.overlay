@@ -1,0 +1,38 @@
+/*
+ * Copyright (c) 2026 Golioth, Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * OpenAMP resource-table plumbing for the i.MX95 M7 talking to a Linux
+ * virtio-rpmsg host. Addresses match the vdev/vring/rsc-table reserved-memory
+ * nodes in NXP's Linux device tree (imx95-19x19-evk / imx95-15x15-frdm).
+ */
+
+/ {
+	chosen {
+		zephyr,ipc_shm = &shmem;
+		zephyr,ipc_rsc_table = &rsc_table;
+		zephyr,ipc = &mailbox0;
+	};
+
+	shmem: memory@88000000 {
+		compatible = "mmio-sram";
+		reg = <0x88000000 0x500000>;
+	};
+
+	rsc_table: memory@88220000 {
+		compatible = "mmio-sram";
+		reg = <0x88220000 0x100>;
+	};
+
+	mailbox0: mailbox {
+		compatible = "zephyr,mbox-ipm";
+		mboxes = <&mu7 1>, <&mu7 1>;
+		mbox-names = "tx", "rx";
+		status = "okay";
+	};
+};
+
+&mu7 {
+	status = "okay";
+};

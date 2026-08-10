@@ -1,0 +1,26 @@
+diff --git a/soc/xlnx/zynqmp/arm_mpu_regions.c b/soc/xlnx/zynqmp/arm_mpu_regions.c
+index 1851c42da67..9cff2796a56 100644
+--- a/soc/xlnx/zynqmp/arm_mpu_regions.c
++++ b/soc/xlnx/zynqmp/arm_mpu_regions.c
+@@ -60,6 +60,21 @@ static const struct arm_mpu_region mpu_regions[] = {
+ 		{.rasr = FULL_ACCESS_Msk |
+ 			 STRONGLY_ORDERED_SHAREABLE |
+ 			 NOT_EXEC}),
++#endif
++#if DT_HAS_CHOSEN(zephyr_ipc_shm)
++	/*
++	 * OpenAMP/rpmsg shared memory (vrings + buffers) lives in DDR and must be
++	 * mapped for the R5, non-cacheable so it stays coherent with the Linux
++	 * host. 4 MiB at 0x3ec00000 covers the ZynqMP OpenAMP carve-out
++	 * (~0x3ed00000-0x3ee48000).
++	 */
++	MPU_REGION_ENTRY(
++		"ipc_shm",
++		0x3ec00000,
++		REGION_4M,
++		{.rasr = P_RW_U_NA_Msk |
++			 NORMAL_OUTER_INNER_NON_CACHEABLE_NON_SHAREABLE |
++			 NOT_EXEC}),
+ #endif
+ 	/*
+ 	 * The address of the vectors is determined by arch/arm/core/cortex_a_r/prep_c.c

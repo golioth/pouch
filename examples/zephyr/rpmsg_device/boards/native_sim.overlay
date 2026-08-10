@@ -1,0 +1,18 @@
+/*
+ * Copyright (c) 2026 Golioth, Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * uart0 stays the console; uart1 carries the Pouch serial link on its own pty,
+ * which the broker process attaches to.
+ */
+
+/ {
+	chosen {
+		golioth,pouch-serial-uart = &uart1;
+	};
+};
+
+&uart1 {
+	status = "okay";
+};

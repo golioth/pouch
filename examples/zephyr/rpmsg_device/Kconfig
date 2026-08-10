@@ -1,0 +1,15 @@
+# Copyright (c) 2026 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+mainmenu "Pouch rpmsg device example"
+
+config EXAMPLE_FW_COMPONENT
+    string "OTA component to use for firmware update"
+    default "rpmsg_device"
+    help
+      Name of the component in the OTA manifest carrying this core's firmware.
+      The image is relayed to the host, which verifies and applies it through
+      remoteproc - this core has no flash of its own.
+
+source "Kconfig.zephyr"
