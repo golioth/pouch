@@ -154,11 +154,7 @@ int pouch_sender_open(struct pouch_sender *sender, struct pouch_bearer *bearer)
         }
     }
 
-    // Publish the sender only once it is fully initialized. Setting bearer/state
-    // before the buffer exists would leave a failed open (malloc or endpoint->start
-    // failure) in a half-initialized state (bearer set, state READY, buf NULL) that
-    // pouch_sender_recv()'s bearer!=NULL check would accept, driving push_fragments()
-    // to dereference &buf[HEADER_LEN] == NULL + HEADER_LEN.
+    // Publish the sender only once it is fully initialized.
     sender->buf = buf;
     sender->bearer = bearer;
     sender->seq = 0;
