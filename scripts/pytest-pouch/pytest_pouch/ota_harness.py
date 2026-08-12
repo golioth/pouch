@@ -13,24 +13,6 @@ import pytest
 pytestmark = pytest.mark.anyio
 
 
-def pytest_addoption(parser):
-    parser.addoption(
-        "--fw-update-bin",
-        type=str,
-        help="Path to the firmware update binary for OTA tests",
-    )
-    parser.addoption(
-        "--fw-update-ver",
-        type=str,
-        help="Version string of the firmware update binary for OTA tests",
-    )
-    parser.addoption(
-        "--fw-update-pkg-name",
-        type=str,
-        help="OTA package name for the firmware update artifact (required for OTA tests)",
-    )
-
-
 @pytest.fixture(scope="module")
 def test_id() -> str:
     return secrets.token_hex(8)
@@ -41,19 +23,22 @@ def artifacts_to_cleanup() -> list:
     return []
 
 
-@pytest.fixture(scope="module")
-def fw_update_bin(request: pytest.FixtureRequest) -> Path:
-    bin_path = request.config.getoption("--fw-update-bin")
-    if not bin_path:
-        pytest.skip("--fw-update-bin not provided")
-    return Path(bin_path)
+@pytest.fixture(scope="module", autouse=True)
+def check_ota_conflict(request: pytest.FixtureRequest):
+    if request.config.getoption("--fw-update-bin") and request.config.getoption(
+        "--ota-dummy-binary"
+    ):
+        pytest.fail("--fw-update-bin and --ota-dummy-binary are mutually exclusive")
 
 
 @pytest.fixture(scope="module")
 def fw_update_ver(request: pytest.FixtureRequest) -> str:
     version = request.config.getoption("--fw-update-ver")
     if not version:
-        pytest.skip("--fw-update-ver not provided")
+        if request.config.getoption("--ota-dummy-binary"):
+            return "dummy_ver"
+        else:
+            pytest.fail("--fw-update-ver not provided")
     return version
 
 
@@ -61,7 +46,9 @@ def fw_update_ver(request: pytest.FixtureRequest) -> str:
 def pouch_ota_package(request: pytest.FixtureRequest) -> str:
     package = request.config.getoption("--fw-update-pkg-name")
     if not package:
-        pytest.skip("--fw-update-pkg-name not provided")
+        if request.config.getoption("--ota-dummy-binary"):
+            return "ci_ota_fw"
+        pytest.fail("--fw-update-pkg-name not provided")
     return package
 
 
@@ -97,45 +84,86 @@ async def ota_update(
     device,
     ota_cohort,
     pouch_ota_package,
-    fw_update_bin,
-    fw_update_ver,
     test_id,
+    request,
     artifacts_to_cleanup,
+    tmp_path_factory,
+    fw_update_ver,
 ) -> str:
-    existing_artifacts = await project.artifacts.get_all()
-    matching = [
-        a
-        for a in existing_artifacts
-        if a.package == pouch_ota_package and a.version == fw_update_ver
-    ]
+    fw_bin_path = request.config.getoption("--fw-update-bin")
 
-    if matching:
-        artifact = matching[0]
-        logging.info(
-            "Found existing artifact (id=%s) for package=%s, version=%s — skipping upload",
-            artifact.id,
-            pouch_ota_package,
-            fw_update_ver,
+    if fw_bin_path:
+        fw_bin = Path(fw_bin_path)
+
+        existing_artifacts = await project.artifacts.get_all()
+        matching = [
+            a
+            for a in existing_artifacts
+            if a.package == pouch_ota_package and a.version == fw_update_ver
+        ]
+
+        if matching:
+            artifact = matching[0]
+            logging.info(
+                "Found existing artifact (id=%s) for package=%s, version=%s — skipping upload",
+                artifact.id,
+                pouch_ota_package,
+                fw_update_ver,
+            )
+            artifacts_to_cleanup.append(artifact.id)
+        else:
+            logging.info(
+                "Uploading OTA artifact: %s, version=%s, package=%s",
+                fw_bin,
+                fw_update_ver,
+                pouch_ota_package,
+            )
+            artifact = await project.artifacts.upload(
+                path=fw_bin,
+                version=fw_update_ver,
+                package=pouch_ota_package,
+            )
+            artifacts_to_cleanup.append(artifact.id)
+
+        logging.info("Creating deployment on cohort '%s'", ota_cohort.name)
+        await ota_cohort.deployments.create(
+            f"ota-test-{device.name}-{test_id}",
+            [artifact.id],
         )
-        artifacts_to_cleanup.append(artifact.id)
-    else:
+
+        yield fw_update_ver
+    elif request.config.getoption("--ota-dummy-binary"):
+        import hashlib
+        import os
+
+        version = f"2.0.0-{device.name}-{test_id}"
+        image_size = 400 * 1024
+        image_data = os.urandom(image_size)
+        expected_sha256 = hashlib.sha256(image_data).hexdigest()
+
+        tmp_path = tmp_path_factory.mktemp("ota")
+        image_path = tmp_path / "firmware.bin"
+        image_path.write_bytes(image_data)
+
         logging.info(
-            "Uploading OTA artifact: %s, version=%s, package=%s",
-            fw_update_bin,
-            fw_update_ver,
-            pouch_ota_package,
+            "Uploading OTA artifact (dummy): %d bytes, SHA256=%s",
+            image_size,
+            expected_sha256,
         )
+
         artifact = await project.artifacts.upload(
-            path=fw_update_bin,
-            version=fw_update_ver,
+            path=image_path,
+            version=version,
             package=pouch_ota_package,
         )
         artifacts_to_cleanup.append(artifact.id)
 
-    logging.info("Creating deployment on cohort '%s'", ota_cohort.name)
-    await ota_cohort.deployments.create(
-        f"ota-test-{device.name}-{test_id}",
-        [artifact.id],
-    )
+        logging.info("Creating deployment on cohort '%s'", ota_cohort.name)
+        await ota_cohort.deployments.create(
+            f"ota-test-{device.name}-{test_id}",
+            [artifact.id],
+        )
 
-    yield fw_update_ver
+        yield expected_sha256
+    else:
+        pytest.fail("either --fw-update-bin or --ota-dummy-binary must be provided")

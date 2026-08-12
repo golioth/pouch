@@ -13,8 +13,8 @@ from twister_harness.device.device_adapter import DeviceAdapter
 pytestmark = pytest.mark.anyio
 
 
-async def test_ota_sha256(dut: DeviceAdapter, ota_firmware):
-    expected_sha256 = ota_firmware
+async def test_ota_sha256(dut: DeviceAdapter, ota_update):
+    expected_sha256 = ota_update
 
     logging.info("Waiting for device to boot and load credentials")
     dut.readlines_until(regex="Credentials loaded", timeout=60.0)
