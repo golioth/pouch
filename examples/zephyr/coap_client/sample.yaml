@@ -4,18 +4,15 @@ common:
   harness: pytest
   harness_config:
     pytest_dut_scope: module
-  platform_allow:
-    - native_sim
-    - native_sim/native/64
-  integration_platforms:
-    - native_sim
-    - native_sim/native/64
   timeout: 300
 tests:
   pouch.coap_client.settings:
     harness_config:
       pytest_root:
-        - ../pytest/test_sample.py
+        - pytest/test_sample.py
+    platform_allow:
+      - native_sim
+      - native_sim/native/64
     extra_configs:
       - CONFIG_FILE_SYSTEM_NSIM_MOUNT=y
       - 'CONFIG_NATIVE_EXTRA_CMDLINE_ARGS="-volume=./creds:/creds"'
@@ -24,7 +21,10 @@ tests:
   pouch.coap_client.ota:
     harness_config:
       pytest_root:
-        - ../pytest/test_ota.py
+        - pytest/test_ota.py
+    platform_allow:
+      - native_sim
+      - native_sim/native/64
     extra_configs:
       - CONFIG_FILE_SYSTEM_NSIM_MOUNT=y
       - 'CONFIG_NATIVE_EXTRA_CMDLINE_ARGS="-volume=./creds:/creds"'

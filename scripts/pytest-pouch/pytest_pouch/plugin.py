@@ -29,6 +29,30 @@ def pytest_addoption(parser):
         help="WiFi PSK",
     )
 
+    ### OTA Flags ###
+
+    parser.addoption(
+        "--fw-update-bin",
+        type=str,
+        help="Path to the firmware update binary for OTA tests",
+    )
+    parser.addoption(
+        "--fw-update-ver",
+        type=str,
+        help="Version string of the firmware update binary for OTA tests",
+    )
+    parser.addoption(
+        "--fw-update-pkg-name",
+        type=str,
+        help="OTA package name for the firmware update artifact (required for OTA tests)",
+    )
+    parser.addoption(
+        "--ota-dummy-binary",
+        action="store_true",
+        default=False,
+        help="Generate a dummy OTA binary for SHA256 verification",
+    )
+
 
 @pytest.fixture(scope="session")
 def anyio_backend():

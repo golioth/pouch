@@ -6,6 +6,7 @@
 
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -14,6 +15,12 @@ from typing import Generator
 import pytest
 
 from twister_harness.device.device_adapter import DeviceAdapter
+
+sys.path.insert(
+    0, str(Path(__file__).resolve().parents[5] / "scripts" / "pytest-pouch")
+)
+
+pytest_plugins = ["pytest_pouch.plugin"]
 
 
 @pytest.fixture(scope="function")
