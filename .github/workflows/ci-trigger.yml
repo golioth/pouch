@@ -58,6 +58,24 @@ jobs:
       api_url: https://api.golioth.io
       api_key_id: PROD_CI_PROJECT_API_KEY
     secrets: inherit
+  trigger-zephyr-hil:
+    name: Run Zephyr HIL (${{ matrix.hil_board }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - hil_board: frdm_rw612
+            west_board: frdm_rw612
+    permissions:
+      contents: read
+      actions: write
+    uses: ./.github/workflows/test-zephyr-hil.yml
+    with:
+      hil_board: ${{ matrix.hil_board }}
+      west_board: ${{ matrix.west_board }}
+      api_url: https://api.golioth.io
+      api_key_id: PROD_CI_PROJECT_API_KEY
+    secrets: inherit
   trigger-nsim:
     name: Run Native Simulator and BabbleSim Tests
     permissions:
@@ -75,6 +93,7 @@ jobs:
     needs:
       - trigger-esp-idf
       - trigger-esp-idf-hil
+      - trigger-zephyr-hil
       - trigger-twister
       - trigger-nsim
     runs-on: ubuntu-24.04

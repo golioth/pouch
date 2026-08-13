@@ -1,0 +1,220 @@
+name: Zephyr HIL
+
+on:
+  workflow_dispatch:
+    inputs:
+      hil_board:
+        description: Self-hosted runner label for HIL board
+        required: true
+        type: string
+      west_board:
+        description: Zephyr west board name
+        required: true
+        type: string
+      api_url:
+        description: API gateway URL for Golioth backend services
+        required: true
+        type: string
+      api_key_id:
+        description: Name of GitHub secret containing project API key
+        required: true
+        type: string
+      coap_gateway_url:
+        description: The CoAP gateway URL to be hardcoded into test firmware
+        required: false
+        type: string
+        default: coaps://coap.golioth.io
+  workflow_call:
+    inputs:
+      hil_board:
+        description: Self-hosted runner label for HIL board
+        required: true
+        type: string
+      west_board:
+        description: Zephyr west board name
+        required: true
+        type: string
+      api_url:
+        description: API gateway URL for Golioth backend services
+        required: true
+        type: string
+      api_key_id:
+        description: Name of GitHub secret containing project API key
+        required: true
+        type: string
+      coap_gateway_url:
+        description: The CoAP gateway URL to be hardcoded into test firmware
+        required: false
+        type: string
+        default: coaps://coap.golioth.io
+
+jobs:
+  build:
+    permissions:
+      contents: read
+      actions: write
+    runs-on: ubuntu-24.04
+    container: golioth/golioth-zephyr-base:sdk-1.0.1
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          path: pouch
+
+      - name: Init and update west
+        run: |
+          west init -l pouch --mf west-zephyr.yml
+          west update --narrow -o=--depth=1
+          git config --global user.email user@git-scm.com
+          git config --global user.name "Git User"
+          west patch apply
+
+      - name: Install pip packages
+        run: |
+          uv pip install                                  \
+            -r zephyr/scripts/requirements-base.txt       \
+            -r zephyr/scripts/requirements-build-test.txt \
+            -r zephyr/scripts/requirements-run-test.txt
+
+          uv pip install                        \
+            -r pouch/requirements-ci-zephyr.txt \
+            --require-hashes
+
+      - name: Build firmware
+        shell: bash
+        run: |
+          zephyr/scripts/twister                \
+            -v                                  \
+            --overflow-as-errors                \
+            --platform ${{ inputs.west_board }} \
+            -T pouch/examples/zephyr/           \
+            --prep-artifacts-for-testing        \
+            --keep-artifacts zephyr.hex
+
+          tar -cjf test_artifacts_${{ inputs.hil_board }}.tar twister-out
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: zephyr-${{ inputs.hil_board }}-build
+          path: test_artifacts_${{ inputs.hil_board }}.tar
+
+  hil-test:
+    permissions:
+      contents: read
+      actions: write
+
+    needs:
+      - build
+
+    runs-on:
+      - is_active
+      - has_${{ inputs.hil_board }}
+
+    timeout-minutes: 30
+
+    container:
+      image: golioth/golioth-twister-base:sdk-1.0.1
+      volumes:
+        - /dev:/dev
+        - /home/golioth/credentials:/opt/credentials
+      options: --privileged
+      env:
+        ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-1.0.1
+
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          path: pouch
+
+      - name: Init and update west
+        run: |
+          rm -rf zephyr
+
+          mkdir -p .west
+          cat <<EOF > .west/config
+          [manifest]
+          path = pouch
+          file = west-zephyr.yml
+
+          [zephyr]
+          base = zephyr
+          EOF
+
+          west update --narrow -o=--depth=1
+          git config --global user.email user@git-scm.com
+          git config --global user.name "Git User"
+
+          uv pip install                                  \
+            -r zephyr/scripts/requirements-base.txt       \
+            -r zephyr/scripts/requirements-build-test.txt \
+            -r zephyr/scripts/requirements-run-test.txt   \
+            git+https://github.com/golioth/python-golioth-tools@v0.7.0
+
+          uv pip install                        \
+            -r pouch/requirements-ci-zephyr.txt \
+            --require-hashes
+
+      - name: Power On USB Hub
+        run: python3 /opt/golioth-scripts/usb_hub_power.py on
+
+      - name: Download build artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: zephyr-${{ inputs.hil_board }}-build
+          path: .
+
+      - name: Extract build artifact
+        run: |
+          rm -rf twister-out
+          tar -xvf test_artifacts_${{ inputs.hil_board }}.tar
+
+      - name: Run HIL test
+        shell: bash
+        env:
+          hil_board: ${{ inputs.hil_board }}
+        run: |
+          source /opt/credentials/runner_env.sh
+          export PATH=$PATH:/opt/SEGGER/JLink
+
+          PORT_VAR=CI_${hil_board^^}_PORT
+          SNR_VAR=CI_${hil_board^^}_SNR
+
+          zephyr/scripts/twister                                        \
+            -v                                                          \
+            -p ${{ inputs.west_board }}                                 \
+            -T pouch/examples/zephyr/                                   \
+            --device-testing                                            \
+            --device-serial "${!PORT_VAR}"                              \
+            --test-only                                                 \
+            --west-flash="--dev-id=${!SNR_VAR}"                         \
+            --pytest-args="--api-url=${{ inputs.api_url }}"             \
+            --pytest-args="--api-key=${{ secrets[inputs.api_key_id] }}" \
+            --pytest-args="--generate-certs"
+
+      - name: Safe upload twister artifacts
+        if: success() || failure()
+        uses: ./pouch/.github/actions/safe-upload-artifacts
+        with:
+          secrets-json: ${{ toJson(secrets) }}
+          name: twister-run-artifacts-${{ inputs.hil_board }}
+          path: |
+            reports/*
+            twister-out/**/*.log
+            twister-out/**/report.xml
+            twister-out/*.xml
+            twister-out/*.json
+
+      - name: Safe upload CI report summary
+        uses: ./pouch/.github/actions/safe-upload-artifacts
+        if: success() || failure()
+        with:
+          secrets-json: ${{ toJson(secrets) }}
+          name: ci-summary-zephyr-${{ inputs.hil_board }}
+          path: twister-out/twister_suite_report.xml
+
+      - name: Power Off USB Hub
+        if: always()
+        run: python3 /opt/golioth-scripts/usb_hub_power.py off
