@@ -33,3 +33,11 @@ tests:
       - CONFIG_EXAMPLE_FW_UPDATE_SHA256_VERIFY=y
       - CONFIG_GOLIOTH_OTA_MAX_VERSION_LEN=64
       - 'CONFIG_EXAMPLE_FW_UPDATE_COMPONENT="ci_ota_fw"'
+  pouch.http_client.hil:
+    harness_config:
+      pytest_root:
+        - pytest/test_sample.py
+    extra_configs:
+      - CONFIG_EXAMPLE_HTTP_CLIENT_SYNC_PERIOD_S=10
+    platform_allow:
+      - frdm_rw612

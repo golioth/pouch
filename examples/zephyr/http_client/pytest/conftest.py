@@ -14,4 +14,5 @@ sys.path.insert(
 pytest_plugins = [
     "pytest_pouch.plugin",
     "pytest_pouch.ota_harness",
+    "pytest_pouch.zephyr_harness",
 ]
