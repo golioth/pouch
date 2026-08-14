@@ -60,7 +60,7 @@ struct session
     struct
     {
         pouch_id_t id;
-        uint32_t block_index;
+        uint16_t block_index;
         uint8_t ad[AD_LEN];
     } pouch;
 };
