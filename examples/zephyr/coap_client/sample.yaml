@@ -2,12 +2,11 @@ sample:
   name: Pouch CoAP Client
 common:
   harness: pytest
-  harness_config:
-    pytest_dut_scope: module
   timeout: 300
 tests:
   pouch.coap_client.settings:
     harness_config:
+      pytest_dut_scope: module
       pytest_root:
         - pytest/test_sample.py
     platform_allow:
@@ -20,6 +19,7 @@ tests:
       - CONFIG_EXAMPLE_COAP_CLIENT_SYNC_PERIOD_S=2
   pouch.coap_client.ota:
     harness_config:
+      pytest_dut_scope: module
       pytest_root:
         - pytest/test_ota.py
     platform_allow:
