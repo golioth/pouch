@@ -2,12 +2,11 @@ sample:
   name: Pouch HTTP Client
 common:
   harness: pytest
-  harness_config:
-    pytest_dut_scope: module
   timeout: 180
 tests:
   pouch.http_client.settings:
     harness_config:
+      pytest_dut_scope: module
       pytest_root:
         - pytest/test_sample.py
     platform_allow:
@@ -20,6 +19,7 @@ tests:
       - CONFIG_EXAMPLE_HTTP_CLIENT_SYNC_PERIOD_S=2
   pouch.http_client.ota:
     harness_config:
+      pytest_dut_scope: module
       pytest_root:
         - pytest/test_ota.py
     platform_allow:
@@ -35,6 +35,7 @@ tests:
       - 'CONFIG_EXAMPLE_FW_UPDATE_COMPONENT="ci_ota_fw"'
   pouch.http_client.hil:
     harness_config:
+      pytest_dut_scope: module
       pytest_root:
         - pytest/test_sample.py
     extra_configs:
