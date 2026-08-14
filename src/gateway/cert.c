@@ -124,6 +124,15 @@ static int server_crt_update(size_t len)
 
     POUCH_LOG_HEXDUMP(cert_chain.serial.p, cert_chain.serial.len, "cert_chain.serial");
 
+    if (cert_chain.serial.len > sizeof(server_crt_serial))
+    {
+        POUCH_LOG_ERR("Server certificate serial number too long: %zu > %zu",
+                      cert_chain.serial.len,
+                      sizeof(server_crt_serial));
+        mbedtls_x509_crt_free(&cert_chain);
+        return -EINVAL;
+    }
+
     memcpy(server_crt_serial, cert_chain.serial.p, cert_chain.serial.len);
     pouch_atomic_set(&server_crt_serial_len, cert_chain.serial.len);
 
