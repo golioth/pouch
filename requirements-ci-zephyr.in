@@ -4,5 +4,6 @@ pyyaml
 cbor>=1.0.0
 imgtool>=1.9.0
 jinja2
+smpmgr>=0.17.0
 
 -r requirements.txt
