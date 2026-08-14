@@ -6,8 +6,8 @@
 
 import logging
 import subprocess
+import time
 
-import anyio
 import pytest
 
 _SIMULATOR_PLATFORMS = {
@@ -18,31 +18,7 @@ _SIMULATOR_PLATFORMS = {
 }
 
 
-@pytest.fixture(scope="module", autouse=True)
-async def provisioned_credentials(creds_dir, creds, request):
-    try:
-        twister_config = request.getfixturevalue("twister_harness_config")
-    except pytest.FixtureLookupError:
-        yield
-        return
-
-    platform = twister_config.devices[0].platform
-    if platform in _SIMULATOR_PLATFORMS:
-        yield
-        return
-
-    build_dir = twister_config.devices[0].build_dir
-    serial_port = twister_config.devices[0].serial_configs[0].port
-
-    logging.info("Flashing firmware")
-    subprocess.run(
-        ["west", "flash", "--no-rebuild", "-d", str(build_dir)],
-        check=True,
-    )
-
-    logging.info("Waiting for device to boot")
-    await anyio.sleep(15)
-
+def _upload_credentials(serial_port, creds_dir):
     logging.info("Uploading Pouch/HTTP credentials via smpmgr")
     for local_name, remote_path in [
         ("crt.der", "/lfs1/credentials/crt.der"),
@@ -62,26 +38,44 @@ async def provisioned_credentials(creds_dir, creds, request):
             ],
             check=True,
         )
+
         logging.info("Uploaded %s -> %s", local_name, remote_path)
 
-    logging.info("Resetting device")
-    subprocess.run(
-        [
-            "smpmgr",
-            "--port",
-            serial_port,
-            "os",
-            "reset",
-        ],
-        check=True,
-    )
 
-    logging.info("Waiting for device to reboot")
-    await anyio.sleep(5)
+def _provision_hardware(device_object, creds_dir):
+    serial_port = device_object.device_config.serial_configs[0].port
+    build_dir = device_object.device_config.build_dir
 
-    yield
+    logging.info("Flashing firmware")
+    flash_cmd = ["west", "flash", "--no-rebuild", "-d", str(build_dir)]
+
+    west_flash_extra_args = device_object.device_config.west_flash_extra_args
+    if west_flash_extra_args:
+        flash_cmd.extend(["--", *west_flash_extra_args])
+
+    subprocess.run(flash_cmd, check=True)
+
+    logging.info("Waiting for device to boot")
+    time.sleep(15)
+
+    _upload_credentials(serial_port, creds_dir)
+
+    # Device needs reboot; we rely on device_object.launch()
 
 
 @pytest.fixture(scope="module")
-def ensured_credentials(provisioned_credentials):
-    pass
+def dut(request, device_object, creds_dir, creds):
+    device_object.initialize_log_files(request.node.name)
+
+    platform = device_object.device_config.platform
+    if platform not in _SIMULATOR_PLATFORMS:
+        _provision_hardware(device_object, creds_dir)
+
+    device_object.launch()
+
+    logging.info("Waiting for device to boot and load credentials")
+    device_object.readlines_until(regex="Credentials loaded", timeout=60.0)
+
+    yield device_object
+
+    device_object.close()

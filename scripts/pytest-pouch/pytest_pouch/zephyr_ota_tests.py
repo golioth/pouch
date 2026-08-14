@@ -16,9 +16,6 @@ pytestmark = pytest.mark.anyio
 async def test_ota_sha256(dut: DeviceAdapter, ota_update):
     expected_sha256 = ota_update
 
-    logging.info("Waiting for device to boot and load credentials")
-    dut.readlines_until(regex="Credentials loaded", timeout=60.0)
-
     logging.info("Waiting for OTA download, expected SHA256=%s", expected_sha256)
     lines = dut.readlines_until(
         regex=r"OTA computed SHA256: [0-9a-f]{64}", timeout=180.0
