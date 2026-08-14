@@ -4,7 +4,7 @@ common:
   harness: pytest
   timeout: 180
 tests:
-  pouch.http_client.settings:
+  pouch.http_client.sample:
     harness_config:
       pytest_dut_scope: module
       pytest_root:
