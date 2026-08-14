@@ -309,6 +309,7 @@ jobs:
           path: |
             pytest-${{ matrix.name }}-hil.log
             ${{ env.UNITY_REPORT_NAME }}
+            gateway-${{ matrix.name }}.log
 
       - name: Erase flash
         if: always()

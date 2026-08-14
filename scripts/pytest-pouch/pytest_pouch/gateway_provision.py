@@ -7,9 +7,12 @@
 import logging
 import secrets
 import subprocess
+import threading
 import time
+from pathlib import Path
 
 import pytest
+import serial
 
 
 def pytest_addoption(parser):
@@ -114,6 +117,24 @@ def gateway_creds(creds, creds_dir, gateway_creds_dir, gateway_cloud_device, pro
     )
 
 
+_GW_CONNECTED_PATTERN = "Scanning successfully started"
+_GW_LOG_FILENAME = "gateway-ble_gatt.log"
+_GW_REBOOT_TIMEOUT_S = 120.0
+_GW_BAUD = 115200
+
+
+def _read_loop(ser, log_path, stop_event):
+    with open(log_path, "ab") as f:
+        while not stop_event.is_set():
+            try:
+                data = ser.read(4096)
+            except serial.SerialException:
+                break
+            if data:
+                f.write(data)
+                f.flush()
+
+
 @pytest.fixture(scope="module", autouse=True)
 def provisioned_gateway(gateway_serial_port, gateway_creds_dir, gateway_creds):
     logging.info("Uploading gateway credentials via smpmgr")
@@ -148,7 +169,57 @@ def provisioned_gateway(gateway_serial_port, gateway_creds_dir, gateway_creds):
         check=True,
     )
 
-    logging.info("Waiting for gateway to reboot")
-    time.sleep(30)
+    _gw_log = Path.cwd() / _GW_LOG_FILENAME
+    logging.info("Starting gateway serial capture to %s", _gw_log)
 
+    # Remove stale log from previous run
+    _gw_log.unlink(missing_ok=True)
+
+    ser = serial.Serial(gateway_serial_port, baudrate=_GW_BAUD, timeout=0.5)
+    stop_event = threading.Event()
+    reader = threading.Thread(
+        target=_read_loop,
+        args=(ser, _gw_log, stop_event),
+        daemon=True,
+    )
+    reader.start()
+
+    try:
+        logging.info("Waiting for gateway connected pattern: %s", _GW_CONNECTED_PATTERN)
+
+        deadline = time.monotonic() + _GW_REBOOT_TIMEOUT_S
+        while time.monotonic() < deadline:
+            if _gw_log.exists():
+                try:
+                    content = _gw_log.read_text()
+                    if _GW_CONNECTED_PATTERN in content:
+                        logging.info("Gateway connected pattern found")
+                        break
+                except Exception:
+                    pass
+            time.sleep(1)
+        else:
+            # Write what we did capture to the log so it's uploaded
+            last_content = ""
+            if _gw_log.exists():
+                try:
+                    last_content = _gw_log.read_text()
+                except Exception:
+                    pass
+            pytest.fail(
+                f"Gateway failed to start scanning within {_GW_REBOOT_TIMEOUT_S}s. "
+                f"Last captured output: {last_content[-200:]}\n"
+                f"Full gateway log: {_gw_log}"
+            )
+    except Exception:
+        stop_event.set()
+        reader.join(timeout=5)
+        ser.close()
+        raise
+
+    logging.info("Gateway provisioned and ready")
     yield
+
+    stop_event.set()
+    reader.join(timeout=5)
+    ser.close()
