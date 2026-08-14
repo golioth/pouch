@@ -138,27 +138,28 @@ int pouch_sender_open(struct pouch_sender *sender, struct pouch_bearer *bearer)
         return -EINVAL;
     }
 
-    sender->bearer = bearer;
-    sender->seq = 0;
-    sender->window = 0;
-    sender->state = STATE_READY;
-
-    sender->buf = malloc(bearer->maxlen);
-    if (sender->buf == NULL)
+    uint8_t *buf = malloc(bearer->maxlen);
+    if (buf == NULL)
     {
         return -ENOMEM;
     }
 
     if (sender->endpoint->start != NULL)
     {
-        int err = sender->endpoint->start(sender->bearer);
+        int err = sender->endpoint->start(bearer);
         if (err)
         {
-            free(sender->buf);
-            sender->buf = NULL;
+            free(buf);
             return err;
         }
     }
+
+    // Publish the sender only once it is fully initialized.
+    sender->buf = buf;
+    sender->bearer = bearer;
+    sender->seq = 0;
+    sender->window = 0;
+    sender->state = STATE_READY;
 
     // wait for the receiver to send an ack with a window.
 
