@@ -4,7 +4,7 @@ common:
   harness: pytest
   timeout: 300
 tests:
-  pouch.coap_client.settings:
+  pouch.coap_client.sample:
     harness_config:
       pytest_dut_scope: module
       pytest_root:
