@@ -1,0 +1,30 @@
+# Copyright (c) 2026 Golioth, Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+title: Pouch SPI Broker transport adapter
+
+description: |
+  This node should be a child of an SPI bus controller. The broker acts as SPI
+  master, exchanging frames with a device (SPI slave). Multiple instances may
+  exist on the same SPI bus.
+
+compatible: "golioth,pouch-broker"
+
+include: spi-device.yaml
+
+properties:
+  data-ready-gpios:
+    type: phandle-array
+    description: |
+      Optional GPIO input pin connected to the device's data-ready output.
+      When defined, the broker uses an interrupt on the rising edge to detect
+      when the device has data available. When omitted, the broker polls at
+      the interval specified by poll-interval-ms.
+
+  poll-interval-ms:
+    type: int
+    default: 1000
+    description: |
+      Polling interval in milliseconds. Only used when data-ready-gpios is
+      not defined. The broker polls the device at this interval to check for
+      data.
