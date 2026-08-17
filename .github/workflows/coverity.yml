@@ -39,8 +39,8 @@ jobs:
           /opt/toolchains/coverity/bin/cov-build --dir cov-int \
             west build -p -b nrf52840dk/nrf52840 pouch/examples/zephyr/ble_gatt \
             -- -DCONFIG_LOG=n
-          /opt/toolchains/coverity/bin/cov-build --dir cov-int --append \
-            west build -p -b nrf9160dk/nrf9160/ns pouch/examples/zephyr/gateway \
+          /opt/toolchains/coverity/bin/cov-build --dir cov-int \
+            west build -p -b nrf9160dk/nrf52840 pouch/examples/zephyr/gateway \
             -- -DCONFIG_NET_LOG=n -DCONFIG_LOG=n
           tar czvf pouch.tgz cov-int
           curl --form token=${{ secrets.POUCH_COVERITY_TOKEN }} \
