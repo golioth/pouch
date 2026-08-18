@@ -53,6 +53,84 @@ mcumgr --conntype serial --connstring $SERIAL_PORT fs upload $KEY_FILE /lfs1/cre
 where `$SERIAL_PORT` is the serial port for the device, like `/dev/ttyACM0` on
 Linux, or `COM1` on Windows.
 
+### Provisioning with littlefs binary
+
+Credentials can also be provisioned by creating a LittleFS binary image
+containing the certificate and key files, then flashing it directly to the
+storage partition on the device.
+
+This approach is useful when MCUmgr USB/serial provisioning is not available,
+such as on platforms where the UART is used for other purposes (e.g. serial
+modem communication on a Thingy91x-based gateway).
+
+Install the `littlefs_tools` Python package:
+
+```bash
+pip install littlefs_tools
+```
+
+Create a directory structure for the credentials:
+
+```bash
+mkdir -p littlefs/credentials
+```
+
+Place your DER-encoded certificate and private key files into the
+`littlefs/credentials/` directory:
+
+```
+littlefs/
+└── credentials
+    ├── crt.der
+    └── key.der
+```
+
+Generate the LittleFS binary image:
+
+```bash
+littlefs create -s littlefs -i image.bin -b 4096 -c 8
+```
+
+Convert the binary to Intel HEX format at the appropriate flash offset for the
+target platform:
+
+```bash
+arm-zephyr-eabi-objcopy -I binary -O ihex --change-addresses <storage-partition-address> image.bin lfs_storage.hex
+```
+
+The `<storage-partition-address>` is the flash address of the `storage_partition`
+in the device tree. See the platform-specific examples below.
+
+Flash the HEX file to the device:
+
+```bash
+nrfutil device program \
+        --firmware lfs_storage.hex \
+        --core application \
+        --options chip_erase_mode=ERASE_RANGES_TOUCHED_BY_FIRMWARE,reset=RESET_SYSTEM,verify=VERIFY_READ
+```
+
+#### Thingy:91 X
+
+For the Thingy:91 X, the nRF5340 application core has the storage partition
+at address `0xF8000`. Use `arm-zephyr-eabi-objcopy` from the Zephyr SDK to
+convert the binary:
+
+```bash
+/path/to/zephyr-sdk-0.17.2/arm-zephyr-eabi/bin/arm-zephyr-eabi-objcopy \
+  -I binary -O ihex --change-addresses 0xF8000 image.bin lfs_storage.hex
+```
+
+Ensure the SWD switch (`SW2`) is set to `nRF53`, then flash to the nRF5340
+application core:
+
+```bash
+nrfutil device program \
+        --firmware lfs_storage.hex \
+        --core application \
+        --options chip_erase_mode=ERASE_RANGES_TOUCHED_BY_FIRMWARE,reset=RESET_SYSTEM,verify=VERIFY_READ
+```
+
 ## WiFi Gateway Using the NXP frdm_rw612
 
 By default the frdm_rw612 will build with Ethernet support, but may
