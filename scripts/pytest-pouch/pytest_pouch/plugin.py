@@ -10,6 +10,15 @@ from pathlib import Path
 
 import pytest
 
+_OTA_MODES = {
+    "firmware": "default; real update binary",
+    "dummy": "random bytes, SHA256 verification",
+    "disabled": "deselect all OTA-marked tests",
+}
+_OTA_MODES_DEFAULT = "firmware"
+_OTA_MARKER_VALUES = frozenset(_OTA_MODES) - {"disabled"}
+_OTA_MODES_VALID_STR = ", ".join(repr(m) for m in sorted(_OTA_MARKER_VALUES))
+
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -46,12 +55,63 @@ def pytest_addoption(parser):
         type=str,
         help="OTA package name for the firmware update artifact (required for OTA tests)",
     )
-    parser.addoption(
-        "--ota-dummy-binary",
-        action="store_true",
-        default=False,
-        help="Generate a dummy OTA binary for SHA256 verification",
+
+    mode_values_str = ", ".join(
+        f"'{mode}' ({desc})" for mode, desc in _OTA_MODES.items()
     )
+    parser.addoption(
+        "--ota-mode",
+        choices=tuple(_OTA_MODES),
+        default=_OTA_MODES_DEFAULT,
+        help=f"OTA test mode: {mode_values_str}",
+    )
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "ota_mode(mode): restrict the test to a specific OTA mode "
+        f"({_OTA_MODES_VALID_STR}); respected when --ota-mode is one of "
+        f"({_OTA_MODES_VALID_STR}). When --ota-mode=disabled, all "
+        "OTA-marked tests are deselected.",
+    )
+
+
+def _ota_mode_extract_and_validate(item) -> str | None:
+    marker = item.get_closest_marker("ota_mode")
+    if marker is None:
+        return None
+    if len(marker.args) != 1:
+        raise pytest.UsageError(
+            f"Invalid ota_mode marker for {item.nodeid}: "
+            f"expected exactly one argument, got {len(marker.args)}"
+        )
+    if len(marker.kwargs) != 0:
+        raise pytest.UsageError(
+            f"Invalid ota_mode marker for {item.nodeid}: "
+            f"expected zero kwargs, got {len(marker.kwargs)}"
+        )
+    if marker.args[0] not in _OTA_MARKER_VALUES:
+        raise pytest.UsageError(
+            f"Invalid ota_mode marker for {item.nodeid}: "
+            f"'{marker.args[0]!r}' not a valid option ({_OTA_MODES_VALID_STR})"
+        )
+    return marker.args[0]
+
+
+def pytest_collection_modifyitems(config, items):
+    selected = config.getoption("--ota-mode")
+    keep: list = []
+    drop: list = []
+    for item in items:
+        mode = _ota_mode_extract_and_validate(item)
+        if mode is None or mode == selected:
+            keep.append(item)
+        else:
+            drop.append(item)
+    if drop:
+        config.hook.pytest_deselected(items=drop)
+    items[:] = keep
 
 
 @pytest.fixture(scope="session")
