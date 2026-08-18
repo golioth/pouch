@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
     "pytest",
     "anyio[trio]",
+    "pyserial",
 ]
 classifiers = [
     "Framework :: Pytest",
