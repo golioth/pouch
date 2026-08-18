@@ -12,6 +12,10 @@ from twister_harness.device.device_adapter import DeviceAdapter
 
 pytestmark = pytest.mark.anyio
 
+OTA_DOWNLINK_TIMEOUT_S = 120.0
+OTA_DOWNLOAD_TIMEOUT_S = 180.0
+OTA_REBOOT_TIMEOUT_S = 180.0
+
 
 @pytest.mark.ota_mode("dummy")
 async def test_ota_sha256(dut: DeviceAdapter, ota_update):
@@ -19,7 +23,7 @@ async def test_ota_sha256(dut: DeviceAdapter, ota_update):
 
     logging.info("Waiting for OTA download, expected SHA256=%s", expected_sha256)
     lines = dut.readlines_until(
-        regex=r"OTA computed SHA256: [0-9a-f]{64}", timeout=180.0
+        regex=r"OTA computed SHA256: [0-9a-f]{64}", timeout=OTA_DOWNLOAD_TIMEOUT_S
     )
 
     actual_sha256 = None
@@ -36,4 +40,35 @@ async def test_ota_sha256(dut: DeviceAdapter, ota_update):
 
     assert actual_sha256 == expected_sha256, (
         f"SHA256 mismatch: device={actual_sha256}, expected={expected_sha256}"
+    )
+
+
+@pytest.mark.ota_mode("firmware")
+async def test_ota_firmware_update(
+    dut: DeviceAdapter,
+    ota_update,
+    fw_update_ver,
+):
+    dut.readlines_until(
+        regex=".*Receiving Downlink entry on path.*", timeout=OTA_DOWNLINK_TIMEOUT_S
+    )
+
+    dut.readlines_until(
+        regex=".*fw_update: Rebooting to apply upgrade",
+        timeout=OTA_DOWNLOAD_TIMEOUT_S,
+    )
+
+    dut.readlines_until(
+        regex=rf".*Image version: v{re.escape(fw_update_ver)}",
+        timeout=OTA_REBOOT_TIMEOUT_S,
+    )
+
+    dut.readlines_until(
+        regex=".*Credentials loaded.*",
+        timeout=OTA_DOWNLINK_TIMEOUT_S,
+    )
+
+    dut.readlines_until(
+        regex=r".*Received LED setting: [0-1]",
+        timeout=OTA_DOWNLINK_TIMEOUT_S,
     )
