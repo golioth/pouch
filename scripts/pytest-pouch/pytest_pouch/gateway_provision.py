@@ -5,11 +5,17 @@
 #
 
 import logging
+import queue
 import secrets
 import subprocess
-import time
+import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
+from typing import BinaryIO
 
 import pytest
+import serial
 
 
 def pytest_addoption(parser):
@@ -18,6 +24,17 @@ def pytest_addoption(parser):
         type=str,
         help="Serial port for gateway provisioning",
     )
+    parser.addoption(
+        "--gateway-log-file",
+        type=Path,
+        default=Path("gateway.log"),
+        help="Path for captured gateway serial output",
+    )
+
+
+@pytest.fixture(scope="module")
+def gateway_log_path(request):
+    return request.config.getoption("--gateway-log-file").resolve()
 
 
 @pytest.fixture(scope="module")
@@ -114,8 +131,116 @@ def gateway_creds(creds, creds_dir, gateway_creds_dir, gateway_cloud_device, pro
     )
 
 
+_GATEWAY_READY_PATTERN = b"Scanning successfully started"
+_GATEWAY_READY = object()
+_GATEWAY_READY_TIMEOUT_S = 120.0
+_GATEWAY_BAUDRATE = 115_200
+_GATEWAY_READ_TIMEOUT_S = 0.5
+_GATEWAY_READER_JOIN_TIMEOUT_S = 5.0
+_GATEWAY_LOG_TAIL_BYTES = 200
+
+
+def _read_gateway_output(
+    gateway_serial: serial.Serial,
+    log_file: BinaryIO,
+    stop_event: threading.Event,
+    status_queue: queue.Queue[object],
+):
+    overlap = b""
+    ready = False
+
+    try:
+        while not stop_event.is_set():
+            data = gateway_serial.read(4096)
+            if not data:
+                continue
+
+            log_file.write(data)
+
+            if ready:
+                continue
+
+            marker_window = overlap + data
+            if _GATEWAY_READY_PATTERN in marker_window:
+                ready = True
+                status_queue.put(_GATEWAY_READY)
+                continue
+
+            overlap = marker_window[-(len(_GATEWAY_READY_PATTERN) - 1) :]
+    except Exception as error:
+        if stop_event.is_set():
+            return
+        if ready:
+            logging.exception("Gateway serial capture stopped")
+        else:
+            status_queue.put(error)
+
+
+@contextmanager
+def _capture_gateway_output(
+    serial_port: str, log_path: Path
+) -> Iterator[queue.Queue[object]]:
+    stop_event = threading.Event()
+    status_queue: queue.Queue[object] = queue.Queue()
+
+    with (
+        log_path.open("wb", buffering=0) as log_file,
+        serial.Serial(
+            serial_port,
+            baudrate=_GATEWAY_BAUDRATE,
+            timeout=_GATEWAY_READ_TIMEOUT_S,
+        ) as gateway_serial,
+    ):
+        reader = threading.Thread(
+            name="gateway-log-reader",
+            target=_read_gateway_output,
+            args=(gateway_serial, log_file, stop_event, status_queue),
+            daemon=True,
+        )
+        reader.start()
+
+        try:
+            yield status_queue
+        finally:
+            stop_event.set()
+            reader.join(timeout=_GATEWAY_READER_JOIN_TIMEOUT_S)
+            if reader.is_alive():
+                logging.error(
+                    "Gateway serial reader did not stop within %.1fs",
+                    _GATEWAY_READER_JOIN_TIMEOUT_S,
+                )
+
+
+def _gateway_log_tail(log_path: Path) -> str:
+    with log_path.open("rb") as log_file:
+        log_file.seek(0, 2)
+        log_file.seek(max(0, log_file.tell() - _GATEWAY_LOG_TAIL_BYTES))
+        return log_file.read(_GATEWAY_LOG_TAIL_BYTES).decode(errors="replace")
+
+
+def _wait_for_gateway_ready(status_queue: queue.Queue[object], log_path: Path) -> None:
+    try:
+        status = status_queue.get(timeout=_GATEWAY_READY_TIMEOUT_S)
+    except queue.Empty:
+        pytest.fail(
+            f"Gateway failed to start scanning within {_GATEWAY_READY_TIMEOUT_S:g}s. "
+            f"Last captured output: {_gateway_log_tail(log_path)}\n"
+            f"Full gateway log: {log_path}"
+        )
+
+    if status is _GATEWAY_READY:
+        return
+    if isinstance(status, Exception):
+        raise RuntimeError(
+            f"Gateway serial capture failed before readiness; output is in {log_path}"
+        ) from status
+    raise RuntimeError(f"Unexpected gateway capture status: {status!r}")
+
+
 @pytest.fixture(scope="module", autouse=True)
-def provisioned_gateway(gateway_serial_port, gateway_creds_dir, gateway_creds):
+def provisioned_gateway(
+    gateway_serial_port, gateway_creds_dir, gateway_creds, gateway_log_path
+):
     logging.info("Uploading gateway credentials via smpmgr")
 
     for local_name, remote_path in [
@@ -148,7 +273,13 @@ def provisioned_gateway(gateway_serial_port, gateway_creds_dir, gateway_creds):
         check=True,
     )
 
-    logging.info("Waiting for gateway to reboot")
-    time.sleep(30)
+    logging.info("Starting gateway serial capture to %s", gateway_log_path)
 
-    yield
+    with _capture_gateway_output(gateway_serial_port, gateway_log_path) as status_queue:
+        logging.info(
+            "Waiting for gateway ready pattern: %s",
+            _GATEWAY_READY_PATTERN.decode(),
+        )
+        _wait_for_gateway_ready(status_queue, gateway_log_path)
+        logging.info("Gateway provisioned and ready")
+        yield
