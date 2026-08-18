@@ -1,0 +1,8 @@
+filter:
+  path: "/sensor"
+  content_type: application/json
+steps:
+  - name: send-to-lightdb-stream
+    destination:
+      type: lightdb-stream
+      version: v1
