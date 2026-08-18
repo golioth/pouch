@@ -13,7 +13,9 @@ Usage notes:
 """
 
 import os
+import re
 import secrets
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -71,6 +73,67 @@ def _device_name_from_cert_cn(cert_der: bytes | None = None) -> str | None:
         return cn or None
     except Exception:
         return None
+
+
+def _read_sdkconfig_value(sdkconfig_path: Path, key: str) -> str | None:
+    """Read a string Kconfig value from an ESP-IDF build's ``sdkconfig``."""
+    if not sdkconfig_path.exists():
+        return None
+    pattern = re.compile(rf'^{re.escape(key)}="([^"]*)"$', re.MULTILINE)
+    match = pattern.search(sdkconfig_path.read_text())
+    return match.group(1) if match else None
+
+
+@pytest.fixture(scope="module")
+def fw_update_bin(request: pytest.FixtureRequest) -> Path | None:
+    """Resolve OTA update binary path from ESP-IDF build context.
+
+    Overrides the default in ``ota_harness``. CLI override
+    (``--fw-update-bin``) takes precedence when provided.
+    """
+    bin_cli = request.config.getoption("--fw-update-bin")
+    if bin_cli:
+        return Path(bin_cli)
+    app_path = request.config.getoption("--app-path")
+    target = request.config.getoption("--target")
+    if not app_path or not target:
+        return None
+    sample_name = Path(app_path).name
+    return Path(app_path) / "build" / f"{sample_name}_{target}_fwupdate.bin"
+
+
+@pytest.fixture(scope="module")
+def fw_update_version(request: pytest.FixtureRequest) -> str | None:
+    """Resolve OTA update version from ESP-IDF build context.
+
+    Overrides the default in ``ota_harness``. CLI override
+    (``--fw-update-ver``) takes precedence when provided.
+    """
+    ver_cli = request.config.getoption("--fw-update-ver")
+    if ver_cli:
+        return ver_cli
+    return (
+        subprocess.check_output(["git", "rev-parse", "--short", "HEAD"])
+        .strip()
+        .decode()
+    )
+
+
+@pytest.fixture(scope="module")
+def fw_update_package(request: pytest.FixtureRequest) -> str | None:
+    """Resolve OTA package name from ESP-IDF build context.
+
+    Overrides the default in ``ota_harness``. CLI override
+    (``--fw-update-pkg-name``) takes precedence when provided.
+    """
+    pkg_cli = request.config.getoption("--fw-update-pkg-name")
+    if pkg_cli:
+        return pkg_cli
+    app_path = request.config.getoption("--app-path")
+    if not app_path:
+        return None
+    sdkconfig = Path(app_path) / "build" / "sdkconfig.orig"
+    return _read_sdkconfig_value(sdkconfig, "CONFIG_EXAMPLE_FW_UPDATE_COMPONENT")
 
 
 @pytest.fixture(scope="module")

@@ -347,6 +347,7 @@ async def test_led_setting_downlink(connected_cloud_session):
     print(f"Device received LED setting {int(next_led)} after {elapsed:.1f}s")
 
 
+@pytest.mark.ota_mode("firmware")
 async def test_ota_firmware_update(
     connected_cloud_session,
     ota_update,

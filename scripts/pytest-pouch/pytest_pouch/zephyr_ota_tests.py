@@ -13,6 +13,7 @@ from twister_harness.device.device_adapter import DeviceAdapter
 pytestmark = pytest.mark.anyio
 
 
+@pytest.mark.ota_mode("dummy")
 async def test_ota_sha256(dut: DeviceAdapter, ota_update):
     expected_sha256 = ota_update
 
