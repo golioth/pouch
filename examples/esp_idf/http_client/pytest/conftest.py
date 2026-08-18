@@ -15,8 +15,8 @@ sys.path.insert(
 
 pytest_plugins = [
     "pytest_pouch.plugin",
-    "pytest_pouch.esp_idf_harness",
     "pytest_pouch.ota_harness",
+    "pytest_pouch.esp_idf_harness",
 ]
 
 

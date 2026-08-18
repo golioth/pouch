@@ -86,10 +86,14 @@ jobs:
           cd "${{ matrix.dir }}"
           shopt -s globstar nullglob
 
+          # Preserve the sdkconfig; harness can read package name from it
+          cp sdkconfig build/sdkconfig.orig
+
           artifact_files=(
             build/flasher_args.json
             build/**/*.bin
             build/*.elf
+            build/sdkconfig.orig
           )
 
           tar -cf build-artifacts.tar "${artifact_files[@]}"
@@ -283,9 +287,6 @@ jobs:
             --port "${!PORT_VAR}"            \
             --app-path "$SAMPLE_DIR"         \
             --build-dir build                \
-            --fw-update-bin "$SAMPLE_DIR/build/${{ matrix.name }}_${{ inputs.idf_target }}_fwupdate.bin" \
-            --fw-update-ver "$(git rev-parse --short HEAD)" \
-            --fw-update-pkg-name "hil_ota_${IDF_TARGET}_${{ matrix.name }}"      \
             --erase-all n                    \
             --api-url "$GOLIOTH_API_URL"     \
             --api-key "$GOLIOTH_API_KEY"     \
