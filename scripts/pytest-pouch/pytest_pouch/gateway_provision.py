@@ -39,10 +39,7 @@ def gateway_log_path(request):
 
 @pytest.fixture(scope="module")
 def gateway_serial_port(request):
-    port = request.config.getoption("--gateway-port")
-    if not port:
-        pytest.fail("--gateway-port not set")
-    return port
+    return request.config.getoption("--gateway-port")
 
 
 @pytest.fixture(scope="module")
@@ -238,10 +235,17 @@ def _wait_for_gateway_ready(status_queue: queue.Queue[object], log_path: Path) -
 
 
 @pytest.fixture(scope="module", autouse=True)
-def provisioned_gateway(
-    gateway_serial_port, gateway_creds_dir, gateway_creds, gateway_log_path
-):
+def provisioned_gateway(request, gateway_serial_port):
+    if not gateway_serial_port:
+        logging.info("No gateway port configured; skipping gateway provisioning")
+        yield
+        return
+
     logging.info("Uploading gateway credentials via smpmgr")
+
+    request.getfixturevalue("gateway_creds")  # Need to generate the gateway credentials
+    creds_dir = request.getfixturevalue("gateway_creds_dir")
+    log_path = request.getfixturevalue("gateway_log_path")
 
     for local_name, remote_path in [
         ("crt.der", "/lfs1/credentials/crt.der"),
@@ -254,7 +258,7 @@ def provisioned_gateway(
                 gateway_serial_port,
                 "file",
                 "upload",
-                str(gateway_creds_dir / local_name),
+                str(creds_dir / local_name),
                 remote_path,
             ],
             check=True,
@@ -273,13 +277,13 @@ def provisioned_gateway(
         check=True,
     )
 
-    logging.info("Starting gateway serial capture to %s", gateway_log_path)
+    logging.info("Starting gateway serial capture to %s", log_path)
 
-    with _capture_gateway_output(gateway_serial_port, gateway_log_path) as status_queue:
+    with _capture_gateway_output(gateway_serial_port, log_path) as status_queue:
         logging.info(
             "Waiting for gateway ready pattern: %s",
             _GATEWAY_READY_PATTERN.decode(),
         )
-        _wait_for_gateway_ready(status_queue, gateway_log_path)
+        _wait_for_gateway_ready(status_queue, log_path)
         logging.info("Gateway provisioned and ready")
         yield
