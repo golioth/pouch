@@ -39,10 +39,7 @@ def gateway_log_path(request):
 
 @pytest.fixture(scope="module")
 def gateway_serial_port(request):
-    port = request.config.getoption("--gateway-port")
-    if not port:
-        pytest.fail("--gateway-port not set")
-    return port
+    return request.config.getoption("--gateway-port")
 
 
 @pytest.fixture(scope="module")
@@ -241,6 +238,10 @@ def _wait_for_gateway_ready(status_queue: queue.Queue[object], log_path: Path) -
 def provisioned_gateway(
     gateway_serial_port, gateway_creds_dir, gateway_creds, gateway_log_path
 ):
+    if not gateway_serial_port:
+        logging.info("No gateway port configured; skipping gateway provisioning")
+        yield
+        return
     logging.info("Uploading gateway credentials via smpmgr")
 
     for local_name, remote_path in [
