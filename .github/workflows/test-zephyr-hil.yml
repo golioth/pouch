@@ -234,7 +234,7 @@ jobs:
           SNR_VAR=CI_${hil_board^^}_SNR
 
           zephyr/scripts/twister                                        \
-            -v                                                          \
+            -vv                                                         \
             -p ${{ inputs.west_board }}                                 \
             -T pouch/examples/zephyr/                                   \
             --device-testing                                            \
