@@ -32,21 +32,6 @@ uv pip install --python "$IDF_PYTHON_ENV_PATH" "golioth@git+https://github.com/g
 
    - `examples/esp_idf/http_client/pytest/json-sensor-path-to-lightdb-stream.txt`
 
-## Build Firmware
-
-From the repository root (`pouch`):
-
-```bash
-idf.py -C examples/esp_idf/http_client set-target esp32s3
-export SDKCONFIG_DEFAULTS="sdkconfig.defaults;pytest/sdkconfig.pytest.defaults"
-idf.py -C examples/esp_idf/http_client build
-```
-
-This build command includes an overlay file that resets the sync
-interval to 10s. This may be omitted to use the default 30s period.
-
-## Run Test
-
 Set required environment variables (test auto-provisions before cloud
 checks):
 
@@ -55,28 +40,57 @@ export GOLIOTH_API_URL="https://api.golioth.io"
 export GOLIOTH_API_KEY="your_project_api_key"
 export WIFI_SSID="your_wifi_ssid"
 export WIFI_PSK="your_wifi_psk"
-
-# Manual cert mode: provide DER file paths
-export DEVICE_CRT_DER_PATH="/path/to/device.crt.der"
-export DEVICE_KEY_DER_PATH="/path/to/device.key.der"
-
-# Optional override (otherwise derived from cert CN in DEVICE_CRT_DER_PATH)
-export GOLIOTH_DEVICE_NAME="your_device_name"
 ```
 
-The test also accepts `python-golioth-tools`/SDK-style pytest flags:
+## Build Update Firmware
 
-- `--api-key` (fallback: `GOLIOTH_API_KEY`)
-- `--api-url` (fallback: `GOLIOTH_API_URL`, default: `https://api.golioth.io`)
-- `--device-name` (fallback: `GOLIOTH_DEVICE_NAME`)
-- `--wifi-ssid` (fallback: `WIFI_SSID`)
-- `--wifi-psk` (fallback: `WIFI_PSK`)
+Note: if you prefer to skip the fw_update test you can ignore this
+section and simply add the following to the pytest command in place of
+fw_update specific flags:
 
-To generate device certificates automatically during the test run,
-pass `--generate-certs` and omit manual cert inputs
-(`DEVICE_CRT_DER_PATH`/`DEVICE_KEY_DER_PATH`).
+```
+--ota-mode=disabled
+```
 
-Then run from the repository root (`pouch`):
+OTA testing requires two firmware builds: an update version (unique
+version number) and an initial version (default version).
+
+1. Build the update firmware with a unique version and OTA package name:
+
+```bash
+# Create fw_update.defaults with OTA package name and version
+cat > examples/esp_idf/http_client/fw_update.defaults <<EOF
+CONFIG_EXAMPLE_FW_UPDATE_COMPONENT="hil_ota_esp32s3_http_client"
+CONFIG_APP_PROJECT_VER="$(git rev-parse --short HEAD)"
+EOF
+
+idf.py -C examples/esp_idf/http_client set-target esp32s3
+export SDKCONFIG_DEFAULTS="sdkconfig.defaults;pytest/sdkconfig.pytest.defaults;fw_update.defaults"
+rm -f examples/esp_idf/http_client/sdkconfig
+idf.py -C examples/esp_idf/http_client reconfigure
+idf.py -C examples/esp_idf/http_client build
+
+# Copy the update binary to a known location
+cp examples/esp_idf/http_client/build/pouch_http_client_example.bin /tmp/http_client_esp32s3_fwupdate.bin
+```
+
+2. Build the initial version of the example:
+
+```bash
+# Create fw_update.defaults with OTA package name (no version override)
+cat > examples/esp_idf/http_client/fw_update.defaults <<EOF
+CONFIG_EXAMPLE_FW_UPDATE_COMPONENT="hil_ota_esp32s3_http_client"
+EOF
+
+export SDKCONFIG_DEFAULTS="sdkconfig.defaults;pytest/sdkconfig.pytest.defaults;fw_update.defaults"
+rm -f examples/esp_idf/http_client/sdkconfig
+idf.py -C examples/esp_idf/http_client reconfigure
+idf.py -C examples/esp_idf/http_client build
+```
+
+## Run Test
+
+From the repository root (`pouch`):
 
 ```bash
 # Full erase to remove existing credentials:
@@ -92,21 +106,9 @@ pytest -vv -rs -s \
   --app-path examples/esp_idf/http_client \
   --build-dir build \
   --erase-all n \
-  examples/esp_idf/http_client/pytest/test_sample.py
-```
-
-Example generated-cert run:
-
-```bash
-pytest -vv -rs -s \
-  -c examples/esp_idf/http_client/pytest.ini \
-  --rootdir examples/esp_idf/http_client \
-  --embedded-services esp,idf \
-  --target esp32s3 \
-  --port /dev/ttyUSB0 \
-  --app-path examples/esp_idf/http_client \
-  --build-dir build \
-  --erase-all n \
   --generate-certs \
+  --fw-update-pkg-name hil_ota_esp32s3_http_client \
+  --fw-update-bin /tmp/http_client_esp32s3_fwupdate.bin \
+  --fw-update-ver "$(git rev-parse --short HEAD)" \
   examples/esp_idf/http_client/pytest/test_sample.py
 ```
