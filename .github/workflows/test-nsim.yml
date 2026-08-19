@@ -93,7 +93,7 @@ jobs:
           export CONFIG_POUCH_SERVER_CERT_CN="pouch.${COAP_HOST#coap.}"
 
           zephyr/scripts/twister                                                  \
-            -c -v -W                                                              \
+            -c -vv -W                                                             \
             -p native_sim                                                         \
             -p native_sim/native/64                                               \
             -p nrf52_bsim/native                                                  \
