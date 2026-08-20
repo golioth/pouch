@@ -1,0 +1,39 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /.github/actions/safe-upload-artifacts
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      python-root:
+        patterns:
+          - "*"
+
+  - package-ecosystem: pip
+    directory: /scripts/pytest-pouch
+    schedule:
+      interval: weekly
+    groups:
+      pytest-pouch:
+        patterns:
+          - "*"
+
+  - package-ecosystem: pre-commit
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      pre-commit:
+        patterns:
+          - "*"
