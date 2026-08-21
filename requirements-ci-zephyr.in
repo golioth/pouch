@@ -1,4 +1,4 @@
-cryptography==41.0.7
+cryptography==50.0.0
 pyasn1
 pyyaml
 cbor>=1.0.0
