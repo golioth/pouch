@@ -47,11 +47,46 @@ def pytest_addoption(parser):
         help="OTA package name for the firmware update artifact (required for OTA tests)",
     )
     parser.addoption(
-        "--ota-dummy-binary",
-        action="store_true",
-        default=False,
-        help="Generate a dummy OTA binary for SHA256 verification",
+        "--ota-mode",
+        choices=("dummy", "firmware", "disabled"),
+        default="firmware",
+        help=(
+            "OTA test mode: 'firmware' (default; real update binary), "
+            "'dummy' (random bytes, SHA256 verification), or 'disabled' "
+            "(deselect all OTA-marked tests)."
+        ),
     )
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "ota_mode(mode): restrict the test to a specific OTA mode "
+        "('dummy' or 'firmware'); respected when --ota-mode is 'dummy' or "
+        "'firmware'. When --ota-mode=disabled, all OTA-marked tests are "
+        "deselected.",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    selected = config.getoption("--ota-mode")
+    keep: list = []
+    drop: list = []
+    for item in items:
+        marker = item.get_closest_marker("ota_mode")
+        if selected == "disabled":
+            if marker is None:
+                keep.append(item)
+            else:
+                drop.append(item)
+        else:
+            if marker is None or marker.args[0] == selected:
+                keep.append(item)
+            else:
+                drop.append(item)
+    if drop:
+        config.hook.pytest_deselected(items=drop)
+    items[:] = keep
 
 
 @pytest.fixture(scope="session")

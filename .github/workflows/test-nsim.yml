@@ -93,14 +93,13 @@ jobs:
           export CONFIG_POUCH_SERVER_CERT_CN="pouch.${COAP_HOST#coap.}"
 
           zephyr/scripts/twister                                                  \
-            -c -v -W                                                              \
+            -c -vv -W                                                             \
             -p native_sim                                                         \
             -p native_sim/native/64                                               \
             -p nrf52_bsim/native                                                  \
             -T pouch/examples/zephyr/                                             \
             --pytest-args="--api-url=${{ inputs.api_url }}"                       \
-            --pytest-args="--api-key=${{ secrets[inputs.api_key_id] }}"           \
-            --pytest-args="--ota-dummy-binary"
+            --pytest-args="--api-key=${{ secrets[inputs.api_key_id] }}"
 
       - name: Safe upload twister artifacts
         if: success() || failure()

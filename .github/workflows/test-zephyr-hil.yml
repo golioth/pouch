@@ -93,11 +93,56 @@ jobs:
 
           tar -cjf test_artifacts_${{ inputs.hil_board }}.tar twister-out
 
+      - name: Build update version of firmware
+        shell: bash
+        run: |
+          # Ensure we can query the short hash
+          git config --global --add safe.directory $GITHUB_WORKSPACE/pouch
+
+          # MCUboot doesn't allow strings version; convert short hash base-10 by byte
+          SHORT_HASH=$(git -C pouch rev-parse --short HEAD)
+          V_MAJOR=$((16#${SHORT_HASH:0:2}))
+          V_MINOR=$((16#${SHORT_HASH:2:2}))
+          V_PATCH=$((16#${SHORT_HASH:4:2}))
+          V_TWEAK=$((16#${SHORT_HASH:6:2}))
+
+          # Create version file with update version number
+          cat > "VERSION" <<EOF
+          VERSION_MAJOR = $V_MAJOR
+          VERSION_MINOR = $V_MINOR
+          PATCHLEVEL = $V_PATCH
+          VERSION_TWEAK = $V_TWEAK
+          EXTRAVERSION =
+          EOF
+
+          # Replace app version files with update version
+          find pouch/examples/zephyr/ -name VERSION -exec cp VERSION {} \;
+          rm VERSION
+
+          # Build update binaries
+          zephyr/scripts/twister                \
+            -v                                  \
+            --overflow-as-errors                \
+            --platform ${{ inputs.west_board }} \
+            -T pouch/examples/zephyr/           \
+            --build-only
+
+          # Create archive of update files, preserving path
+          find twister-out -name "zephyr.signed.bin" | \
+            tar -cf fw_update_bins_${{ inputs.hil_board }}.tar -T -
+
+          # Preserve update version number in a file
+          echo "$V_MAJOR.$V_MINOR.$V_PATCH" > twister-out/update-ver-num.txt
+          find twister-out -name "update-ver-num.txt" | \
+            tar -rf fw_update_bins_${{ inputs.hil_board }}.tar -T -
+
       - name: Upload build artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: zephyr-${{ inputs.hil_board }}-build
-          path: test_artifacts_${{ inputs.hil_board }}.tar
+          path: |
+            test_artifacts_${{ inputs.hil_board }}.tar
+            fw_update_bins_${{ inputs.hil_board }}.tar
 
   hil-test:
     permissions:
@@ -169,7 +214,13 @@ jobs:
       - name: Extract build artifact
         run: |
           rm -rf twister-out
+
+          # Build artifacts
           tar -xvf test_artifacts_${{ inputs.hil_board }}.tar
+
+          # FW Update artifacts
+          mkdir -p twister-out/fw_update_bins
+          tar -xvf fw_update_bins_${{ inputs.hil_board }}.tar --strip-components=1 -C twister-out/fw_update_bins
 
       - name: Run HIL test
         shell: bash
@@ -183,7 +234,7 @@ jobs:
           SNR_VAR=CI_${hil_board^^}_SNR
 
           zephyr/scripts/twister                                        \
-            -v                                                          \
+            -vv                                                         \
             -p ${{ inputs.west_board }}                                 \
             -T pouch/examples/zephyr/                                   \
             --device-testing                                            \

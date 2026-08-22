@@ -23,33 +23,50 @@ def artifacts_to_cleanup() -> list:
     return []
 
 
-@pytest.fixture(scope="module", autouse=True)
-def check_ota_conflict(request: pytest.FixtureRequest):
-    if request.config.getoption("--fw-update-bin") and request.config.getoption(
-        "--ota-dummy-binary"
-    ):
-        pytest.fail("--fw-update-bin and --ota-dummy-binary are mutually exclusive")
+@pytest.fixture(scope="module")
+def ota_mode(request: pytest.FixtureRequest) -> str:
+    """Selected OTA mode (``dummy``, ``firmware``, or ``disabled``)."""
+    return request.config.getoption("--ota-mode")
 
 
 @pytest.fixture(scope="module")
-def fw_update_ver(request: pytest.FixtureRequest) -> str:
-    version = request.config.getoption("--fw-update-ver")
-    if not version:
-        if request.config.getoption("--ota-dummy-binary"):
-            return "dummy_ver"
-        else:
-            pytest.fail("--fw-update-ver not provided")
-    return version
+def fw_update_ver(request: pytest.FixtureRequest, ota_mode: str) -> str:
+    if ota_mode == "dummy":
+        return "dummy_ver"
+    cli = request.config.getoption("--fw-update-ver")
+    if cli:
+        return cli
+    try:
+        ver = request.getfixturevalue("fw_update_version")
+        if ver is not None:
+            return ver
+    except pytest.FixtureLookupError:
+        pass
+    pytest.fail(
+        "Firmware update version not provided. Pass --fw-update-ver via "
+        "--pytest-args, use --ota-mode=dummy, or load a harness plugin that "
+        "defines the fw_update_version fixture."
+    )
 
 
 @pytest.fixture(scope="module")
-def pouch_ota_package(request: pytest.FixtureRequest) -> str:
-    package = request.config.getoption("--fw-update-pkg-name")
-    if not package:
-        if request.config.getoption("--ota-dummy-binary"):
-            return "ci_ota_fw"
-        pytest.fail("--fw-update-pkg-name not provided")
-    return package
+def pouch_ota_package(request: pytest.FixtureRequest, ota_mode: str) -> str:
+    if ota_mode == "dummy":
+        return "ci_ota_fw"
+    cli = request.config.getoption("--fw-update-pkg-name")
+    if cli:
+        return cli
+    try:
+        pkg = request.getfixturevalue("fw_update_package")
+        if pkg is not None:
+            return pkg
+    except pytest.FixtureLookupError:
+        pass
+    pytest.fail(
+        "OTA package name not provided. Pass --fw-update-pkg-name via "
+        "--pytest-args, use --ota-mode=dummy, or load a harness plugin that "
+        "defines the fw_update_package fixture."
+    )
 
 
 @pytest.fixture(scope="module")
@@ -89,50 +106,9 @@ async def ota_update(
     artifacts_to_cleanup,
     tmp_path_factory,
     fw_update_ver,
+    ota_mode: str,
 ) -> str:
-    fw_bin_path = request.config.getoption("--fw-update-bin")
-
-    if fw_bin_path:
-        fw_bin = Path(fw_bin_path)
-
-        existing_artifacts = await project.artifacts.get_all()
-        matching = [
-            a
-            for a in existing_artifacts
-            if a.package == pouch_ota_package and a.version == fw_update_ver
-        ]
-
-        if matching:
-            artifact = matching[0]
-            logging.info(
-                "Found existing artifact (id=%s) for package=%s, version=%s — skipping upload",
-                artifact.id,
-                pouch_ota_package,
-                fw_update_ver,
-            )
-            artifacts_to_cleanup.append(artifact.id)
-        else:
-            logging.info(
-                "Uploading OTA artifact: %s, version=%s, package=%s",
-                fw_bin,
-                fw_update_ver,
-                pouch_ota_package,
-            )
-            artifact = await project.artifacts.upload(
-                path=fw_bin,
-                version=fw_update_ver,
-                package=pouch_ota_package,
-            )
-            artifacts_to_cleanup.append(artifact.id)
-
-        logging.info("Creating deployment on cohort '%s'", ota_cohort.name)
-        await ota_cohort.deployments.create(
-            f"ota-test-{device.name}-{test_id}",
-            [artifact.id],
-        )
-
-        yield fw_update_ver
-    elif request.config.getoption("--ota-dummy-binary"):
+    if ota_mode == "dummy":
         import hashlib
         import os
 
@@ -165,5 +141,57 @@ async def ota_update(
         )
 
         yield expected_sha256
+        return
+
+    fw_bin_cli = request.config.getoption("--fw-update-bin")
+    if fw_bin_cli:
+        fw_bin = Path(fw_bin_cli)
     else:
-        pytest.fail("either --fw-update-bin or --ota-dummy-binary must be provided")
+        try:
+            fw_bin = request.getfixturevalue("fw_update_bin")
+        except pytest.FixtureLookupError:
+            fw_bin = None
+        if fw_bin is None:
+            pytest.fail(
+                "Firmware update binary not provided. Pass --fw-update-bin via "
+                "--pytest-args, use --ota-mode=dummy, or load a harness plugin "
+                "that defines the fw_update_bin fixture."
+            )
+
+    existing_artifacts = await project.artifacts.get_all()
+    matching = [
+        a
+        for a in existing_artifacts
+        if a.package == pouch_ota_package and a.version == fw_update_ver
+    ]
+
+    if matching:
+        artifact = matching[0]
+        logging.info(
+            "Found existing artifact (id=%s) for package=%s, version=%s — skipping upload",
+            artifact.id,
+            pouch_ota_package,
+            fw_update_ver,
+        )
+        artifacts_to_cleanup.append(artifact.id)
+    else:
+        logging.info(
+            "Uploading OTA artifact: %s, version=%s, package=%s",
+            fw_bin,
+            fw_update_ver,
+            pouch_ota_package,
+        )
+        artifact = await project.artifacts.upload(
+            path=fw_bin,
+            version=fw_update_ver,
+            package=pouch_ota_package,
+        )
+        artifacts_to_cleanup.append(artifact.id)
+
+    logging.info("Creating deployment on cohort '%s'", ota_cohort.name)
+    await ota_cohort.deployments.create(
+        f"ota-test-{device.name}-{test_id}",
+        [artifact.id],
+    )
+
+    yield fw_update_ver
