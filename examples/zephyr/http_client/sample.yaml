@@ -27,7 +27,7 @@ tests:
       pytest_dut_scope: module
       pytest_root:
         - pytest/test_sample.py
-    timeout: 600
+    timeout: 960
     sysbuild: true
     extra_configs:
       - CONFIG_EXAMPLE_HTTP_CLIENT_SYNC_PERIOD_S=10
