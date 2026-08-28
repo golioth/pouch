@@ -11,7 +11,7 @@ import pytest
 
 pytestmark = pytest.mark.anyio
 
-_STREAM_POLL_ATTEMPTS = 24
+_STREAM_POLL_ATTEMPTS = 12
 _STREAM_POLL_DELAY_S = 5.0
 
 

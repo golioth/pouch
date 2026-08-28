@@ -12,6 +12,7 @@ from twister_harness.device.device_adapter import DeviceAdapter
 
 pytestmark = pytest.mark.anyio
 
+OTA_DEFAULT_TIMEOUT_S = 60.0
 OTA_DOWNLINK_TIMEOUT_S = 120.0
 OTA_DOWNLOAD_TIMEOUT_S = 180.0
 OTA_REBOOT_TIMEOUT_S = 180.0
@@ -65,10 +66,10 @@ async def test_ota_firmware_update(
 
     dut.readlines_until(
         regex=".*Credentials loaded.*",
-        timeout=OTA_DOWNLINK_TIMEOUT_S,
+        timeout=OTA_DEFAULT_TIMEOUT_S,
     )
 
     dut.readlines_until(
         regex=r".*Received LED setting: [0-1]",
-        timeout=OTA_DOWNLINK_TIMEOUT_S,
+        timeout=OTA_DEFAULT_TIMEOUT_S,
     )
