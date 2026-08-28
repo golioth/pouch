@@ -8,6 +8,7 @@ import datetime
 
 import anyio
 import pytest
+from twister_harness.device.device_adapter import DeviceAdapter
 
 pytestmark = pytest.mark.anyio
 
@@ -19,7 +20,7 @@ def _iso8601_utc(timestamp: datetime.datetime) -> str:
     return timestamp.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
-async def test_sensor_stream_uplink(device):
+async def test_sensor_stream_uplink(device, dut: DeviceAdapter):
     start_time = datetime.datetime.now(datetime.UTC)
 
     latest_payload = None
