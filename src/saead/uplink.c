@@ -104,13 +104,6 @@ int saead_uplink_header_get(struct saead_info *info)
 
 struct pouch_buf *saead_uplink_encrypt_block(struct pouch_buf *block)
 {
-    if (!pouch_atomic_test_bit(&uplink.flags, SESSION_ACTIVE))
-    {
-        POUCH_LOG_WRN("Not in a session");
-        block_free(block);
-        return NULL;
-    }
-
     struct pouch_buf *encrypted = session_encrypt_block(&uplink, block);
 
     block_free(block);
