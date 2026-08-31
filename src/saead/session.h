@@ -49,6 +49,7 @@ enum session_flags
     SESSION_VALID,
     SESSION_ACTIVE,
     SESSION_HAS_POUCH,
+    SESSION_POUCH_OPEN,
 };
 
 struct session
