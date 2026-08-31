@@ -184,6 +184,8 @@ int session_pouch_start(struct session *session, pouch_id_t pouch_id)
     session->pouch.id = pouch_id;
     session->pouch.block_index = 0;
 
+    pouch_atomic_set_bit(&session->flags, SESSION_POUCH_OPEN);
+
     return 0;
 }
 
@@ -197,11 +199,27 @@ static void nonce_generate(const struct session *session,
     memset(&nonce[5], 0, NONCE_LEN - 5);
 }
 
+static bool pouch_is_open(const struct session *session)
+{
+    if (!pouch_atomic_test_bit(&session->flags, SESSION_ACTIVE))
+    {
+        POUCH_LOG_ERR("Not in a session");
+        return false;
+    }
+
+    if (!pouch_atomic_test_bit(&session->flags, SESSION_POUCH_OPEN))
+    {
+        POUCH_LOG_ERR("Pouch has been closed");
+        return false;
+    }
+
+    return true;
+}
+
 struct pouch_buf *session_encrypt_block(struct session *session, struct pouch_buf *block)
 {
-    if (session->pouch.block_index == UINT16_MAX)
+    if (!pouch_is_open(session))
     {
-        POUCH_LOG_ERR("Block index space exhausted; session must rotate");
         return NULL;
     }
 
@@ -267,6 +285,13 @@ struct pouch_buf *session_encrypt_block(struct session *session, struct pouch_bu
         return NULL;
     }
 
+    if (session->pouch.block_index == UINT16_MAX)
+    {
+        // This pouch is now full, and we shouldn't accept any more blocks for it.
+        pouch_atomic_clear_bit(&session->flags, SESSION_POUCH_OPEN);
+        return encrypted;
+    }
+
     // prepare for the next block:
     memcpy(&session->pouch.ad, &ciphertext[plaintext_len], AUTH_TAG_LEN);
     session->pouch.block_index++;
@@ -283,10 +308,9 @@ int session_decrypt_block(struct session *session,
                           const struct pouch_buf *block,
                           struct pouch_buf *decrypted)
 {
-    if (session->pouch.block_index == UINT16_MAX)
+    if (!pouch_is_open(session))
     {
-        POUCH_LOG_ERR("Block index space exhausted; session must rotate");
-        return -ERANGE;
+        return NULL;
     }
 
     uint8_t nonce[NONCE_LEN];
@@ -337,6 +361,13 @@ int session_decrypt_block(struct session *session,
     {
         POUCH_LOG_ERR("Unexpected length");
         return -EINVAL;
+    }
+
+    if (session->pouch.block_index == UINT16_MAX)
+    {
+        // This pouch is now full, and we can't add any more blocks to it.
+        pouch_atomic_clear_bit(&session->flags, SESSION_POUCH_OPEN);
+        return 0;
     }
 
     // prepare for the next block:
