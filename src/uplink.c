@@ -195,6 +195,7 @@ struct pouch_uplink *pouch_uplink_start(void)
     if (err)
     {
         pouch_atomic_clear_bit(uplink.flags, SESSION_ACTIVE);
+        crypto_session_end();
         return NULL;
     }
 
@@ -203,6 +204,7 @@ struct pouch_uplink *pouch_uplink_start(void)
     if (!uplink.header)
     {
         pouch_atomic_clear_bit(uplink.flags, SESSION_ACTIVE);
+        crypto_session_end();
         return NULL;
     }
 
