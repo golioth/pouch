@@ -57,6 +57,7 @@ struct session
     pouch_atomic_t flags;
     psa_algorithm_t algorithm;
     psa_key_id_t key;
+    uint8_t max_block_size_log;
     struct
     {
         pouch_id_t id;
@@ -84,6 +85,18 @@ psa_key_id_t session_key_generate(const struct session_id *id,
 
 /** End the given session, deleting the session key. */
 void session_end(struct session *session);
+
+/**
+ * Check if the given parameters matches the session.
+ *
+ * @return 0 if the session ID does not match the session.
+ * @return 1 if everything matches
+ * @return -EINVAL if the ID matches, but not the parameters.
+ */
+int session_match(const struct session *session,
+                  const struct session_id *id,
+                  uint8_t max_block_size_log,
+                  psa_algorithm_t algorithm);
 
 int session_pouch_start(struct session *session, pouch_id_t pouch_id);
 

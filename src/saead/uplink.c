@@ -58,6 +58,7 @@ int saead_uplink_session_start(psa_algorithm_t algorithm, psa_key_id_t private_k
 
     uplink.algorithm = algorithm;
     uplink.pouch.id = 0;
+    uplink.max_block_size_log = MAX_BLOCK_PAYLOAD_SIZE_LOG;
     pouch_atomic_set_bit(&uplink.flags, SESSION_VALID);
 
     return 0;
@@ -135,9 +136,7 @@ bool saead_uplink_session_matches(const struct session_id *id,
                                   uint8_t max_block_size_log,
                                   psa_algorithm_t algorithm)
 {
-    return pouch_atomic_test_bit(&uplink.flags, SESSION_VALID)
-        && session_id_is_equal(id, &uplink.id) && max_block_size_log == MAX_BLOCK_PAYLOAD_SIZE_LOG
-        && uplink.algorithm == algorithm;
+    return session_match(&uplink, id, max_block_size_log, algorithm) == 1;
 }
 
 psa_key_id_t saead_uplink_session_key_copy(psa_key_usage_t usage)
