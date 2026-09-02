@@ -15,7 +15,7 @@
 #include <pouch/port.h>
 
 #include "uplink.h"
-#include "../buf.h"
+#include "../block.h"
 
 POUCH_LOG_REGISTER(gw_uplink, CONFIG_POUCH_GATEWAY_LOG_LEVEL);
 
@@ -65,8 +65,8 @@ static void cleanup_uplink(struct pouch_gateway_uplink *uplink)
 
 static void submit_wblock(struct pouch_gateway_uplink *uplink)
 {
-    POUCH_LOG_DBG("Submitting block of size %zu", buf_size_get(uplink->wblock));
-    uplink->total_len += buf_size_get(uplink->wblock);
+    POUCH_LOG_DBG("Submitting block of size %zu", block_size_get(uplink->wblock));
+    uplink->total_len += block_size_get(uplink->wblock);
     buf_queue_submit(&uplink->queue, uplink->wblock);
     uplink->wblock = NULL;
 }
@@ -190,20 +190,13 @@ static void send_uplink_via_cloud(struct pouch_gateway_uplink *uplink)
     cleanup_uplink(uplink);
 }
 
-/*
- * Max bytes per gateway block.  Each pouch_buf slot holds at least
- * CONFIG_POUCH_BLOCK_SIZE bytes; we conservatively use that as the
- * per-block capacity.
- */
-#define GW_BLOCK_MAX_BYTES CONFIG_POUCH_BLOCK_SIZE
-
 int pouch_gateway_uplink_write(struct pouch_gateway_uplink *uplink,
                                const uint8_t *payload,
                                size_t len)
 {
     while (len)
     {
-        if (uplink->wblock != NULL && buf_size_get(uplink->wblock) >= GW_BLOCK_MAX_BYTES)
+        if (uplink->wblock != NULL && block_space_get(uplink->wblock) == 0)
         {
             submit_wblock(uplink);
         }
@@ -218,7 +211,7 @@ int pouch_gateway_uplink_write(struct pouch_gateway_uplink *uplink,
             }
         }
 
-        size_t space = GW_BLOCK_MAX_BYTES - buf_size_get(uplink->wblock);
+        size_t space = block_space_get(uplink->wblock);
         size_t bytes_to_copy = MIN(len, space);
 
         buf_write(uplink->wblock, payload, bytes_to_copy);
@@ -309,7 +302,7 @@ void pouch_gateway_uplink_close(struct pouch_gateway_uplink *uplink)
 {
     bool closed = pouch_atomic_test_and_set_bit(uplink->flags, POUCH_UPLINK_CLOSED);
 
-    if (!closed && uplink->wblock != NULL && buf_size_get(uplink->wblock) > 0)
+    if (!closed && uplink->wblock != NULL && block_size_get(uplink->wblock) > 0)
     {
         submit_wblock(uplink);
     }
