@@ -57,6 +57,11 @@ struct pouch_stream *pouch_uplink_stream_open(const char *path,
                                               uint16_t content_type,
                                               pouch_timeout_t timeout)
 {
+    if (strlen(path) > UINT8_MAX)
+    {
+        return NULL;
+    }
+
     if (pouch_atomic_inc(&open_streams) >= POUCH_STREAMS_MAX)
     {
         pouch_atomic_dec(&open_streams);
