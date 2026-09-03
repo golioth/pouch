@@ -16,6 +16,7 @@
 
 #include "uplink.h"
 #include "../buf.h"
+#include "../block.h"
 
 POUCH_LOG_REGISTER(gw_uplink, CONFIG_POUCH_GATEWAY_LOG_LEVEL);
 
@@ -191,11 +192,11 @@ static void send_uplink_via_cloud(struct pouch_gateway_uplink *uplink)
 }
 
 /*
- * Max bytes per gateway block.  Each pouch_buf slot holds at least
- * CONFIG_POUCH_BLOCK_SIZE bytes; we conservatively use that as the
+ * Max payload bytes per gateway block.  Each pouch_buf slot holds at least
+ * MAX_BLOCK_PAYLOAD_SIZE bytes; we conservatively use that as the
  * per-block capacity.
  */
-#define GW_BLOCK_MAX_BYTES CONFIG_POUCH_BLOCK_SIZE
+#define GW_BLOCK_MAX_BYTES MAX_BLOCK_PAYLOAD_SIZE
 
 int pouch_gateway_uplink_write(struct pouch_gateway_uplink *uplink,
                                const uint8_t *payload,

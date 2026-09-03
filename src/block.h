@@ -23,6 +23,14 @@
 /** Maximum ciphertext size without the length of the size field */
 #define MAX_BLOCK_SIZE_FIELD_VALUE (MAX_CIPHERTEXT_BLOCK_SIZE - sizeof(uint16_t))
 
+/*
+ * CONFIG_POUCH_BLOCK_SIZE feeds LOG2() above, which rounds DOWN to a power of two.
+ * A non-power-of-two value silently yields a smaller block everywhere it is used. Reject it at build
+ * time so the configured size is the size actually used.
+ */
+POUCH_STATIC_ASSERT((CONFIG_POUCH_BLOCK_SIZE & (CONFIG_POUCH_BLOCK_SIZE - 1)) == 0,
+                    "CONFIG_POUCH_BLOCK_SIZE must be a power of two");
+
 int block_decode_hdr(struct pouch_bufview *v,
                      uint16_t *block_size,
                      uint8_t *stream_id,
