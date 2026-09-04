@@ -229,11 +229,14 @@ def _wait_for_gateway_ready(status_queue: queue.Queue[object], log_path: Path) -
 
     if status is _GATEWAY_READY:
         return
-    if isinstance(status, Exception):
-        raise RuntimeError(
-            f"Gateway serial capture failed before readiness; output is in {log_path}"
-        ) from status
-    raise RuntimeError(f"Unexpected gateway capture status: {status!r}")
+
+    cause = status if isinstance(status, Exception) else None
+    reason = (
+        f"serial capture failed before readiness; output is in {log_path}"
+        if cause is not None
+        else f"unexpected capture status: {status!r}"
+    )
+    raise RuntimeError(f"Gateway {reason}") from cause
 
 
 @pytest.fixture(scope="module", autouse=True)
