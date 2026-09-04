@@ -99,7 +99,7 @@ def process_report(xml_path):
     try:
         tree.write(xml_path, encoding="utf-8", xml_declaration=True)
         print(f"Report updated: {total_tests} tests in {len(groups)} suites.")
-    except Exception as e:
+    except OSError as e:
         print(f"Failed to save the Junit xml file: {e}")
         return
 

@@ -71,7 +71,8 @@ def _device_name_from_cert_cn(cert_der: bytes | None = None) -> str | None:
             cn = cn.decode("utf-8", errors="ignore")
         cn = cn.strip()
         return cn or None
-    except Exception:
+    except (ImportError, ValueError):
+        # No cryptography installed, or the blob is not a parsable certificate.
         return None
 
 
