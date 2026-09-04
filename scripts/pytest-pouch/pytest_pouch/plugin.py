@@ -213,8 +213,7 @@ async def creds(creds_dir, device, project):
 
     logger.info("Upload root public key to Golioth server")
 
-    with open(creds_dir / "ca.crt.pem", "rb") as f:
-        cert_pem = f.read()
+    cert_pem = await anyio.Path(creds_dir / "ca.crt.pem").read_bytes()
 
     root_cert = await project.certificates.add(cert_pem, "root")
     yield root_cert["data"]["id"]
