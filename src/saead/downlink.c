@@ -20,6 +20,8 @@ POUCH_LOG_REGISTER(saead_downlink, CONFIG_POUCH_COMMON_LOG_LEVEL);
 static struct session downlink;
 static struct
 {
+    // Whether we have received a valid sequence number from the server
+    bool has_seqnum;
     /**
      * Highest sequence number we've seen the server create a session with.
      * If replay protection isn't enabled, we can still use this to ensure that the server hasn't
@@ -28,6 +30,7 @@ static struct
      * replay attacks.
      */
     uint64_t seqnum;
+
     /**
      * Highest pouch ID we've seen the server send in the current session. Is only updated once
      * at least one block of the pouch is decrypted.
@@ -36,26 +39,34 @@ static struct
 } server;
 
 /** Check that this session is a valid follow up to the previous downlink session */
-static bool is_valid_downlink(const struct session_id *id, psa_algorithm_t algorithm)
+static bool is_valid_downlink(const struct session_id *id,
+                              uint8_t max_block_size_log,
+                              psa_algorithm_t algorithm)
 {
-    if (!pouch_atomic_test_bit(&downlink.flags, SESSION_VALID))
+    if (id->initiator == POUCH_ROLE_DEVICE)
     {
-        // No previous session to invalidate the incoming session
+        if (id->type != SESSION_ID_TYPE_SEQUENTIAL)
+        {
+            // The server can only use our session if it's a sequential session ID
+            POUCH_LOG_ERR("Session reuse failed: ID not sequential");
+            return false;
+        }
+
+        if (!saead_uplink_session_matches(id, max_block_size_log, algorithm))
+        {
+            // The server claims to use our uplink's session, but it doesn't match
+            POUCH_LOG_ERR("Session reuse failed: No match");
+            return false;
+        }
+
         return true;
     }
 
-    if (session_id_is_equal(&downlink.id, id) && downlink.algorithm != algorithm)
+    // server initiated, sequential ID:
+    if (id->type == SESSION_ID_TYPE_SEQUENTIAL)
     {
-        // Session ID is unchanged, parameters must be identical
-        POUCH_LOG_ERR("Algorithm doesn't match");
-        return false;
-    }
-
-    if (id->initiator == POUCH_ROLE_SERVER)
-    {
-        // This was initiated by the server. If it's sequential, we can validate the sequence
-        // number.
-        if (id->type == SESSION_ID_TYPE_SEQUENTIAL && id->value.sequential.seqnum <= server.seqnum)
+        // seqnum must be increasing:
+        if (server.has_seqnum && id->value.sequential.seqnum <= server.seqnum)
         {
             POUCH_LOG_ERR("Old seqnum: %" PRIu64 " (was %" PRIu64 ")",
                           id->value.sequential.seqnum,
@@ -74,7 +85,21 @@ int saead_downlink_session_start(const struct session_id *id,
 {
     psa_key_id_t session_key;
 
-    if (!is_valid_downlink(id, algorithm))
+    int match = session_match(&downlink, id, max_block_size_log, algorithm);
+    if (match < 0)
+    {
+        POUCH_LOG_ERR("Session parameter changed");
+        return -EBADMSG;
+    }
+
+    if (match && pouch_atomic_test_bit(&downlink.flags, SESSION_ACTIVE))
+    {
+        // This is the current session. We already have a session key, and shouldn't
+        // recalculate or reset anything.
+        return 0;
+    }
+
+    if (!is_valid_downlink(id, max_block_size_log, algorithm))
     {
         POUCH_LOG_ERR("Invalid downlink");
         return -EBADMSG;
@@ -82,20 +107,6 @@ int saead_downlink_session_start(const struct session_id *id,
 
     if (id->initiator == POUCH_ROLE_DEVICE)
     {
-        if (id->type != SESSION_ID_TYPE_SEQUENTIAL)
-        {
-            // The server can only use our session if it's a sequential session ID
-            POUCH_LOG_ERR("Session reuse failed: ID not sequential");
-            return -EBADMSG;
-        }
-
-        if (!saead_uplink_session_matches(id, max_block_size_log, algorithm))
-        {
-            // The server claims to use our uplink's session, but it doesn't match
-            POUCH_LOG_ERR("Session reuse failed: No match");
-            return -EBADMSG;
-        }
-
         // We can make a copy of the uplink session's key instead of deriving it again:
         session_key = saead_uplink_session_key_copy(DOWNLINK_KEY_USAGE);
     }
@@ -121,6 +132,7 @@ int saead_downlink_session_start(const struct session_id *id,
 
     downlink.flags = POUCH_ATOMIC_INIT(0);
     downlink.pouch.id = 0;
+    downlink.max_block_size_log = max_block_size_log;
     downlink.algorithm = algorithm;
     downlink.key = session_key;
     downlink.id = *id;
@@ -170,10 +182,12 @@ int saead_downlink_block_decrypt(const struct pouch_buf *block, struct pouch_buf
     pouch_atomic_set_bit(&downlink.flags, SESSION_HAS_POUCH);
     // We can also update our replay protection:
     server.pouch_id = downlink.pouch.id;
+
     if (downlink.id.initiator == POUCH_ROLE_SERVER
         && downlink.id.type == SESSION_ID_TYPE_SEQUENTIAL)
     {
         server.seqnum = downlink.id.value.sequential.seqnum;
+        server.has_seqnum = true;
     }
 
     return 0;
