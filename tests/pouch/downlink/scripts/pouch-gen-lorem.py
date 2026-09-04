@@ -4,10 +4,10 @@ import json
 import struct
 from contextlib import contextmanager
 from itertools import batched
+from typing import Annotated
 
 import cbor2
 import typer
-from typing_extensions import Annotated
 
 LOREM_IPSUM = """\
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris varius leo sed elit rutrum, sit amet imperdiet velit suscipit. Curabitur eget iaculis quam. Quisque porta risus orci, id sodales enim ullamcorper et. Donec eleifend orci velit, vel efficitur diam hendrerit eu. Donec et tempor sapien. Fusce ultrices varius fermentum. Interdum et malesuada fames ac ante ipsum primis in faucibus. Duis maximus id elit vel rutrum. Vestibulum in turpis pharetra, venenatis dolor consequat, commodo ligula. Nunc ac mi viverra, accumsan sapien vitae, porta velit. Nam diam lacus, luctus in consectetur quis, congue eget sapien. Vivamus interdum, nisi quis viverra tempor, erat justo pulvinar urna, non condimentum tortor ligula molestie nisl. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam eu tempus quam.
