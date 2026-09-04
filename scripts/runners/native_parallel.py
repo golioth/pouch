@@ -26,11 +26,10 @@ from functools import cached_property
 from pathlib import Path
 
 import yaml
-
 from domains import Domain, Domains
+from signal_utils import interruptible_sigterm
 
 from runners.core import RunnerCaps, RunnerConfig, ZephyrBinaryRunner
-from signal_utils import interruptible_sigterm
 
 # ANSI color codes for domain prefixes (green, blue, yellow, cyan, magenta, red)
 _DOMAIN_COLORS = [32, 34, 33, 36, 35, 31]

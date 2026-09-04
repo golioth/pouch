@@ -12,9 +12,9 @@ from functools import cached_property
 from pathlib import Path
 
 from domains import Domain, Domains
+from signal_utils import interruptible_sigterm
 
 from runners.core import RunnerCaps, RunnerConfig, ZephyrBinaryRunner
-from signal_utils import interruptible_sigterm
 
 DEFAULT_GDB_PORT = 3333
 

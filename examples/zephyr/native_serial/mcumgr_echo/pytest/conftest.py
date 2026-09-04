@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Generator
 
 import pytest
-
 from twister_harness.device.device_adapter import DeviceAdapter
 
 sys.path.insert(
