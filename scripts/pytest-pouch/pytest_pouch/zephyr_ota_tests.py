@@ -10,6 +10,8 @@ import re
 import pytest
 from twister_harness.device.device_adapter import DeviceAdapter
 
+logger = logging.getLogger(__name__)
+
 pytestmark = pytest.mark.anyio
 
 OTA_DEFAULT_TIMEOUT_S = 60.0
@@ -22,7 +24,7 @@ OTA_REBOOT_TIMEOUT_S = 180.0
 async def test_ota_sha256(dut: DeviceAdapter, ota_update):
     expected_sha256 = ota_update
 
-    logging.info("Waiting for OTA download, expected SHA256=%s", expected_sha256)
+    logger.info("Waiting for OTA download, expected SHA256=%s", expected_sha256)
     lines = dut.readlines_until(
         regex=r"OTA computed SHA256: [0-9a-f]{64}", timeout=OTA_DOWNLOAD_TIMEOUT_S
     )
@@ -36,8 +38,8 @@ async def test_ota_sha256(dut: DeviceAdapter, ota_update):
 
     assert actual_sha256 is not None, "Device did not log OTA SHA256"
 
-    logging.info("Device SHA256: %s", actual_sha256)
-    logging.info("Expected SHA256: %s", expected_sha256)
+    logger.info("Device SHA256: %s", actual_sha256)
+    logger.info("Expected SHA256: %s", expected_sha256)
 
     assert actual_sha256 == expected_sha256, (
         f"SHA256 mismatch: device={actual_sha256}, expected={expected_sha256}"

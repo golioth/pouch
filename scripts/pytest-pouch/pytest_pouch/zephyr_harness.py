@@ -12,6 +12,8 @@ from pathlib import Path
 
 import pytest
 
+logger = logging.getLogger(__name__)
+
 _SIMULATOR_PLATFORMS = {
     "native_sim",
     "native_sim/native",
@@ -91,7 +93,7 @@ def fw_update_package(request, device_object) -> str | None:
 
 
 def _upload_credentials(serial_port, creds_dir):
-    logging.info("Uploading Pouch/HTTP credentials via smpmgr")
+    logger.info("Uploading Pouch/HTTP credentials via smpmgr")
     for local_name, remote_path in [
         ("crt.der", "/lfs1/credentials/crt.der"),
         ("key.der", "/lfs1/credentials/key.der"),
@@ -111,14 +113,14 @@ def _upload_credentials(serial_port, creds_dir):
             check=True,
         )
 
-        logging.info("Uploaded %s -> %s", local_name, remote_path)
+        logger.info("Uploaded %s -> %s", local_name, remote_path)
 
 
 def _provision_hardware(device_object, creds_dir):
     serial_port = device_object.device_config.serial_configs[0].port
     build_dir = device_object.device_config.build_dir
 
-    logging.info("Flashing firmware")
+    logger.info("Flashing firmware")
     flash_cmd = ["west", "flash", "--no-rebuild", "-d", str(build_dir)]
 
     west_flash_extra_args = device_object.device_config.west_flash_extra_args
@@ -127,7 +129,7 @@ def _provision_hardware(device_object, creds_dir):
 
     subprocess.run(flash_cmd, check=True)
 
-    logging.info("Waiting for device to boot")
+    logger.info("Waiting for device to boot")
     time.sleep(15)
 
     _upload_credentials(serial_port, creds_dir)
@@ -145,7 +147,7 @@ def dut(request, device_object, creds_dir, creds):
 
     device_object.launch()
 
-    logging.info("Waiting for device to boot and load credentials")
+    logger.info("Waiting for device to boot and load credentials")
     device_object.readlines_until(regex="Credentials loaded", timeout=60.0)
 
     yield device_object

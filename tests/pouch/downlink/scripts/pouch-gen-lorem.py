@@ -4,10 +4,10 @@ import json
 import struct
 from contextlib import contextmanager
 from itertools import batched
+from typing import Annotated
 
 import cbor2
 import typer
-from typing_extensions import Annotated
 
 LOREM_IPSUM = """\
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris varius leo sed elit rutrum, sit amet imperdiet velit suscipit. Curabitur eget iaculis quam. Quisque porta risus orci, id sodales enim ullamcorper et. Donec eleifend orci velit, vel efficitur diam hendrerit eu. Donec et tempor sapien. Fusce ultrices varius fermentum. Interdum et malesuada fames ac ante ipsum primis in faucibus. Duis maximus id elit vel rutrum. Vestibulum in turpis pharetra, venenatis dolor consequat, commodo ligula. Nunc ac mi viverra, accumsan sapien vitae, porta velit. Nam diam lacus, luctus in consectetur quis, congue eget sapien. Vivamus interdum, nisi quis viverra tempor, erat justo pulvinar urna, non condimentum tortor ligula molestie nisl. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam eu tempus quam.
@@ -97,14 +97,14 @@ class CInitializer:
     @contextmanager
     def array_or_struct(self, name: str | None, end: str = ",", cast: str = ""):
         if name:
-            self.out.write((self.indentation() + f".{name} = {cast}" + "{\n"))
+            self.out.write(self.indentation() + f".{name} = {cast}" + "{\n")
         else:
-            self.out.write((self.indentation() + "{\n"))
+            self.out.write(self.indentation() + "{\n")
 
         with self.indent():
             yield
 
-        self.out.write((self.indentation() + "}" + end + "\n"))
+        self.out.write(self.indentation() + "}" + end + "\n")
 
     @contextmanager
     def array(self, name: str | None = None, end: str = ",", cast: str = ""):
@@ -122,10 +122,10 @@ class CInitializer:
             yield
 
     def write(self, line: str):
-        self.out.write((self.indentation() + line))
+        self.out.write(self.indentation() + line)
 
     def writeln(self, line: str):
-        self.out.write((self.indentation() + line + "\n"))
+        self.out.write(self.indentation() + line + "\n")
 
     def write_batched(self, payload: str | bytes, n: int = 16):
         if isinstance(payload, str):

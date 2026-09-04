@@ -9,11 +9,10 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
 import pytest
-
 from twister_harness.device.device_adapter import DeviceAdapter
 
 sys.path.insert(

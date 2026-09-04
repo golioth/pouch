@@ -8,10 +8,9 @@ import logging
 import os
 import random
 import string
-import subprocess
 import sys
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
 sys.path.insert(
     0, str(Path(__file__).resolve().parents[4] / "scripts" / "pytest-pouch")
@@ -19,10 +18,12 @@ sys.path.insert(
 
 pytest_plugins = ["pytest_pouch.plugin"]
 
-import pytest  # noqa: E402
+import anyio
+import pytest
+from twister_harness.device.device_adapter import DeviceAdapter
+from twister_harness.twister_harness_config import TwisterHarnessConfig
 
-from twister_harness.device.device_adapter import DeviceAdapter  # noqa: E402
-from twister_harness.twister_harness_config import TwisterHarnessConfig  # noqa: E402
+logger = logging.getLogger(__name__)
 
 
 def pytest_addoption(parser):
@@ -123,25 +124,27 @@ async def gateway_creds(gateway_creds_dir, gateway, creds_dir, creds, project):
     ca_key = creds_dir / "ca.key.pem"
     ca_cert = creds_dir / "ca.crt.pem"
 
-    logging.info("Generate gateway device private key and cert (signed by shared CA)")
+    logger.info("Generate gateway device private key and cert (signed by shared CA)")
 
-    subprocess.run(
+    await anyio.run_process(
         f"openssl ecparam -name prime256v1 -genkey -noout -out {gateway.name}.key.pem",
         check=True,
-        shell=True,
         cwd=gateway_creds_dir,
+        stdout=None,
+        stderr=None,
     )
-    subprocess.run(
+    await anyio.run_process(
         f"""\
     openssl req -new \
         -key {gateway.name}.key.pem \
         -subj "/C=US/O={project.id}/CN={gateway.name}" \
         -out {gateway.name}.csr.pem""",
         check=True,
-        shell=True,
         cwd=gateway_creds_dir,
+        stdout=None,
+        stderr=None,
     )
-    subprocess.run(
+    await anyio.run_process(
         f"""\
     openssl x509 -req \
         -in "{gateway.name}.csr.pem" \
@@ -151,38 +154,42 @@ async def gateway_creds(gateway_creds_dir, gateway, creds_dir, creds, project):
         -out "{gateway.name}.crt.pem" \
         -days 500 -sha256""",
         check=True,
-        shell=True,
         cwd=gateway_creds_dir,
+        stdout=None,
+        stderr=None,
     )
 
-    logging.info("Convert gateway key and cert to DER format")
+    logger.info("Convert gateway key and cert to DER format")
 
-    subprocess.run(
+    await anyio.run_process(
         f"openssl x509 -in {gateway.name}.crt.pem -outform DER -out crt.der",
         check=True,
-        shell=True,
         cwd=gateway_creds_dir,
+        stdout=None,
+        stderr=None,
     )
-    subprocess.run(
+    await anyio.run_process(
         f"openssl ec -in {gateway.name}.key.pem -outform DER -out key.der",
         check=True,
-        shell=True,
         cwd=gateway_creds_dir,
+        stdout=None,
+        stderr=None,
     )
 
-    logging.info("Convert CA cert to DER for gateway DTLS")
+    logger.info("Convert CA cert to DER for gateway DTLS")
 
-    subprocess.run(
+    await anyio.run_process(
         f"openssl x509 -in {ca_cert} -outform DER -out ca.der",
         check=True,
-        shell=True,
         cwd=gateway_creds_dir,
+        stdout=None,
+        stderr=None,
     )
 
 
 @pytest.fixture(scope="module", autouse=True)
 async def setup(project, device, gateway, creds):
-    logging.info("Delete existing device-level LED setting")
+    logger.info("Delete existing device-level LED setting")
 
     settings = await device.settings.get_all()
     for setting in settings:
@@ -194,12 +201,12 @@ async def setup(project, device, gateway, creds):
         if "deviceId" in setting and setting["key"] == "LED":
             await gateway.settings.delete(setting["key"])
 
-    logging.info("Ensure the project-level LED setting exists")
+    logger.info("Ensure the project-level LED setting exists")
     await project.settings.set("LED", False)
 
     yield
 
-    logging.info("Delete any existing device-level LED settings (cleanup)")
+    logger.info("Delete any existing device-level LED settings (cleanup)")
 
     settings = await device.settings.get_all()
     for setting in settings:

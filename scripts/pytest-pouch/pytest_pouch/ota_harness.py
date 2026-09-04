@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+logger = logging.getLogger(__name__)
+
 pytestmark = pytest.mark.anyio
 
 
@@ -72,27 +74,31 @@ def pouch_ota_package(request: pytest.FixtureRequest, ota_mode: str) -> str:
 @pytest.fixture(scope="module")
 async def ota_cohort(project, device, test_id, artifacts_to_cleanup):
     cohort_name = f"{device.name.lower().replace('-', '_')}_{test_id}"
-    logging.info("Creating cohort '%s' for device '%s'", cohort_name, device.name)
+    logger.info("Creating cohort '%s' for device '%s'", cohort_name, device.name)
     cohort = await project.cohorts.create(cohort_name)
     await device.update_cohort(cohort.id)
 
     yield cohort
 
+    # Teardown talks to the Golioth REST API, which fails in more ways than we
+    # can enumerate (golioth.ApiException and its subclasses, httpx transport
+    # errors, malformed error bodies). A failed cleanup must never turn into a
+    # test failure, so the broad catches below are deliberate.
     try:
         await device.remove_cohort()
-    except Exception:
-        pass
+    except Exception:  # noqa: BLE001
+        logger.warning("Device %s could not be removed from its cohort", device.name)
 
     try:
         await project.cohorts.delete(cohort.id)
-    except Exception:
-        logging.warning("Cohort %s could not be deleted", cohort_name)
+    except Exception:  # noqa: BLE001
+        logger.warning("Cohort %s could not be deleted", cohort_name)
 
     for artifact_id in artifacts_to_cleanup:
         try:
             await project.artifacts.delete(artifact_id)
-        except Exception:
-            logging.warning("Artifact %s could not be deleted", artifact_id)
+        except Exception:  # noqa: BLE001
+            logger.warning("Artifact %s could not be deleted", artifact_id)
 
 
 @pytest.fixture(scope="module")
@@ -121,7 +127,7 @@ async def ota_update(
         image_path = tmp_path / "firmware.bin"
         image_path.write_bytes(image_data)
 
-        logging.info(
+        logger.info(
             "Uploading OTA artifact (dummy): %d bytes, SHA256=%s",
             image_size,
             expected_sha256,
@@ -134,7 +140,7 @@ async def ota_update(
         )
         artifacts_to_cleanup.append(artifact.id)
 
-        logging.info("Creating deployment on cohort '%s'", ota_cohort.name)
+        logger.info("Creating deployment on cohort '%s'", ota_cohort.name)
         await ota_cohort.deployments.create(
             f"ota-test-{device.name}-{test_id}",
             [artifact.id],
@@ -167,7 +173,7 @@ async def ota_update(
 
     if matching:
         artifact = matching[0]
-        logging.info(
+        logger.info(
             "Found existing artifact (id=%s) for package=%s, version=%s — skipping upload",
             artifact.id,
             pouch_ota_package,
@@ -175,7 +181,7 @@ async def ota_update(
         )
         artifacts_to_cleanup.append(artifact.id)
     else:
-        logging.info(
+        logger.info(
             "Uploading OTA artifact: %s, version=%s, package=%s",
             fw_bin,
             fw_update_ver,
@@ -188,7 +194,7 @@ async def ota_update(
         )
         artifacts_to_cleanup.append(artifact.id)
 
-    logging.info("Creating deployment on cohort '%s'", ota_cohort.name)
+    logger.info("Creating deployment on cohort '%s'", ota_cohort.name)
     await ota_cohort.deployments.create(
         f"ota-test-{device.name}-{test_id}",
         [artifact.id],

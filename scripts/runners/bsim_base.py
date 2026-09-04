@@ -12,9 +12,9 @@ from functools import cached_property
 from pathlib import Path
 
 from domains import Domain, Domains
+from signal_utils import interruptible_sigterm
 
 from runners.core import RunnerCaps, RunnerConfig, ZephyrBinaryRunner
-from signal_utils import interruptible_sigterm
 
 DEFAULT_GDB_PORT = 3333
 
@@ -173,9 +173,9 @@ class BsimBinaryRunnerBase(ZephyrBinaryRunner):
 
     @cached_property
     def domain(self) -> Domain:
-        return [
+        return next(
             d for d in self.domains_all if d.build_dir == self.build_conf.build_dir
-        ][0]
+        )
 
     @cached_property
     def foreground_domain(self) -> str:

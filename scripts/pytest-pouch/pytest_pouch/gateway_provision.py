@@ -17,6 +17,8 @@ from typing import BinaryIO
 import pytest
 import serial
 
+logger = logging.getLogger(__name__)
+
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -80,7 +82,7 @@ def gateway_creds(creds, creds_dir, gateway_creds_dir, gateway_cloud_device, pro
 
     name = gateway_cloud_device.name
 
-    logging.info("Generate gateway device private key and cert (signed by shared CA)")
+    logger.info("Generate gateway device private key and cert (signed by shared CA)")
 
     subprocess.run(
         f"openssl ecparam -name prime256v1 -genkey -noout -out {name}.key.pem",
@@ -112,7 +114,7 @@ def gateway_creds(creds, creds_dir, gateway_creds_dir, gateway_cloud_device, pro
         cwd=gateway_creds_dir,
     )
 
-    logging.info("Convert gateway key and cert to DER format")
+    logger.info("Convert gateway key and cert to DER format")
 
     subprocess.run(
         f"openssl x509 -in {name}.crt.pem -outform DER -out crt.der",
@@ -168,7 +170,7 @@ def _read_gateway_output(
         if stop_event.is_set():
             return
         if ready:
-            logging.exception("Gateway serial capture stopped")
+            logger.exception("Gateway serial capture stopped")
         else:
             status_queue.put(error)
 
@@ -202,7 +204,7 @@ def _capture_gateway_output(
             stop_event.set()
             reader.join(timeout=_GATEWAY_READER_JOIN_TIMEOUT_S)
             if reader.is_alive():
-                logging.error(
+                logger.error(
                     "Gateway serial reader did not stop within %.1fs",
                     _GATEWAY_READER_JOIN_TIMEOUT_S,
                 )
@@ -227,21 +229,24 @@ def _wait_for_gateway_ready(status_queue: queue.Queue[object], log_path: Path) -
 
     if status is _GATEWAY_READY:
         return
-    if isinstance(status, Exception):
-        raise RuntimeError(
-            f"Gateway serial capture failed before readiness; output is in {log_path}"
-        ) from status
-    raise RuntimeError(f"Unexpected gateway capture status: {status!r}")
+
+    cause = status if isinstance(status, Exception) else None
+    reason = (
+        f"serial capture failed before readiness; output is in {log_path}"
+        if cause is not None
+        else f"unexpected capture status: {status!r}"
+    )
+    raise RuntimeError(f"Gateway {reason}") from cause
 
 
 @pytest.fixture(scope="module", autouse=True)
 def provisioned_gateway(request, gateway_serial_port):
     if not gateway_serial_port:
-        logging.info("No gateway port configured; skipping gateway provisioning")
+        logger.info("No gateway port configured; skipping gateway provisioning")
         yield
         return
 
-    logging.info("Uploading gateway credentials via smpmgr")
+    logger.info("Uploading gateway credentials via smpmgr")
 
     request.getfixturevalue("gateway_creds")  # Need to generate the gateway credentials
     creds_dir = request.getfixturevalue("gateway_creds_dir")
@@ -263,9 +268,9 @@ def provisioned_gateway(request, gateway_serial_port):
             ],
             check=True,
         )
-        logging.info("Uploaded %s -> %s", local_name, remote_path)
+        logger.info("Uploaded %s -> %s", local_name, remote_path)
 
-    logging.info("Resetting gateway")
+    logger.info("Resetting gateway")
     subprocess.run(
         [
             "smpmgr",
@@ -277,13 +282,13 @@ def provisioned_gateway(request, gateway_serial_port):
         check=True,
     )
 
-    logging.info("Starting gateway serial capture to %s", log_path)
+    logger.info("Starting gateway serial capture to %s", log_path)
 
     with _capture_gateway_output(gateway_serial_port, log_path) as status_queue:
-        logging.info(
+        logger.info(
             "Waiting for gateway ready pattern: %s",
             _GATEWAY_READY_PATTERN.decode(),
         )
         _wait_for_gateway_ready(status_queue, log_path)
-        logging.info("Gateway provisioned and ready")
+        logger.info("Gateway provisioned and ready")
         yield

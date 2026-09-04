@@ -4,11 +4,11 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-import datetime
 import base64
-from dataclasses import dataclass
+import datetime
 import re
 import time
+from dataclasses import dataclass
 
 import anyio
 import pytest

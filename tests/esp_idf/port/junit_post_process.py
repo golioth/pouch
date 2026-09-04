@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-import sys
 import os
+import sys
 import xml.etree.ElementTree as ET
 from collections import defaultdict
 from pathlib import Path
@@ -99,7 +99,7 @@ def process_report(xml_path):
     try:
         tree.write(xml_path, encoding="utf-8", xml_declaration=True)
         print(f"Report updated: {total_tests} tests in {len(groups)} suites.")
-    except Exception as e:
+    except OSError as e:
         print(f"Failed to save the Junit xml file: {e}")
         return
 
