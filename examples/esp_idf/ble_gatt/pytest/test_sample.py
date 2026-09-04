@@ -11,4 +11,4 @@ sys.path.insert(
     0, str(Path(__file__).resolve().parents[4] / "scripts" / "pytest-pouch")
 )
 
-from pytest_pouch.esp_idf_sample_tests import *  # noqa: F403
+from pytest_pouch.esp_idf_sample_tests import *
