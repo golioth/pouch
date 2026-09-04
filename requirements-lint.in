@@ -1,2 +1,2 @@
-ruff==0.15.11
+ruff==0.16.5
 clang-format==22.1.3
