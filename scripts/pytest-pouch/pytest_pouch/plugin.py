@@ -5,9 +5,9 @@
 #
 
 import logging
-import subprocess
 from pathlib import Path
 
+import anyio
 import pytest
 
 logger = logging.getLogger(__name__)
@@ -140,42 +140,46 @@ async def creds(creds_dir, device, project):
 
     logger.info("Generate CA private key and cert")
 
-    subprocess.run(
+    await anyio.run_process(
         "openssl ecparam -name prime256v1 -genkey -noout -out ca.key.pem",
         check=True,
-        shell=True,
         cwd=creds_dir,
+        stdout=None,
+        stderr=None,
     )
-    subprocess.run(
+    await anyio.run_process(
         """\
     openssl req -x509 -new -nodes \
         -key ca.key.pem \
         -sha256 -subj "/C=US/CN=Root CA" \
         -days 14 -out ca.crt.pem""",
         check=True,
-        shell=True,
         cwd=creds_dir,
+        stdout=None,
+        stderr=None,
     )
 
     logger.info("Generate edge node private key, csr and cert")
 
-    subprocess.run(
+    await anyio.run_process(
         f"openssl ecparam -name prime256v1 -genkey -noout -out {device.name}.key.pem",
         check=True,
-        shell=True,
         cwd=creds_dir,
+        stdout=None,
+        stderr=None,
     )
-    subprocess.run(
+    await anyio.run_process(
         f"""\
     openssl req -new \
         -key {device.name}.key.pem \
         -subj "/C=US/O={project.id}/CN={device.name}" \
         -out {device.name}.csr.pem""",
         check=True,
-        shell=True,
         cwd=creds_dir,
+        stdout=None,
+        stderr=None,
     )
-    subprocess.run(
+    await anyio.run_process(
         f"""\
     openssl x509 -req \
         -in "{device.name}.csr.pem" \
@@ -185,23 +189,26 @@ async def creds(creds_dir, device, project):
         -out "{device.name}.crt.pem" \
         -days 500 -sha256""",
         check=True,
-        shell=True,
         cwd=creds_dir,
+        stdout=None,
+        stderr=None,
     )
 
     logger.info("Convert key and cert to DER format")
 
-    subprocess.run(
+    await anyio.run_process(
         f"openssl x509 -in {device.name}.crt.pem -outform DER -out crt.der",
         check=True,
-        shell=True,
         cwd=creds_dir,
+        stdout=None,
+        stderr=None,
     )
-    subprocess.run(
+    await anyio.run_process(
         f"openssl ec -in {device.name}.key.pem -outform DER -out key.der",
         check=True,
-        shell=True,
         cwd=creds_dir,
+        stdout=None,
+        stderr=None,
     )
 
     logger.info("Upload root public key to Golioth server")

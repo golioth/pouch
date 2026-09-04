@@ -8,7 +8,6 @@ import logging
 import os
 import random
 import string
-import subprocess
 import sys
 from collections.abc import Generator
 from pathlib import Path
@@ -19,6 +18,7 @@ sys.path.insert(
 
 pytest_plugins = ["pytest_pouch.plugin"]
 
+import anyio  # noqa: E402
 import pytest  # noqa: E402
 from twister_harness.device.device_adapter import DeviceAdapter  # noqa: E402
 from twister_harness.twister_harness_config import TwisterHarnessConfig  # noqa: E402
@@ -126,23 +126,25 @@ async def gateway_creds(gateway_creds_dir, gateway, creds_dir, creds, project):
 
     logger.info("Generate gateway device private key and cert (signed by shared CA)")
 
-    subprocess.run(
+    await anyio.run_process(
         f"openssl ecparam -name prime256v1 -genkey -noout -out {gateway.name}.key.pem",
         check=True,
-        shell=True,
         cwd=gateway_creds_dir,
+        stdout=None,
+        stderr=None,
     )
-    subprocess.run(
+    await anyio.run_process(
         f"""\
     openssl req -new \
         -key {gateway.name}.key.pem \
         -subj "/C=US/O={project.id}/CN={gateway.name}" \
         -out {gateway.name}.csr.pem""",
         check=True,
-        shell=True,
         cwd=gateway_creds_dir,
+        stdout=None,
+        stderr=None,
     )
-    subprocess.run(
+    await anyio.run_process(
         f"""\
     openssl x509 -req \
         -in "{gateway.name}.csr.pem" \
@@ -152,32 +154,36 @@ async def gateway_creds(gateway_creds_dir, gateway, creds_dir, creds, project):
         -out "{gateway.name}.crt.pem" \
         -days 500 -sha256""",
         check=True,
-        shell=True,
         cwd=gateway_creds_dir,
+        stdout=None,
+        stderr=None,
     )
 
     logger.info("Convert gateway key and cert to DER format")
 
-    subprocess.run(
+    await anyio.run_process(
         f"openssl x509 -in {gateway.name}.crt.pem -outform DER -out crt.der",
         check=True,
-        shell=True,
         cwd=gateway_creds_dir,
+        stdout=None,
+        stderr=None,
     )
-    subprocess.run(
+    await anyio.run_process(
         f"openssl ec -in {gateway.name}.key.pem -outform DER -out key.der",
         check=True,
-        shell=True,
         cwd=gateway_creds_dir,
+        stdout=None,
+        stderr=None,
     )
 
     logger.info("Convert CA cert to DER for gateway DTLS")
 
-    subprocess.run(
+    await anyio.run_process(
         f"openssl x509 -in {ca_cert} -outform DER -out ca.der",
         check=True,
-        shell=True,
         cwd=gateway_creds_dir,
+        stdout=None,
+        stderr=None,
     )
 
 
