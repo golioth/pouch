@@ -97,14 +97,14 @@ class CInitializer:
     @contextmanager
     def array_or_struct(self, name: str | None, end: str = ",", cast: str = ""):
         if name:
-            self.out.write((self.indentation() + f".{name} = {cast}" + "{\n"))
+            self.out.write(self.indentation() + f".{name} = {cast}" + "{\n")
         else:
-            self.out.write((self.indentation() + "{\n"))
+            self.out.write(self.indentation() + "{\n")
 
         with self.indent():
             yield
 
-        self.out.write((self.indentation() + "}" + end + "\n"))
+        self.out.write(self.indentation() + "}" + end + "\n")
 
     @contextmanager
     def array(self, name: str | None = None, end: str = ",", cast: str = ""):
@@ -122,10 +122,10 @@ class CInitializer:
             yield
 
     def write(self, line: str):
-        self.out.write((self.indentation() + line))
+        self.out.write(self.indentation() + line)
 
     def writeln(self, line: str):
-        self.out.write((self.indentation() + line + "\n"))
+        self.out.write(self.indentation() + line + "\n")
 
     def write_batched(self, payload: str | bytes, n: int = 16):
         if isinstance(payload, str):
