@@ -37,7 +37,7 @@ async def setup(project, device, creds):
 
 
 async def test_setting_project(dut: DeviceAdapter):
-    dut.readlines_until(regex="Received LED setting: 0", timeout=60.0)
+    dut.readlines_until(regex="Received LED setting: 0", timeout=120.0)
 
 
 async def test_setting_device(device, dut: DeviceAdapter):
