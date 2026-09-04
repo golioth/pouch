@@ -23,6 +23,8 @@ import pytest  # noqa: E402
 from twister_harness.device.device_adapter import DeviceAdapter  # noqa: E402
 from twister_harness.twister_harness_config import TwisterHarnessConfig  # noqa: E402
 
+logger = logging.getLogger(__name__)
+
 
 def pytest_addoption(parser):
     parser.addoption("--gateway-name", type=str, help="Golioth gateway name")
@@ -122,7 +124,7 @@ async def gateway_creds(gateway_creds_dir, gateway, creds_dir, creds, project):
     ca_key = creds_dir / "ca.key.pem"
     ca_cert = creds_dir / "ca.crt.pem"
 
-    logging.info("Generate gateway device private key and cert (signed by shared CA)")
+    logger.info("Generate gateway device private key and cert (signed by shared CA)")
 
     subprocess.run(
         f"openssl ecparam -name prime256v1 -genkey -noout -out {gateway.name}.key.pem",
@@ -154,7 +156,7 @@ async def gateway_creds(gateway_creds_dir, gateway, creds_dir, creds, project):
         cwd=gateway_creds_dir,
     )
 
-    logging.info("Convert gateway key and cert to DER format")
+    logger.info("Convert gateway key and cert to DER format")
 
     subprocess.run(
         f"openssl x509 -in {gateway.name}.crt.pem -outform DER -out crt.der",
@@ -169,7 +171,7 @@ async def gateway_creds(gateway_creds_dir, gateway, creds_dir, creds, project):
         cwd=gateway_creds_dir,
     )
 
-    logging.info("Convert CA cert to DER for gateway DTLS")
+    logger.info("Convert CA cert to DER for gateway DTLS")
 
     subprocess.run(
         f"openssl x509 -in {ca_cert} -outform DER -out ca.der",
@@ -181,7 +183,7 @@ async def gateway_creds(gateway_creds_dir, gateway, creds_dir, creds, project):
 
 @pytest.fixture(scope="module", autouse=True)
 async def setup(project, device, gateway, creds):
-    logging.info("Delete existing device-level LED setting")
+    logger.info("Delete existing device-level LED setting")
 
     settings = await device.settings.get_all()
     for setting in settings:
@@ -193,12 +195,12 @@ async def setup(project, device, gateway, creds):
         if "deviceId" in setting and setting["key"] == "LED":
             await gateway.settings.delete(setting["key"])
 
-    logging.info("Ensure the project-level LED setting exists")
+    logger.info("Ensure the project-level LED setting exists")
     await project.settings.set("LED", False)
 
     yield
 
-    logging.info("Delete any existing device-level LED settings (cleanup)")
+    logger.info("Delete any existing device-level LED settings (cleanup)")
 
     settings = await device.settings.get_all()
     for setting in settings:
