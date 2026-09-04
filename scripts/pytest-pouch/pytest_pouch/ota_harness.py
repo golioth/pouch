@@ -80,20 +80,24 @@ async def ota_cohort(project, device, test_id, artifacts_to_cleanup):
 
     yield cohort
 
+    # Teardown talks to the Golioth REST API, which fails in more ways than we
+    # can enumerate (golioth.ApiException and its subclasses, httpx transport
+    # errors, malformed error bodies). A failed cleanup must never turn into a
+    # test failure, so the broad catches below are deliberate.
     try:
         await device.remove_cohort()
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     try:
         await project.cohorts.delete(cohort.id)
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.warning("Cohort %s could not be deleted", cohort_name)
 
     for artifact_id in artifacts_to_cleanup:
         try:
             await project.artifacts.delete(artifact_id)
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.warning("Artifact %s could not be deleted", artifact_id)
 
 
