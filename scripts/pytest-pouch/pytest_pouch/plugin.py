@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+logger = logging.getLogger(__name__)
+
 _OTA_MODES = {
     "firmware": "default; real update binary",
     "dummy": "random bytes, SHA256 verification",
@@ -136,7 +138,7 @@ def creds_dir(request: pytest.FixtureRequest):
 async def creds(creds_dir, device, project):
     creds_dir.mkdir(mode=0o755, exist_ok=True, parents=True)
 
-    logging.info("Generate CA private key and cert")
+    logger.info("Generate CA private key and cert")
 
     subprocess.run(
         "openssl ecparam -name prime256v1 -genkey -noout -out ca.key.pem",
@@ -155,7 +157,7 @@ async def creds(creds_dir, device, project):
         cwd=creds_dir,
     )
 
-    logging.info("Generate edge node private key, csr and cert")
+    logger.info("Generate edge node private key, csr and cert")
 
     subprocess.run(
         f"openssl ecparam -name prime256v1 -genkey -noout -out {device.name}.key.pem",
@@ -187,7 +189,7 @@ async def creds(creds_dir, device, project):
         cwd=creds_dir,
     )
 
-    logging.info("Convert key and cert to DER format")
+    logger.info("Convert key and cert to DER format")
 
     subprocess.run(
         f"openssl x509 -in {device.name}.crt.pem -outform DER -out crt.der",
@@ -202,7 +204,7 @@ async def creds(creds_dir, device, project):
         cwd=creds_dir,
     )
 
-    logging.info("Upload root public key to Golioth server")
+    logger.info("Upload root public key to Golioth server")
 
     with open(creds_dir / "ca.crt.pem", "rb") as f:
         cert_pem = f.read()

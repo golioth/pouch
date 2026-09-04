@@ -9,24 +9,26 @@ import logging
 import pytest
 from twister_harness.device.device_adapter import DeviceAdapter
 
+logger = logging.getLogger(__name__)
+
 pytestmark = pytest.mark.anyio
 
 
 @pytest.fixture(scope="module", autouse=True)
 async def setup(project, device, creds):
-    logging.info("Delete existing device-level LED setting")
+    logger.info("Delete existing device-level LED setting")
 
     settings = await device.settings.get_all()
     for setting in settings:
         if "deviceId" in setting and setting["key"] == "LED":
             await device.settings.delete(setting["key"])
 
-    logging.info("Ensure the project-level LED setting exists")
+    logger.info("Ensure the project-level LED setting exists")
     await project.settings.set("LED", False)
 
     yield
 
-    logging.info("Delete any existing device-level LED settings (cleanup)")
+    logger.info("Delete any existing device-level LED settings (cleanup)")
 
     settings = await device.settings.get_all()
     for setting in settings:
@@ -39,7 +41,7 @@ async def test_setting_project(dut: DeviceAdapter):
 
 
 async def test_setting_device(device, dut: DeviceAdapter):
-    logging.info("Set device-level setting")
+    logger.info("Set device-level setting")
     await device.settings.set("LED", True)
 
     dut.readlines_until(regex="Received LED setting: 1", timeout=60.0)

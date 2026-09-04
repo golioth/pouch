@@ -9,6 +9,8 @@ import logging
 import pytest
 from twister_harness.device.device_adapter import DeviceAdapter
 
+logger = logging.getLogger(__name__)
+
 pytestmark = pytest.mark.anyio
 
 
@@ -21,7 +23,7 @@ async def test_setting_project(dut: DeviceAdapter):
 
 
 async def test_setting_device(gateway, dut: DeviceAdapter):
-    logging.info("Set device-level setting on gateway")
+    logger.info("Set device-level setting on gateway")
     await gateway.settings.set("LED", True)
 
     dut.readlines_until(regex="Received LED setting: 1")
