@@ -18,10 +18,10 @@ sys.path.insert(
 
 pytest_plugins = ["pytest_pouch.plugin"]
 
-import anyio  # noqa: E402
-import pytest  # noqa: E402
-from twister_harness.device.device_adapter import DeviceAdapter  # noqa: E402
-from twister_harness.twister_harness_config import TwisterHarnessConfig  # noqa: E402
+import anyio
+import pytest
+from twister_harness.device.device_adapter import DeviceAdapter
+from twister_harness.twister_harness_config import TwisterHarnessConfig
 
 logger = logging.getLogger(__name__)
 
