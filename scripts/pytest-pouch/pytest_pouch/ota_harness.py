@@ -87,7 +87,7 @@ async def ota_cohort(project, device, test_id, artifacts_to_cleanup):
     try:
         await device.remove_cohort()
     except Exception:  # noqa: BLE001
-        pass
+        logger.warning("Device %s could not be removed from its cohort", device.name)
 
     try:
         await project.cohorts.delete(cohort.id)
