@@ -164,9 +164,6 @@ jobs:
         - /dev:/dev
         - /home/golioth/credentials:/opt/credentials
       options: --privileged
-      env:
-        ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-1.0.1
-
 
     steps:
       - name: Checkout repository
