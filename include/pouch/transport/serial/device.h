@@ -57,3 +57,8 @@ int pouch_serial_device_recv(const void *frame, size_t len);
  * @return Number of bytes written to the buffer.
  */
 size_t pouch_serial_device_frame_get(uint8_t *buf, size_t maxlen);
+
+/**
+ * Perform a sync with the broker.
+ */
+void pouch_serial_device_sync(void);

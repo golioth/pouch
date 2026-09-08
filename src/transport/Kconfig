@@ -5,9 +5,30 @@
 # Note: This file must be sourced by each port transport Kconfig file.
 # This is approach is brittle and should be improved in future work.
 
+choice POUCH_TRANSPORT
+    prompt "Transport protocol"
+    optional
+    help
+      The transport protocol to use for communicating with Golioth.
+
+endchoice
+
 config POUCH_TRANSPORT_SAR
   bool "Enable SAR core transport support" if ZTEST
   help
     Enable shared Segmentation and Reassembly (SAR) sender/receiver
     packetization support used by transport backends and transport unit
     tests.
+    bool # Selected by transports that require Segmentation and Reassembly (SAR)
+
+menu "Transport Segmentation and Reassembly"
+    visible if POUCH_TRANSPORT_SAR
+
+config POUCH_TRANSPORT_ACK_TIMEOUT_MS
+    int "Pouch Transport ACK timeout (ms)"
+    default 1000
+    help
+        The timeout, in milliseconds, that a receiver will wait
+        for new packets before retransmitting an acknowledgement
+
+endmenu # SAR options
