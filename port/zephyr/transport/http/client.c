@@ -47,7 +47,6 @@ static struct sync_context
 {
     atomic_t flags;
     struct http_request *req;
-    struct pouch_uplink *uplink;
 
     uint32_t rcv_offset;
 
@@ -187,10 +186,7 @@ static int pouch_http_response_callback(struct http_response *rsp,
     return 0;
 }
 
-static int get_data_from_pouch(struct pouch_uplink *uplink,
-                               uint8_t *buf,
-                               size_t *buf_len,
-                               bool *is_last)
+static int get_data_from_pouch(uint8_t *buf, size_t *buf_len, bool *is_last)
 {
     int err;
     enum pouch_result res = POUCH_ERROR;
@@ -199,7 +195,7 @@ static int get_data_from_pouch(struct pouch_uplink *uplink,
     while (true)
     {
         *buf_len = buf_size; /* restore buf_len after each loop because it's in/out */
-        res = pouch_uplink_fill(uplink, buf, buf_len);
+        res = pouch_uplink_fill(buf, buf_len);
         if (POUCH_ERROR == res)
         {
             LOG_ERR("Error getting pouch data: %d", res);
@@ -212,7 +208,7 @@ static int get_data_from_pouch(struct pouch_uplink *uplink,
             return 0;
         }
 
-        err = pouch_wait_for_queue(uplink, POUCH_MSEC_INTERNAL(100));
+        err = pouch_wait_for_queue(POUCH_MSEC_INTERNAL(100));
         if (0 != err)
         {
             LOG_ERR("Failed to receive uplink blocks");
@@ -242,17 +238,24 @@ static int pouch_http_payload_callback(int sock, struct http_request *req, void 
     char chunk_header[16];
     int chunk_header_len;
 
-    sync->uplink = pouch_uplink_start();
-    if (NULL == sync->uplink)
+    err = pouch_uplink_start();
+    if (0 != err)
     {
         LOG_ERR("Failed to start uplink");
-        return -ENOMEM;
+        return err;
+    }
+
+    err = pouch_uplink_pouch_open();
+    if (0 != err)
+    {
+        LOG_ERR("Failed to open uplink pouch: %d", err);
+        return err;
     }
 
     while (false == is_last)
     {
         pouch_data_len = sizeof(sync->scratch);
-        err = get_data_from_pouch(sync->uplink, sync->scratch, &pouch_data_len, &is_last);
+        err = get_data_from_pouch(sync->scratch, &pouch_data_len, &is_last);
         if (0 != err)
         {
             goto finish_with_error;
@@ -311,7 +314,7 @@ static int pouch_http_payload_callback(int sock, struct http_request *req, void 
     err = 0;
 
 finish_with_error:
-    pouch_uplink_finish(sync->uplink);
+    pouch_uplink_pouch_close();
     return err;
 }
 
@@ -407,6 +410,7 @@ finish:
 static void close_socket(void)
 {
     pouch_downlink_finish();
+    pouch_uplink_finish();
     zsock_close(_sock);
     _sock = -1;
     atomic_clear_bit(&pouch_cert_flags, POUCH_CERT_UPLOADED_BIT);

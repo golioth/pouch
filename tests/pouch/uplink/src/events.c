@@ -8,6 +8,7 @@
 
 static uint32_t start_events;
 static uint32_t end_events;
+static uint32_t pouch_open_events;
 
 #define DEVICE_ID "test-device-id"
 
@@ -37,6 +38,9 @@ static void event_handler(enum pouch_event event, void *ctx)
         case POUCH_EVENT_SESSION_END:
             end_events++;
             break;
+        case POUCH_EVENT_POUCH_OPEN:
+            pouch_open_events++;
+            break;
         default:
             zassert_unreachable("Unexpected event %d", event);
             break;
@@ -50,23 +54,47 @@ POUCH_EVENT_HANDLER(event_handler, NULL);
 ZTEST(events, test_start_event)
 {
     start_events = 0;
+    pouch_open_events = 0;
     k_sem_reset(&event_rcvd);
 
+    // transport_session_start() starts the session and opens the first pouch,
+    // so both a session-start and a pouch-open event are emitted:
     transport_session_start();
     zassert_equal(k_sem_take(&event_rcvd, EVENT_TIMEOUT), 0);
+    zassert_equal(k_sem_take(&event_rcvd, EVENT_TIMEOUT), 0);
     zassert_equal(start_events, 1);
+    zassert_equal(pouch_open_events, 1);
     transport_session_end();
     zassert_equal(k_sem_take(&event_rcvd, EVENT_TIMEOUT), 0);
 }
 
+ZTEST(events, test_pouch_open_event)
+{
+    pouch_open_events = 0;
+    k_sem_reset(&event_rcvd);
+
+    transport_session_start();
+    zassert_equal(k_sem_take(&event_rcvd, EVENT_TIMEOUT), 0);  // SESSION_START
+    zassert_equal(k_sem_take(&event_rcvd, EVENT_TIMEOUT), 0);  // POUCH_OPEN
+    zassert_equal(pouch_open_events, 1);
+
+    zassert_ok(transport_pouch_close());
+    zassert_ok(transport_pouch_open());
+    zassert_equal(k_sem_take(&event_rcvd, EVENT_TIMEOUT), 0);  // POUCH_OPEN
+    zassert_equal(pouch_open_events, 2);
+
+    transport_session_end();
+    zassert_equal(k_sem_take(&event_rcvd, EVENT_TIMEOUT), 0);  // SESSION_END
+}
 
 ZTEST(events, test_end_event)
 {
     end_events = 0;
 
     transport_session_start();
-    zassert_equal(k_sem_take(&event_rcvd, EVENT_TIMEOUT), 0);
+    zassert_equal(k_sem_take(&event_rcvd, EVENT_TIMEOUT), 0);  // SESSION_START
+    zassert_equal(k_sem_take(&event_rcvd, EVENT_TIMEOUT), 0);  // POUCH_OPEN
     transport_session_end();
-    zassert_equal(k_sem_take(&event_rcvd, EVENT_TIMEOUT), 0);
+    zassert_equal(k_sem_take(&event_rcvd, EVENT_TIMEOUT), 0);  // SESSION_END
     zassert_equal(end_events, 1);
 }

@@ -10,6 +10,12 @@ void transport_session_start(void);
 
 void transport_session_end(void);
 
+/** Open a new pouch within a session already started with transport_session_start(). */
+int transport_pouch_open(void);
+
+/** Close the currently open pouch without ending the session. */
+int transport_pouch_close(void);
+
 enum pouch_result transport_pull_data(uint8_t *dst, size_t *len);
 
 void transport_flush(void);

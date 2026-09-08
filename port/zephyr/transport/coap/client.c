@@ -430,6 +430,9 @@ void pouch_coap_close_connection(void)
         coap_sock = -1;
     }
 
+    /* Safe to call even if no session was ever started. */
+    pouch_uplink_finish();
+
     atomic_clear_bit(&cert_flow_flags, POUCH_CERT_UPLOADED_BIT);
     atomic_clear_bit(&cert_flow_flags, SERVER_CERT_DOWNLOADED_BIT);
 }
@@ -573,18 +576,17 @@ static int pouch_uplink_chunk_cb(uint8_t *buf,
                                  bool *is_last,
                                  void *user_data)
 {
-    struct pouch_uplink *uplink = user_data;
     size_t total = 0;
     int err;
 
     while (total < buf_size)
     {
         size_t requested = buf_size - total;
-        enum pouch_result res = pouch_uplink_fill(uplink, buf + total, &requested);
+        enum pouch_result res = pouch_uplink_fill(buf + total, &requested);
 
         if (res == POUCH_ERROR)
         {
-            return pouch_uplink_error(uplink);
+            return pouch_uplink_error();
         }
 
         total += requested;
@@ -598,7 +600,7 @@ static int pouch_uplink_chunk_cb(uint8_t *buf,
 
         if (requested == 0)
         {
-            err = pouch_wait_for_queue(uplink, POUCH_MSEC_INTERNAL(100));
+            err = pouch_wait_for_queue(POUCH_MSEC_INTERNAL(100));
             if (err)
             {
                 LOG_ERR("Failed to wait for uplink queue: %d", err);
@@ -615,23 +617,32 @@ static int pouch_uplink_chunk_cb(uint8_t *buf,
 static int pouch_coap_send_uplink(void)
 {
     struct pouch_sync_state state = {0};
-    struct pouch_uplink *uplink;
     int err;
 
-    uplink = pouch_uplink_start();
-    if (uplink == NULL)
+    /* Start a session for the lifetime of this connection - individual syncs
+     * open and close their own pouch within it (see pouch_coap_send_uplink()).
+     */
+    err = pouch_uplink_start();
+    if (err)
     {
-        LOG_ERR("Failed to start uplink");
-        return -ENOMEM;
+        LOG_ERR("Failed to start uplink session: %d", err);
+        return err;
+    }
+
+    err = pouch_uplink_pouch_open();
+    if (err)
+    {
+        LOG_ERR("Failed to open uplink pouch: %d", err);
+        return err;
     }
 
     err = pouch_coap_blockwise_post_streaming(COAP_PATH_POUCH,
                                               pouch_uplink_chunk_cb,
-                                              uplink,
+                                              NULL,
                                               pouch_coap_sync_block2_cb,
                                               &state);
 
-    pouch_uplink_finish(uplink);
+    pouch_uplink_pouch_close();
     pouch_downlink_finish();
 
     if (err)

@@ -8,40 +8,39 @@
 
 #include <zephyr/ztest.h>
 
-static struct pouch_uplink *uplink;
-
 void transport_session_start(void)
 {
-    zassert_is_null(uplink, "uplink is not NULL");
-    uplink = pouch_uplink_start();
+    zassert_ok(pouch_uplink_start(), "session failed to start");
+    zassert_ok(pouch_uplink_pouch_open(), "pouch failed to open");
 }
 
 void transport_session_end(void)
 {
-    zassert_not_null(uplink, "uplink is NULL");
-    pouch_uplink_finish(uplink);
-    uplink = NULL;
+    pouch_uplink_pouch_close();
+    pouch_uplink_finish();
+}
+
+int transport_pouch_open(void)
+{
+    return pouch_uplink_pouch_open();
+}
+
+int transport_pouch_close(void)
+{
+    return pouch_uplink_pouch_close();
 }
 
 enum pouch_result transport_pull_data(uint8_t *dst, size_t *len)
 {
-    zassert_not_null(uplink, "uplink is NULL");
-    return pouch_uplink_fill(uplink, dst, len);
+    return pouch_uplink_fill(dst, len);
 }
 
-void transport_flush(void)
-{
-    zassert_not_null(uplink, "uplink is NULL");
-}
+void transport_flush(void) {}
 
 void transport_reset(void *unused)
 {
     // purge the uplink:
-    if (!uplink)
-    {
-        uplink = pouch_uplink_start();
-    }
-
+    (void) pouch_uplink_start();
     pouch_uplink_close(K_NO_WAIT);
     // let processing run:
     k_sleep(K_MSEC(1));
@@ -50,16 +49,14 @@ void transport_reset(void *unused)
     {
         uint8_t buf[CONFIG_POUCH_BLOCK_SIZE];
         size_t len = CONFIG_POUCH_BLOCK_SIZE;
-        if (pouch_uplink_fill(uplink, buf, &len) != POUCH_MORE_DATA || len == 0)
+        if (pouch_uplink_fill(buf, &len) != POUCH_MORE_DATA || len == 0)
         {
             break;
         }
     }
 
-    pouch_uplink_finish(uplink);
+    pouch_uplink_finish();
 
     // let processing run:
     k_sleep(K_MSEC(1));
-
-    uplink = NULL;
 }
