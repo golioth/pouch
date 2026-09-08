@@ -175,8 +175,24 @@ jobs:
           path: pouch
 
       - name: Init and update west
+        shell: bash
         run: |
-          rm -rf zephyr
+          # Run a command in its own log group and report how long it took, so
+          # that a slow step can be attributed to a single command.
+          timed() {
+            local label="$1"; shift
+            local start=$SECONDS
+            echo "::group::$label"
+            "$@"
+            local rc=$?
+            echo "::endgroup::"
+            echo "TIMING: '$label' took $((SECONDS - start))s"
+            return $rc
+          }
+
+          step_start=$SECONDS
+
+          timed "rm -rf zephyr" rm -rf zephyr
 
           mkdir -p .west
           cat <<EOF > .west/config
@@ -188,19 +204,25 @@ jobs:
           base = zephyr
           EOF
 
-          west update --narrow -o=--depth=1
+          timed "west update" \
+            west -v update --narrow -o=--depth=1
+
           git config --global user.email user@git-scm.com
           git config --global user.name "Git User"
 
-          uv pip install                                  \
+          timed "uv pip install zephyr requirements" \
+            uv pip install                                  \
             -r zephyr/scripts/requirements-base.txt       \
             -r zephyr/scripts/requirements-build-test.txt \
             -r zephyr/scripts/requirements-run-test.txt   \
             git+https://github.com/golioth/python-golioth-tools@v0.7.0
 
-          uv pip install                        \
+          timed "uv pip install pouch requirements" \
+            uv pip install                        \
             -r pouch/requirements-ci-zephyr.txt \
             --require-hashes
+
+          echo "TIMING: whole step took $((SECONDS - step_start))s"
 
       - name: Power On USB Hub
         run: python3 /opt/golioth-scripts/usb_hub_power.py on
