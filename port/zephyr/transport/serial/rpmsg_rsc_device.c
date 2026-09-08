@@ -16,6 +16,9 @@
 #include <addr_translation.h>
 
 #include <pouch/transport/serial/device.h>
+#if defined(CONFIG_POUCH_SERIAL_FW_RELAY)
+#include <pouch/transport/serial/fw.h>
+#endif
 
 #include <errno.h>
 #include <stdint.h>
@@ -110,6 +113,22 @@ static int pouch_ept_cb(struct rpmsg_endpoint *ept,
 
     rx_frames++;
     LOG_DBG("rx %u: %zu bytes, hdr 0x%02x", rx_frames, len, ((const uint8_t *) data)[0]);
+
+#if defined(CONFIG_POUCH_SERIAL_FW_RELAY)
+    /* Stall while the firmware relay is backed up. Not returning from this
+     * callback leaves the receive buffer unreturned, so the host's write(2)
+     * blocks and the backpressure reaches the broker. Without it a fast link
+     * delivers a whole component faster than the relay drains and the downlink
+     * heap-allocates itself to death. The transmit thread keeps draining the
+     * firmware channel meanwhile, which is what clears the pressure.
+     */
+    for (uint32_t waited = 0;
+         pouch_serial_fw_pressure() && waited < CONFIG_POUCH_RPMSG_RSC_DEVICE_RX_STALL_MS;
+         waited += 2)
+    {
+        k_sleep(K_MSEC(2));
+    }
+#endif
 
     int err = pouch_serial_device_recv(data, len);
     if (err)

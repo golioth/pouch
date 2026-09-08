@@ -21,6 +21,37 @@ config POUCH_TRANSPORT_SERIAL_DEVICE
         runs on the node device and communicates with a gateway running the
         broker implementation.
 
+menuconfig POUCH_SERIAL_FW_RELAY
+    bool "MCU-mediated firmware relay"
+    depends on POUCH_TRANSPORT_SERIAL_DEVICE
+    help
+        Relay this core's own firmware image to the broker over the Pouch
+        Serial firmware channels, for cores that remoteproc loads from the
+        host filesystem at every boot and so have no flash of their own to
+        write an update into. The core stays the authenticated Pouch endpoint:
+        it downloads its image through Pouch OTA and streams the plaintext out,
+        and the host verifies it and applies it.
+
+        Off by default. The channel ids exist unconditionally so that every
+        build agrees on the wire format, but a device that does not enable this
+        leaves them unconfigured and pays neither the relay buffer nor the code.
+
+        Requires a broker that collects the firmware channel; the in-tree
+        broker does not.
+
+if POUCH_SERIAL_FW_RELAY
+
+config POUCH_SERIAL_FW_BUF_SIZE
+    int "Firmware relay buffer size"
+    default 8192
+    help
+        Bytes of the firmware image held in RAM while relaying it to the
+        broker. The broker collects the firmware channel alongside the downlink
+        that feeds it, so this only has to cover the gap between the two - the
+        image is never resident.
+
+endif # POUCH_SERIAL_FW_RELAY
+
 menuconfig POUCH_RPMSG_RSC_DEVICE
     bool "Pouch rpmsg device transport adapter (resource table)"
     depends on POUCH_TRANSPORT_SERIAL_DEVICE
@@ -67,7 +98,19 @@ config POUCH_RPMSG_RSC_DEVICE_TX_THREAD_PRIORITY
     default 4
     help
         Must be above the management thread so the Pouch work queue keeps
-        draining what the receive callback delivers.
+        draining what the receive callback delivers, and so the firmware
+        channel keeps draining while the receive callback stalls on it.
+
+config POUCH_RPMSG_RSC_DEVICE_RX_STALL_MS
+    int "How long the receive path stalls on firmware relay pressure (ms)"
+    depends on POUCH_SERIAL_FW_RELAY
+    default 5000
+    help
+        While the firmware relay buffer is more than half full the receive
+        callback waits rather than taking more downlink off the wire, which
+        makes the host's write(2) block and pushes the backpressure back to
+        the broker. Capped so a broker that never collects the firmware
+        channel cannot wedge the link.
 
 config POUCH_RPMSG_RSC_DEVICE_TX_WAIT_MS
     int "How long to wait for a free rpmsg TX buffer (ms)"

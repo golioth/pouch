@@ -256,3 +256,52 @@ const struct pouch_endpoint pouch_device_endpoint_uplink = {
     .send = d_uplink_send,
     .end = d_uplink_end,
 };
+
+/* FW_STATUS: device receives the broker's apply verdict (receiver) */
+
+static int d_fw_status_start(struct pouch_bearer *bearer)
+{
+    (void) bearer;
+    device_stubs.fw_status.rx_len = 0;
+    device_stubs.fw_status.start_count++;
+    return device_stubs.fw_status.start_err;
+}
+
+static int d_fw_status_recv(struct pouch_bearer *bearer, const void *buf, size_t len)
+{
+    (void) bearer;
+    if (device_stubs.fw_status.recv_err != 0)
+    {
+        return device_stubs.fw_status.recv_err;
+    }
+    receiver_push(&device_stubs.fw_status, buf, len);
+    return 0;
+}
+
+/* No end() callback, matching the real pouch_device_endpoint_fw_status. */
+const struct pouch_endpoint pouch_device_endpoint_fw_status = {
+    .start = d_fw_status_start,
+    .recv = d_fw_status_recv,
+};
+
+/* FW: device relays the firmware image to the broker (sender) */
+
+static int d_fw_start(struct pouch_bearer *bearer)
+{
+    device_stubs.fw.bearer = bearer;
+    device_stubs.fw.tx_offset = 0;
+    device_stubs.fw.start_count++;
+    return device_stubs.fw.start_err;
+}
+
+static enum pouch_result d_fw_send(struct pouch_bearer *bearer, void *dst, size_t *dst_len)
+{
+    (void) bearer;
+    return sender_fill(&device_stubs.fw, dst, dst_len);
+}
+
+/* No end() callback, matching the real pouch_device_endpoint_fw. */
+const struct pouch_endpoint pouch_device_endpoint_fw = {
+    .start = d_fw_start,
+    .send = d_fw_send,
+};

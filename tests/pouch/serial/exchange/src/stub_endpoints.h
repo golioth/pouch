@@ -62,6 +62,8 @@ struct device_stubs
     struct stub_sender device_cert;
     struct stub_receiver downlink;
     struct stub_sender uplink;
+    struct stub_receiver fw_status;
+    struct stub_sender fw;
 };
 
 extern struct broker_stubs broker_stubs;

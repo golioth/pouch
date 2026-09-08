@@ -20,6 +20,10 @@ target_include_directories(app PRIVATE
 # builds serial sources in isolation, define it directly.
 target_compile_definitions(app PRIVATE CONFIG_POUCH_SERIAL_LOG_LEVEL=3)
 
+# The device channel table only carries the firmware channels when the relay
+# is enabled, and these suites stub those endpoints, so enable it here.
+target_compile_definitions(app PRIVATE CONFIG_POUCH_SERIAL_FW_RELAY=1)
+
 # Serial transport sources (device side only, no broker)
 target_sources(app PRIVATE
     ${POUCH_DIR}/src/transport/serial/device.c

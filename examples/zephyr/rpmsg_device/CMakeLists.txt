@@ -11,3 +11,7 @@ target_sources(app PRIVATE
   src/main.c
   src/credentials.c
 )
+
+if(CONFIG_POUCH_SERIAL_FW_RELAY)
+  target_sources(app PRIVATE src/fw_relay.c)
+endif()

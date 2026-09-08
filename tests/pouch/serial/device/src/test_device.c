@@ -212,6 +212,8 @@ static void reset_stubs(void)
     stub_sender_reset(&device_stubs.device_cert);
     stub_receiver_reset(&device_stubs.downlink);
     stub_sender_reset(&device_stubs.uplink);
+    stub_receiver_reset(&device_stubs.fw_status);
+    stub_sender_reset(&device_stubs.fw);
 }
 
 /* ---- Test fixture -------------------------------------------------------- */

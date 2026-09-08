@@ -21,6 +21,10 @@ static struct pouch_serial serial = {
             [POUCH_SERIAL_CH_DEVICE_CERT] = CHANNEL(&pouch_device_endpoint_device_cert),
             [POUCH_SERIAL_CH_DOWNLINK] = CHANNEL(&pouch_device_endpoint_downlink),
             [POUCH_SERIAL_CH_UPLINK] = CHANNEL(&pouch_device_endpoint_uplink),
+#if defined(CONFIG_POUCH_SERIAL_FW_RELAY)
+            [POUCH_SERIAL_CH_FW_STATUS] = CHANNEL(&pouch_device_endpoint_fw_status),
+            [POUCH_SERIAL_CH_FW] = CHANNEL(&pouch_device_endpoint_fw),
+#endif
         },
 };
 
