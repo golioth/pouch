@@ -1,0 +1,298 @@
+// Package gateway runs Pouch sync sessions between a device on a frame link and
+// a Pouch-compatible cloud.
+package gateway
+
+import (
+	"context"
+	"crypto/x509"
+	"encoding/pem"
+	"fmt"
+	"log/slog"
+	"sync"
+
+	"github.com/fxamacker/cbor/v2"
+
+	"github.com/golioth/pouch/examples/linux/rpmsg_gateway/internal/serial"
+)
+
+// infoFlagDeviceProvisioned is set by the device once the cloud holds its
+// certificate. The remaining seven bits are unused - the natural place for a
+// future capability exchange.
+const infoFlagDeviceProvisioned = 1 << 0
+
+// deviceInfo is the CBOR map the device sends on the INFO channel.
+type deviceInfo struct {
+	Flags         uint8  `cbor:"flags"`
+	ServerCertSNR []byte `cbor:"server_cert_snr"`
+}
+
+// Link is a frame-oriented transport to the device.
+type Link interface {
+	ReadFrame() ([]byte, error)
+	WriteFrame(frame []byte) error
+	Close() error
+}
+
+// Cloud is the Pouch server contract.
+type Cloud interface {
+	ServerCert(ctx context.Context) ([]byte, error)
+	RegisterDevice(ctx context.Context, cert []byte) error
+	Forward(ctx context.Context, uplink []byte) ([]byte, error)
+}
+
+// Gateway brokers sessions for one device.
+type Gateway struct {
+	link  Link
+	cloud Cloud
+	log   *slog.Logger
+
+	maxFrame int
+
+	// serverCert is fetched once and reused across sessions.
+	certOnce sync.Once
+	cert     []byte
+	certSNR  []byte
+	certErr  error
+}
+
+// New returns a gateway that brokers between link and cloud.
+func New(link Link, cloud Cloud, maxFrame int, log *slog.Logger) *Gateway {
+	return &Gateway{link: link, cloud: cloud, maxFrame: maxFrame, log: log}
+}
+
+// serverCert fetches the chain to provision, and the serial number the device
+// reports back once it holds it.
+func (g *Gateway) serverCert(ctx context.Context) ([]byte, []byte, error) {
+	g.certOnce.Do(func() {
+		g.cert, g.certErr = g.cloud.ServerCert(ctx)
+		if g.certErr != nil {
+			return
+		}
+		// The device echoes the serial of the certificate it holds, which is how
+		// the broker decides whether provisioning can be skipped next time. The
+		// chain may hold several; the device reports the first, matching
+		// mbedtls_x509_crt_parse().
+		leaf, err := firstCertificate(g.cert)
+		if err != nil {
+			g.log.Warn("cannot derive the server certificate serial, "+
+				"so the chain will be pushed every session", "err", err)
+		} else {
+			g.certSNR = derSerial(leaf)
+		}
+	})
+	return g.cert, g.certSNR, g.certErr
+}
+
+// RunSession brokers one complete sync and returns when it finishes.
+func (g *Gateway) RunSession(ctx context.Context) error {
+	cert, certSNR, err := g.serverCert(ctx)
+	if err != nil {
+		return fmt.Errorf("fetch server certificate: %w", err)
+	}
+
+	var (
+		sessErr    error
+		finished   bool
+		uplinkDone bool
+		deviceCert []byte
+		uplink     []byte
+		downlink   []byte
+	)
+
+	ep := serial.Endpoints{}
+	var broker *serial.Broker
+
+	// INFO: the device tells us what it already has.
+	ep.Info = &serial.BufReceiver{Done: func(data []byte, ok bool) {
+		if !ok {
+			return
+		}
+		var info deviceInfo
+		if err := cbor.Unmarshal(data, &info); err != nil {
+			sessErr = fmt.Errorf("decode device info: %w", err)
+			return
+		}
+		node := broker.Node()
+		node.ServerCertProvisioned = len(certSNR) > 0 &&
+			string(info.ServerCertSNR) == string(certSNR)
+		node.DeviceCertProvisioned = info.Flags&infoFlagDeviceProvisioned != 0
+
+		g.log.Info("device info",
+			"flags", info.Flags,
+			"server_cert_provisioned", node.ServerCertProvisioned,
+			"device_cert_provisioned", node.DeviceCertProvisioned)
+	}}
+
+	// SERVER_CERT: push the chain so the device can authenticate the cloud.
+	ep.ServerCert = &serial.BufSender{
+		Data: func() []byte { return cert },
+		Done: func(ok bool) {
+			if ok {
+				broker.Node().ServerCertProvisioned = true
+				g.log.Info("server certificate provisioned", "bytes", len(cert))
+			}
+		},
+	}
+
+	// DEVICE_CERT: collect the device's leaf and register it with the cloud.
+	ep.DeviceCert = &serial.BufReceiver{Done: func(data []byte, ok bool) {
+		if !ok {
+			return
+		}
+		deviceCert = append([]byte(nil), data...)
+		if err := g.cloud.RegisterDevice(ctx, deviceCert); err != nil {
+			sessErr = fmt.Errorf("register device: %w", err)
+			return
+		}
+		broker.Node().DeviceCertProvisioned = true
+		g.log.Info("device certificate registered", "bytes", len(deviceCert))
+	}}
+
+	// UPLINK: collect the outbound pouch and post it; the reply is the downlink.
+	ep.Uplink = &serial.BufReceiver{Done: func(data []byte, ok bool) {
+		if !ok {
+			return
+		}
+		uplink = append([]byte(nil), data...)
+		uplinkDone = true
+		g.log.Info("uplink collected", "bytes", len(uplink))
+	}}
+
+	// DOWNLINK: post the uplink and hand back what the cloud returns.
+	//
+	// Both directions are opened in the same phase, so the device usually
+	// prompts for its downlink before it has finished sending the uplink. There
+	// is nothing to post yet at that point - and an empty body is not a valid
+	// pouch, the server rejects it with 400 - so the sender reports "not ready"
+	// until the uplink transfer closes. Zero bytes with MoreData re-arms the
+	// channel without putting a frame on the wire, which is exactly what that
+	// result is for.
+	ep.Downlink = &deferredSender{
+		ready: func() bool { return uplinkDone },
+		fetch: func() ([]byte, error) {
+			resp, err := g.cloud.Forward(ctx, uplink)
+			if err != nil {
+				return nil, err
+			}
+			downlink = resp
+			g.log.Info("downlink received", "bytes", len(downlink))
+			return downlink, nil
+		},
+		fail: func(err error) { sessErr = fmt.Errorf("forward uplink: %w", err) },
+	}
+
+	broker = serial.NewBroker(ep, g.log,
+		func(ok bool) {
+			finished = true
+			if !ok && sessErr == nil {
+				sessErr = fmt.Errorf("session ended in error")
+			}
+		},
+		func() {},
+	)
+
+	broker.Start()
+
+	// Pump: drain everything the broker wants to say, then block for a frame.
+	for !finished {
+		for {
+			frame := broker.FrameGet(g.maxFrame)
+			if frame == nil {
+				break
+			}
+			if err := g.link.WriteFrame(frame); err != nil {
+				return err
+			}
+		}
+		if finished {
+			break
+		}
+
+		frame, err := g.link.ReadFrame()
+		if err != nil {
+			return err
+		}
+		if err := broker.Recv(frame); err != nil {
+			// A frame the broker rejects is not fatal to the link; log it and
+			// keep going so a stray frame cannot end the session.
+			g.log.Warn("dropped frame", "err", err)
+		}
+	}
+
+	return sessErr
+}
+
+// derSerial returns the serial number as DER encodes its content octets, which
+// is the form the device reports. A positive integer whose top bit is set gains
+// a leading zero byte, and Go's big.Int does not carry it.
+func derSerial(c *x509.Certificate) []byte {
+	b := c.SerialNumber.Bytes()
+	if len(b) > 0 && b[0]&0x80 != 0 {
+		return append([]byte{0x00}, b...)
+	}
+	return b
+}
+
+// deferredSender serves a payload that is not available when the transfer
+// opens. It reports MoreData with no bytes until ready() is true, which re-arms
+// the channel without emitting a frame.
+type deferredSender struct {
+	ready func() bool
+	fetch func() ([]byte, error)
+	fail  func(error)
+
+	data    []byte
+	off     int
+	fetched bool
+}
+
+func (s *deferredSender) Start() error {
+	s.data, s.off, s.fetched = nil, 0, false
+	return nil
+}
+
+func (s *deferredSender) Send(max int) ([]byte, serial.Result) {
+	if !s.fetched {
+		if !s.ready() {
+			return nil, serial.MoreData
+		}
+		data, err := s.fetch()
+		if err != nil {
+			if s.fail != nil {
+				s.fail(err)
+			}
+			return nil, serial.SendError
+		}
+		s.data, s.fetched = data, true
+	}
+
+	n := min(len(s.data)-s.off, max)
+	chunk := s.data[s.off : s.off+n]
+	s.off += n
+	if s.off >= len(s.data) {
+		return chunk, serial.NoMoreData
+	}
+	return chunk, serial.MoreData
+}
+
+func (s *deferredSender) End(bool) {}
+
+// firstCertificate returns the leading certificate of a chain, which the server
+// may hand over as PEM or as concatenated DER.
+func firstCertificate(chain []byte) (*x509.Certificate, error) {
+	if block, _ := pem.Decode(chain); block != nil {
+		if block.Type != "CERTIFICATE" {
+			return nil, fmt.Errorf("first PEM block is %q, not CERTIFICATE", block.Type)
+		}
+		return x509.ParseCertificate(block.Bytes)
+	}
+
+	certs, err := x509.ParseCertificates(chain)
+	if err != nil {
+		return nil, err
+	}
+	if len(certs) == 0 {
+		return nil, fmt.Errorf("no certificates in chain")
+	}
+	return certs[0], nil
+}
