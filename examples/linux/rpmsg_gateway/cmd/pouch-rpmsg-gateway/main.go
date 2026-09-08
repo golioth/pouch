@@ -34,6 +34,8 @@ func main() {
 		insecure = flag.Bool("insecure", false, "skip upstream TLS verification (testing only)")
 		firmware = flag.Bool("firmware", false, "accept MCU-mediated firmware relay")
 		fwDir    = flag.String("firmware-dir", "", "install verified images here (implies -firmware)")
+		rproc    = flag.String("remoteproc", "",
+			"remoteproc node to apply firmware through, e.g. /sys/class/remoteproc/remoteproc1")
 		fwReject = flag.Bool("firmware-reject", false,
 			"report a hash failure for images that verify, to exercise the device's retry path")
 		verbose = flag.Bool("v", false, "debug logging")
@@ -76,8 +78,14 @@ func main() {
 	}
 
 	gw := gateway.New(l, c, link.MaxFrame, log)
+	var fwOpts *gateway.FirmwareOptions
 
-	if *firmware || *fwDir != "" || *fwReject {
+	// applied is set when an image lands on disk. The core is restarted after
+	// the session ends, not during it: the device is owed its apply verdict
+	// first, and restarting mid-session would take the link down under it.
+	var applied string
+
+	if *firmware || *fwDir != "" || *fwReject || *rproc != "" {
 		opts := &gateway.FirmwareOptions{ForceReject: *fwReject}
 		if *fwDir != "" {
 			dir := *fwDir
@@ -89,11 +97,13 @@ func main() {
 				if err := os.WriteFile(path, image, 0o644); err != nil {
 					return err
 				}
+				applied = path
 				log.Info("firmware installed", "path", path, "bytes", len(image))
 				return nil
 			}
 		}
 		gw.Firmware = opts
+		fwOpts = opts
 	}
 	log.Info("gateway started", "device", *dev, "cloud", *server, "mtls", *certPath != "")
 
@@ -105,6 +115,26 @@ func main() {
 			log.Info("session complete", "elapsed", time.Since(start))
 		}
 
+		if applied != "" && *rproc != "" {
+			if err := applyViaRemoteproc(log, *rproc, applied); err != nil {
+				log.Error("apply through remoteproc", "err", err)
+			}
+			applied = ""
+			// The core dropped its rpmsg endpoint on the way down and brings a
+			// new one up on the way back, so the link has to be reopened.
+			_ = l.Close()
+			time.Sleep(3 * time.Second)
+			nl, err := link.Open(*dev)
+			if err != nil {
+				log.Error("reopen rpmsg endpoint after restart", "err", err)
+				return
+			}
+			l = nl
+			gw = gateway.New(l, c, link.MaxFrame, log)
+			gw.Firmware = fwOpts
+			log.Info("reattached after firmware apply", "device", *dev)
+		}
+
 		if *once {
 			return
 		}
@@ -114,4 +144,36 @@ func main() {
 		case <-time.After(*interval):
 		}
 	}
+}
+
+// applyViaRemoteproc installs an image as the core's firmware and restarts it.
+// This is the "host-side apply" half of an MCU-mediated update: the core has no
+// flash of its own, so applying means putting the file where remoteproc loads
+// from and cycling the core.
+func applyViaRemoteproc(log *slog.Logger, node, image string) error {
+	name := filepath.Base(image)
+	dst := filepath.Join("/lib/firmware", name)
+
+	if dst != image {
+		data, err := os.ReadFile(image)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(dst, data, 0o644); err != nil {
+			return err
+		}
+	}
+
+	if err := os.WriteFile(filepath.Join(node, "state"), []byte("stop"), 0o644); err != nil {
+		return fmt.Errorf("stop: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(node, "firmware"), []byte(name), 0o644); err != nil {
+		return fmt.Errorf("select firmware: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(node, "state"), []byte("start"), 0o644); err != nil {
+		return fmt.Errorf("start: %w", err)
+	}
+
+	log.Info("core restarted on the new image", "firmware", name, "node", node)
+	return nil
 }
