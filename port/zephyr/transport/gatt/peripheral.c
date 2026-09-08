@@ -14,6 +14,7 @@
 #include "transport/sar/receiver.h"
 #include "transport/sar/sender.h"
 #include "transport/endpoints/device/endpoints.h"
+#include <pouch/transport/uplink.h>
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(pouch_gatt, CONFIG_POUCH_GATT_LOG_LEVEL);
@@ -273,3 +274,16 @@ BT_GATT_SERVICE_DEFINE(pouch,
                        POUCH_CHARACTERISTIC(POUCH_GATT_UUID_DEVICE_CERT_CHRC_VAL, device_cert),
 #endif
 );
+
+
+static void disconnected(struct bt_conn *conn, uint8_t reason)
+{
+    if (conn == uplink.conn)
+    {
+        pouch_uplink_finish();
+    }
+}
+
+BT_CONN_CB_DEFINE(conn_callbacks) = {
+    .disconnected = disconnected,
+};

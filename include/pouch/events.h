@@ -22,6 +22,8 @@ enum pouch_event
     POUCH_EVENT_SESSION_START,
     /** A session has ended */
     POUCH_EVENT_SESSION_END,
+    /** A new pouch has been opened within the current uplink session */
+    POUCH_EVENT_POUCH_OPEN,
 };
 
 /**
