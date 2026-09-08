@@ -24,6 +24,12 @@ type Endpoints struct {
 	DeviceCert Receiver
 	Downlink   Sender
 	Uplink     Receiver
+
+	// Fw and FwStatus carry MCU-mediated firmware updates. Both are optional:
+	// leaving them nil leaves the channels unconfigured, which is what a
+	// gateway that does not apply firmware wants.
+	Fw       Receiver
+	FwStatus Sender
 }
 
 // Broker drives one Pouch Serial session against a single device.
@@ -40,6 +46,11 @@ type Broker struct {
 	syncStarted  bool
 	uplinkDone   bool
 	downlinkDone bool
+	fwDone       bool
+
+	// fwStatusPending is set when a verdict is waiting to go out, and cleared
+	// once it has been delivered. The session does not end while it is set.
+	fwStatusPending bool
 
 	// done reports the end of a session.
 	done func(success bool)
@@ -57,6 +68,8 @@ func NewBroker(ep Endpoints, log *slog.Logger, done func(bool), wake func()) *Br
 	b.channels[ChDeviceCert] = channel{id: ChDeviceCert, receiver: ep.DeviceCert}
 	b.channels[ChDownlink] = channel{id: ChDownlink, sender: ep.Downlink}
 	b.channels[ChUplink] = channel{id: ChUplink, receiver: ep.Uplink}
+	b.channels[ChFwStatus] = channel{id: ChFwStatus, sender: ep.FwStatus}
+	b.channels[ChFw] = channel{id: ChFw, receiver: ep.Fw}
 
 	for i := range b.channels {
 		b.channels[i].closed = b.channelClosed
@@ -73,6 +86,8 @@ func (b *Broker) Start() {
 	b.syncStarted = false
 	b.uplinkDone = false
 	b.downlinkDone = false
+	b.fwDone = b.channels[ChFw].receiver == nil
+	b.fwStatusPending = false
 	b.next()
 }
 
@@ -92,11 +107,21 @@ func (b *Broker) next() {
 
 	case !b.syncStarted:
 		b.syncStarted = true
-		// Both directions are collected in the same phase.
+		// Both pouch directions are collected in the same phase, and so is the
+		// firmware channel: the relay is fed by the very downlink it runs
+		// alongside, so collecting it afterwards would deadlock a device whose
+		// buffer fills mid-transfer.
 		b.channels[ChUplink].ready()
 		b.channels[ChDownlink].ready()
+		if b.channels[ChFw].receiver != nil {
+			b.channels[ChFw].ready()
+		}
 
-	case b.uplinkDone && b.downlinkDone:
+	// A verdict became available after the firmware transfer closed.
+	case b.fwStatusPending && !b.channels[ChFwStatus].pending && !b.channels[ChFwStatus].open:
+		b.channels[ChFwStatus].ready()
+
+	case b.uplinkDone && b.downlinkDone && b.fwDone && !b.fwStatusPending:
 		if b.done != nil {
 			b.done(true)
 		}
@@ -117,6 +142,8 @@ func (b *Broker) channelClosed(ch Channel, success bool) {
 		b.syncStarted = false
 		b.uplinkDone = false
 		b.downlinkDone = false
+		b.fwDone = false
+		b.fwStatusPending = false
 		if b.done != nil {
 			b.done(false)
 		}
@@ -130,6 +157,10 @@ func (b *Broker) channelClosed(ch Channel, success bool) {
 		b.uplinkDone = true
 	case ChDownlink:
 		b.downlinkDone = true
+	case ChFw:
+		b.fwDone = true
+	case ChFwStatus:
+		b.fwStatusPending = false
 	}
 
 	b.next()
@@ -161,6 +192,15 @@ func (b *Broker) FrameGet(maxLen int) []byte {
 		}
 	}
 	return nil
+}
+
+// SendFwStatus asks the broker to deliver a firmware apply verdict before the
+// session ends. Call it from the firmware channel's End, while the transfer
+// that produced the image is closing.
+func (b *Broker) SendFwStatus() {
+	if b.channels[ChFwStatus].sender != nil {
+		b.fwStatusPending = true
+	}
 }
 
 // NotifyUplink re-arms the uplink channel, for a caller that has learned the

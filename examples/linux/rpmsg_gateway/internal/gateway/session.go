@@ -48,11 +48,28 @@ type Gateway struct {
 
 	maxFrame int
 
+	// Firmware carries MCU-mediated updates when set. relay persists across
+	// sessions because the image arrives a chunk at a time.
+	Firmware *FirmwareOptions
+	relay    fwRelay
+
 	// serverCert is fetched once and reused across sessions.
 	certOnce sync.Once
 	cert     []byte
 	certSNR  []byte
 	certErr  error
+}
+
+// FirmwareOptions enables MCU-mediated firmware relay. A core loaded by
+// remoteproc has no flash of its own, so it downloads its own image through
+// Pouch OTA and streams the plaintext here for the host to verify and apply.
+type FirmwareOptions struct {
+	// Apply installs a verified image. Leaving it nil verifies and discards,
+	// which is what a bring-up run wants.
+	Apply func(pkg, version string, image []byte) error
+	// ForceReject reports a hash failure for an image that actually verified.
+	// It exists to exercise the device's retry path on demand.
+	ForceReject bool
 }
 
 // New returns a gateway that brokers between link and cloud.
@@ -97,6 +114,7 @@ func (g *Gateway) RunSession(ctx context.Context) error {
 		deviceCert []byte
 		uplink     []byte
 		downlink   []byte
+		fwVerdict  FwStatus
 	)
 
 	ep := serial.Endpoints{}
@@ -179,6 +197,64 @@ func (g *Gateway) RunSession(ctx context.Context) error {
 			return downlink, nil
 		},
 		fail: func(err error) { sessErr = fmt.Errorf("forward uplink: %w", err) },
+	}
+
+	if g.Firmware != nil {
+		ep.Fw = &serial.BufReceiver{Done: func(data []byte, ok bool) {
+			// An empty transfer is the normal answer: it means the device has
+			// no image in flight.
+			if !ok || len(data) == 0 {
+				return
+			}
+			chunk, err := parseFwChunk(data)
+			if err != nil {
+				g.log.Error("firmware relay", "err", err)
+				g.relay.reset()
+				return
+			}
+			complete, err := g.relay.push(chunk)
+			if err != nil {
+				g.log.Error("firmware relay", "err", err)
+				g.relay.reset()
+				return
+			}
+			g.log.Info("firmware chunk",
+				"package", chunk.pkg, "version", chunk.version,
+				"offset", chunk.offset, "bytes", len(chunk.data),
+				"have", len(g.relay.image), "of", g.relay.size)
+
+			if !complete {
+				return
+			}
+
+			fwVerdict = g.relay.verdict()
+			if fwVerdict == FwStatusOK && g.Firmware.ForceReject {
+				g.log.Warn("image verified, reporting a hash failure anyway " +
+					"to exercise the device's retry path")
+				fwVerdict = FwStatusHashFail
+			}
+			if fwVerdict == FwStatusOK && g.Firmware.Apply != nil {
+				if err := g.Firmware.Apply(g.relay.pkg, g.relay.version, g.relay.image); err != nil {
+					g.log.Error("apply firmware", "err", err)
+					fwVerdict = FwStatusError
+				}
+			}
+			g.log.Info("firmware image complete",
+				"package", g.relay.pkg, "version", g.relay.version,
+				"bytes", len(g.relay.image), "verdict", fwVerdict)
+
+			g.relay.reset()
+			broker.SendFwStatus()
+		}}
+
+		ep.FwStatus = &serial.BufSender{
+			Data: func() []byte { return []byte{byte(fwVerdict)} },
+			Done: func(ok bool) {
+				if ok {
+					g.log.Info("apply verdict delivered", "verdict", fwVerdict)
+				}
+			},
+		}
 	}
 
 	broker = serial.NewBroker(ep, g.log,

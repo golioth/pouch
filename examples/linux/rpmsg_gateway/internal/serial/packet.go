@@ -20,9 +20,15 @@ const (
 	ChDeviceCert Channel = 2 // device -> broker: device leaf certificate
 	ChDownlink   Channel = 3 // broker -> device: inbound pouches
 	ChUplink     Channel = 4 // device -> broker: outbound pouches
+	ChFwStatus   Channel = 5 // broker -> device: firmware apply verdict
+	ChFw         Channel = 6 // device -> broker: firmware image relay
 
-	ChannelCount Channel = 5
+	ChannelCount Channel = 7
 )
+
+// Direction is encoded in the parity of the channel id: odd ids run
+// broker -> device, even ids device -> broker.
+func (c Channel) BrokerToDevice() bool { return c&1 == 1 }
 
 // HeaderLen is the size of the frame header in bytes.
 const HeaderLen = 1

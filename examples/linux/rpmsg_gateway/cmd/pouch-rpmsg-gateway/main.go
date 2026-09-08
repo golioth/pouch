@@ -9,9 +9,11 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -30,7 +32,11 @@ func main() {
 		certPath = flag.String("cert", "", "gateway certificate for upstream mTLS (DER or PEM)")
 		keyPath  = flag.String("key", "", "gateway private key for upstream mTLS (DER or PEM)")
 		insecure = flag.Bool("insecure", false, "skip upstream TLS verification (testing only)")
-		verbose  = flag.Bool("v", false, "debug logging")
+		firmware = flag.Bool("firmware", false, "accept MCU-mediated firmware relay")
+		fwDir    = flag.String("firmware-dir", "", "install verified images here (implies -firmware)")
+		fwReject = flag.Bool("firmware-reject", false,
+			"report a hash failure for images that verify, to exercise the device's retry path")
+		verbose = flag.Bool("v", false, "debug logging")
 	)
 	flag.Parse()
 
@@ -70,6 +76,25 @@ func main() {
 	}
 
 	gw := gateway.New(l, c, link.MaxFrame, log)
+
+	if *firmware || *fwDir != "" || *fwReject {
+		opts := &gateway.FirmwareOptions{ForceReject: *fwReject}
+		if *fwDir != "" {
+			dir := *fwDir
+			opts.Apply = func(pkg, version string, image []byte) error {
+				if err := os.MkdirAll(dir, 0o755); err != nil {
+					return err
+				}
+				path := filepath.Join(dir, fmt.Sprintf("%s-%s.elf", pkg, version))
+				if err := os.WriteFile(path, image, 0o644); err != nil {
+					return err
+				}
+				log.Info("firmware installed", "path", path, "bytes", len(image))
+				return nil
+			}
+		}
+		gw.Firmware = opts
+	}
 	log.Info("gateway started", "device", *dev, "cloud", *server, "mtls", *certPath != "")
 
 	for {
