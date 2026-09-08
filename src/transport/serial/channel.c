@@ -131,6 +131,17 @@ int pouch_serial_ch_recv(struct pouch_serial_channel *ch,
                          const void *payload,
                          size_t len)
 {
+    /* A channel id this build knows but has no endpoint for: the peer is using
+     * an optional feature that is not configured here. Ignore the frame rather
+     * than dereferencing the missing endpoint. Channel ids are wire constants
+     * shared by every build, so the id being in range says nothing about
+     * whether both ends implement it.
+     */
+    if (ch->endpoint == NULL)
+    {
+        return -ENODEV;
+    }
+
     if (header->is_data)
     {
         return handle_data(ch, header, payload, len);
@@ -145,6 +156,12 @@ size_t pouch_serial_ch_frame_get(struct pouch_serial_channel *ch, uint8_t *buf, 
     if (maxlen <= POUCH_SERIAL_HEADER_LEN)
     {
         return -EINVAL;
+    }
+
+    /* Unconfigured channel: nothing to send, ever. See pouch_serial_ch_recv(). */
+    if (ch->endpoint == NULL)
+    {
+        return 0;
     }
 
     if (!pouch_atomic_test_and_clear_bit(&ch->flags, CH_FLAG_PENDING))

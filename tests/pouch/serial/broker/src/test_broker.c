@@ -1154,6 +1154,45 @@ ZTEST(serial_broker, test_invalid_channel_id)
     zassert_equal(err, -EINVAL);
 }
 
+/*
+ * A channel id this build knows but has no endpoint for.
+ *
+ * The broker implements five channels; the firmware-relay ids exist in the
+ * shared enum regardless, so they are in range for the bounds check and reach
+ * the channel layer with a NULL endpoint. That is not hypothetical: the
+ * firmware relay's counterpart broker lives outside this tree, so a device
+ * built with it talks to an in-tree broker that has never heard of it. Without
+ * a guard the first frame on such a channel dereferences NULL.
+ */
+ZTEST(serial_broker, test_unconfigured_channel_is_ignored)
+{
+    uint8_t buf[FRAME_BUF_SIZE];
+
+    struct pouch_serial_header ack = {
+        .is_data = false,
+        .channel = POUCH_SERIAL_CH_FW,
+    };
+    size_t len = build_frame(buf, sizeof(buf), &ack, NULL, 0);
+    zassert_equal(pouch_serial_broker_recv(test_broker, buf, len), -ENODEV);
+
+    static const uint8_t payload[] = {0x01, 0x02};
+    struct pouch_serial_header data = {
+        .is_data = true,
+        .first = true,
+        .channel = POUCH_SERIAL_CH_FW_STATUS,
+    };
+    len = build_frame(buf, sizeof(buf), &data, payload, sizeof(payload));
+    zassert_equal(pouch_serial_broker_recv(test_broker, buf, len), -ENODEV);
+
+    /* Those frames left no response queued, and the broker still runs a normal
+     * session afterwards. */
+    zassert_equal(pouch_serial_broker_frame_get(test_broker, buf, sizeof(buf)),
+                  0,
+                  "unconfigured channel produced a frame");
+
+    advance_to_sync(true, true);
+}
+
 ZTEST(serial_broker, test_malformed_ack_header)
 {
     /*
