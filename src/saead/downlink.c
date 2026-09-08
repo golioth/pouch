@@ -91,12 +91,17 @@ int saead_downlink_session_start(const struct session_id *id,
         POUCH_LOG_ERR("Session parameter changed");
         return -EBADMSG;
     }
-
-    if (match && pouch_atomic_test_bit(&downlink.flags, SESSION_ACTIVE))
+    if (pouch_atomic_test_bit(&downlink.flags, SESSION_ACTIVE))
     {
-        // This is the current session. We already have a session key, and shouldn't
-        // recalculate or reset anything.
-        return 0;
+        if (match)
+        {
+            // This is the current session. We already have a session key, and shouldn't
+            // recalculate or reset anything.
+            return 0;
+        }
+
+        // end current session
+        session_end(&downlink);
     }
 
     if (!is_valid_downlink(id, max_block_size_log, algorithm))

@@ -24,10 +24,11 @@ typedef void (*pouch_uplink_handler_t)(void);
 /**
  * Register a handler for pouch uplink.
  *
- * Allows the application to register a callback that gets called when the pouch
- * uplink is started.
+ * Allows the application to register a callback that gets called each time a new
+ * pouch is opened for uplink, which may happen more than once within the same
+ * uplink session.
  *
- * The pouch uplink will be closed once all uplink handlers have been called,
+ * The pouch will be closed once all uplink handlers have been called,
  * and all streams are closed.
  */
 #define POUCH_UPLINK_HANDLER(handler)                                  \
@@ -57,7 +58,10 @@ int pouch_uplink_entry_write(const char *path,
                              pouch_timeout_t timeout);
 
 /**
- * Close the current uplink session by finalizing the open pouch.
+ * Close the currently open uplink pouch by finalizing it.
+ *
+ * This does not end the uplink session - another pouch may be opened
+ * afterwards within the same session.
  *
  * @param timeout Timeout in milliseconds
  *
@@ -68,7 +72,7 @@ int pouch_uplink_close(pouch_timeout_t timeout);
 /**
  * Open a new stream to the uplink.
  *
- * Note that the stream must be closed with @ref pouch_stream_close() before the uplink session is
+ * Note that the stream must be closed with @ref pouch_stream_close() before the current pouch is
  * closed with @ref pouch_uplink_close().
  *
  * The content type is defined by the CoAP Content-Formats sub-registry within the IANA CoRE.

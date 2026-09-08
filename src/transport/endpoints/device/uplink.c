@@ -9,34 +9,27 @@
 #include <pouch/transport/uplink.h>
 #include "endpoints.h"
 
-static struct pouch_uplink *uplink;
 
 static int start(struct pouch_bearer *bearer)
 {
-    uplink = pouch_uplink_start();
-    if (uplink == NULL)
+    // ensure the uplink is started
+    int err = pouch_uplink_start();
+    if (err)
     {
-        return -EAGAIN;
+        return err;
     }
 
-    return 0;
+    return pouch_uplink_pouch_open();
 }
 
 static enum pouch_result send(struct pouch_bearer *bearer, void *dst, size_t *dst_len)
 {
-    if (uplink == NULL)
-    {
-        *dst_len = 0;
-        return POUCH_ERROR;
-    }
-
-    return pouch_uplink_fill(uplink, dst, dst_len);
+    return pouch_uplink_fill(dst, dst_len);
 }
 
 static void end(struct pouch_bearer *bearer, bool success)
 {
-    pouch_uplink_finish(uplink);
-    uplink = NULL;
+    pouch_uplink_pouch_close();
 }
 
 const struct pouch_endpoint pouch_device_endpoint_uplink = {
