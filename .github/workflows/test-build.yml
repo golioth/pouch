@@ -23,6 +23,13 @@ jobs:
             example: http_client
             board: native_sim
             no_sysbuild: true
+          # Builds the resource-table rpmsg adapter, which the native_sim
+          # variant of this sample does not: its board conf selects
+          # CONFIG_POUCH_RPMSG_RSC_DEVICE in place of the UART adapter.
+          - manifest: west-zephyr.yml
+            example: rpmsg_device
+            board: imx95_evk/mimx9596/m7
+            no_sysbuild: true
       fail-fast: false
     runs-on: ubuntu-24.04
     steps:
