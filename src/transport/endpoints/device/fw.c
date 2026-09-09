@@ -12,6 +12,7 @@
 #include <pouch/types.h>
 
 #include "endpoints.h"
+#include "fw_internal.h"
 
 POUCH_LOG_REGISTER(pouch_fw_relay, CONFIG_POUCH_COMMON_LOG_LEVEL);
 
@@ -38,14 +39,12 @@ POUCH_LOG_REGISTER(pouch_fw_relay, CONFIG_POUCH_COMMON_LOG_LEVEL);
 #define CONFIG_POUCH_SERIAL_FW_BUF_SIZE 8192
 #endif
 
-#define MAX_NAME_LEN 32
-
 struct fw_relay
 {
     pouch_mutex_t lock;
     pouch_sem_t space; /* given when the drain frees buffer space */
 
-    uint8_t hdr[POUCH_SERIAL_FW_HDR_FIXED_LEN + 2 * MAX_NAME_LEN];
+    uint8_t hdr[POUCH_SERIAL_FW_HDR_FIXED_LEN + 2 * POUCH_SERIAL_FW_MAX_NAME_LEN];
     size_t hdr_len;
     size_t hdr_sent; /* bytes of the current chunk's header already sent */
 
@@ -60,14 +59,10 @@ struct fw_relay
 
     bool active;   /* a relay has been announced */
     bool complete; /* the application has written the last byte */
-
-    bool status_valid;
-    enum pouch_serial_fw_status status;
 };
 
 static struct fw_relay relay;
 static bool inited;
-static pouch_serial_fw_status_cb_t status_cb;
 
 static void relay_init_once(void)
 {
@@ -77,14 +72,6 @@ static void relay_init_once(void)
         pouch_sem_init(&relay.space, 0, 1);
         inited = true;
     }
-}
-
-static void put_le32(uint8_t *dst, uint32_t v)
-{
-    dst[0] = (uint8_t) (v & 0xff);
-    dst[1] = (uint8_t) ((v >> 8) & 0xff);
-    dst[2] = (uint8_t) ((v >> 16) & 0xff);
-    dst[3] = (uint8_t) ((v >> 24) & 0xff);
 }
 
 int pouch_serial_fw_begin(const char *package,
@@ -99,7 +86,7 @@ int pouch_serial_fw_begin(const char *package,
 
     size_t pkg_len = strlen(package);
     size_t ver_len = strlen(version);
-    if (pkg_len > MAX_NAME_LEN || ver_len > MAX_NAME_LEN)
+    if (pkg_len > POUCH_SERIAL_FW_MAX_NAME_LEN || ver_len > POUCH_SERIAL_FW_MAX_NAME_LEN)
     {
         return -EINVAL;
     }
@@ -115,9 +102,9 @@ int pouch_serial_fw_begin(const char *package,
 
     /* The offset field is rewritten per chunk in fw_send(). */
     uint8_t *h = relay.hdr;
-    put_le32(&h[0], POUCH_SERIAL_FW_MAGIC);
-    put_le32(&h[4], size);
-    put_le32(&h[8], 0);
+    pouch_serial_put_le32(&h[0], POUCH_SERIAL_FW_MAGIC);
+    pouch_serial_put_le32(&h[4], size);
+    pouch_serial_put_le32(&h[8], 0);
     memcpy(&h[12], sha256, 32);
     h[44] = (uint8_t) ver_len;
     h[45] = (uint8_t) pkg_len;
@@ -133,10 +120,12 @@ int pouch_serial_fw_begin(const char *package,
     relay.sent = 0;
     relay.chunk_open = false;
     relay.complete = false;
-    relay.status_valid = false;
     relay.active = true;
 
     pouch_mutex_unlock(&relay.lock);
+
+    /* Any verdict still held belongs to the previous image. */
+    pouch_serial_fw_status_reset();
 
     POUCH_LOG_INF("Firmware relay started: %s %s, %u bytes", package, version, size);
     return 0;
@@ -237,24 +226,6 @@ bool pouch_serial_fw_pressure(void)
     return full;
 }
 
-bool pouch_serial_fw_status_get(enum pouch_serial_fw_status *status)
-{
-    relay_init_once();
-    pouch_mutex_lock(&relay.lock, POUCH_FOREVER);
-    bool valid = relay.status_valid;
-    if (valid && status)
-    {
-        *status = relay.status;
-    }
-    pouch_mutex_unlock(&relay.lock);
-    return valid;
-}
-
-void pouch_serial_fw_status_callback_set(pouch_serial_fw_status_cb_t cb)
-{
-    status_cb = cb;
-}
-
 /* --- serial endpoint: firmware stream (device -> broker) --- */
 
 static int fw_start(struct pouch_bearer *bearer)
@@ -299,7 +270,7 @@ static enum pouch_result fw_send(struct pouch_bearer *bearer, void *dst, size_t 
     if (!relay.chunk_open)
     {
         /* Start a chunk: stamp it with the absolute offset it begins at. */
-        put_le32(&relay.hdr[8], relay.sent);
+        pouch_serial_put_le32(&relay.hdr[8], relay.sent);
         relay.hdr_sent = 0;
         relay.chunk_open = true;
     }
@@ -357,52 +328,4 @@ static enum pouch_result fw_send(struct pouch_bearer *bearer, void *dst, size_t 
 const struct pouch_endpoint pouch_device_endpoint_fw = {
     .start = fw_start,
     .send = fw_send,
-};
-
-/* --- serial endpoint: apply status (broker -> device) --- */
-
-static int fw_status_start(struct pouch_bearer *bearer)
-{
-    return 0;
-}
-
-static int fw_status_recv(struct pouch_bearer *bearer, const void *buf, size_t len)
-{
-    const uint8_t *in = buf;
-
-    if (len == 0)
-    {
-        return 0;
-    }
-
-    if (in[0] > POUCH_SERIAL_FW_STATUS_ERROR)
-    {
-        POUCH_LOG_WRN("Unknown firmware apply status %u from broker", in[0]);
-        return -EINVAL;
-    }
-
-    enum pouch_serial_fw_status status = (enum pouch_serial_fw_status) in[0];
-
-    relay_init_once();
-    pouch_mutex_lock(&relay.lock, POUCH_FOREVER);
-    relay.status = status;
-    relay.status_valid = true;
-    pouch_mutex_unlock(&relay.lock);
-
-    POUCH_LOG_INF("Firmware apply status from broker: %u", in[0]);
-
-    /* Called with the lock released: the handler re-arms a rejected update,
-     * which comes straight back into pouch_serial_fw_begin().
-     */
-    if (status_cb)
-    {
-        status_cb(status);
-    }
-
-    return 0;
-}
-
-const struct pouch_endpoint pouch_device_endpoint_fw_status = {
-    .start = fw_status_start,
-    .recv = fw_status_recv,
 };

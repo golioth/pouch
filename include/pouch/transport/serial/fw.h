@@ -37,6 +37,14 @@
 /** Magic at the head of a firmware chunk: "PFW2", little endian. */
 #define POUCH_SERIAL_FW_MAGIC 0x32574650UL
 
+/*
+ * The verdict below - the status enum, pouch_serial_fw_status_get() and the
+ * callback - is not the relay's alone. It is reported by the host for any image
+ * it was handed, however it was handed over, so a device that uses the signed-URL
+ * handoff in <pouch/transport/serial/fw_url.h> and never relays a byte still
+ * reads its result here.
+ */
+
 /** Firmware apply result reported by the broker. */
 enum pouch_serial_fw_status
 {

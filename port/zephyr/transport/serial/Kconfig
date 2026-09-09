@@ -21,9 +21,18 @@ config POUCH_TRANSPORT_SERIAL_DEVICE
         runs on the node device and communicates with a gateway running the
         broker implementation.
 
+config POUCH_SERIAL_FW_STATUS
+    bool
+    depends on POUCH_TRANSPORT_SERIAL_DEVICE
+    help
+        The apply verdict channel: the host reports what became of an image it
+        was handed. Shared by every mechanism that hands one over, and selected
+        by each of them, so a device that enables two still carries one copy.
+
 menuconfig POUCH_SERIAL_FW_RELAY
     bool "MCU-mediated firmware relay"
     depends on POUCH_TRANSPORT_SERIAL_DEVICE
+    select POUCH_SERIAL_FW_STATUS
     help
         Relay this core's own firmware image to the broker over the Pouch
         Serial firmware channels, for cores that remoteproc loads from the

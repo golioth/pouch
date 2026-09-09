@@ -22,6 +22,7 @@ target_compile_definitions(app PRIVATE CONFIG_POUCH_COMMON_LOG_LEVEL=3)
 # pouch module's own build, as they do for the other serial test suites.
 target_sources(app PRIVATE
     ${POUCH_DIR}/src/transport/endpoints/device/fw.c
+    ${POUCH_DIR}/src/transport/endpoints/device/fw_status.c
 )
 
 target_sources(app PRIVATE src/test_fw.c)
