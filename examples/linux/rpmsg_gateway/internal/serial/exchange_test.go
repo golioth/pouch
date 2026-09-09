@@ -211,3 +211,115 @@ func TestProvisionedDeviceSkipsCertPhases(t *testing.T) {
 		t.Errorf("device received %d server-cert bytes, want none", gotServerCert.Len())
 	}
 }
+
+// withSignedURL adds the two signed-URL channels to a device, so the exchange
+// covers a device that advertises the capability.
+func (d *device) withSignedURL(timeBuf *bytes.Buffer, urlRecord []byte) *device {
+	d.channels[ChTime] = channel{id: ChTime, receiver: &collector{buf: timeBuf}}
+	d.channels[ChFwURL] = channel{
+		id:     ChFwURL,
+		sender: &BufSender{Data: func() []byte { return urlRecord }},
+	}
+	return d
+}
+
+// signedURLEndpoints builds a provisioning-complete broker with the two
+// signed-URL channels attached. capable mirrors what the device advertised.
+func signedURLEndpoints(b **Broker, capable bool, collected *bytes.Buffer,
+	timePayload []byte) Endpoints {
+	return Endpoints{
+		Info: &BufReceiver{Done: func(d []byte, ok bool) {
+			(*b).Node().SignedURLCapable = capable
+		}},
+		ServerCert: &BufSender{Data: func() []byte { return []byte("server-certificate") },
+			Done: func(ok bool) { (*b).Node().ServerCertProvisioned = ok }},
+		DeviceCert: &BufReceiver{Done: func(d []byte, ok bool) {
+			(*b).Node().DeviceCertProvisioned = ok
+		}},
+		Downlink: &BufSender{Data: func() []byte { return []byte("downlink") }},
+		Uplink:   &BufReceiver{Done: func(d []byte, ok bool) {}},
+		Time:     &BufSender{Data: func() []byte { return timePayload }},
+		FwURL:    &BufReceiver{Done: func(d []byte, ok bool) { collected.Write(d) }},
+	}
+}
+
+func TestSignedURLExchange(t *testing.T) {
+	var serverCert, downlink, timeSeen, collected bytes.Buffer
+
+	record := []byte("a signed URL record")
+	dev := newDevice([]byte("info"), []byte("device-cert"), []byte("uplink"),
+		&serverCert, &downlink).withSignedURL(&timeSeen, record)
+
+	var b *Broker
+	var finished, sessionOK bool
+	b = NewBroker(signedURLEndpoints(&b, true, &collected, []byte("the time")),
+		discardLogger(),
+		func(ok bool) { finished, sessionOK = true, ok },
+		func() {})
+
+	b.Start()
+	pump(t, b, dev, 16)
+
+	if !finished || !sessionOK {
+		t.Fatalf("session finished=%v ok=%v, want both true", finished, sessionOK)
+	}
+	if got := timeSeen.String(); got != "the time" {
+		t.Errorf("device saw time %q, want %q", got, "the time")
+	}
+	if got := collected.String(); got != string(record) {
+		t.Errorf("broker collected %q, want %q", got, record)
+	}
+}
+
+func TestSignedURLSkippedWithoutCapability(t *testing.T) {
+	var serverCert, downlink, collected bytes.Buffer
+
+	// A device built without the handoff: the channel ids exist as wire
+	// constants but nothing is attached to them. A broker that pushed the time
+	// anyway would wait forever for an acknowledgement that never comes.
+	dev := newDevice([]byte("info"), []byte("device-cert"), []byte("uplink"),
+		&serverCert, &downlink)
+
+	var b *Broker
+	var finished, sessionOK bool
+	b = NewBroker(signedURLEndpoints(&b, false, &collected, []byte("the time")),
+		discardLogger(),
+		func(ok bool) { finished, sessionOK = true, ok },
+		func() {})
+
+	b.Start()
+	pump(t, b, dev, 16)
+
+	if !finished || !sessionOK {
+		t.Fatalf("session finished=%v ok=%v, want both true", finished, sessionOK)
+	}
+	if collected.Len() != 0 {
+		t.Errorf("collected %d bytes from a device without the channel", collected.Len())
+	}
+}
+
+func TestSignedURLEmptyHandoff(t *testing.T) {
+	var serverCert, downlink, timeSeen, collected bytes.Buffer
+
+	// The usual answer: no artifact pending, so the device hands back an empty
+	// transfer rather than a record, and the session still completes.
+	dev := newDevice([]byte("info"), []byte("device-cert"), []byte("uplink"),
+		&serverCert, &downlink).withSignedURL(&timeSeen, nil)
+
+	var b *Broker
+	var finished, sessionOK bool
+	b = NewBroker(signedURLEndpoints(&b, true, &collected, []byte("the time")),
+		discardLogger(),
+		func(ok bool) { finished, sessionOK = true, ok },
+		func() {})
+
+	b.Start()
+	pump(t, b, dev, 16)
+
+	if !finished || !sessionOK {
+		t.Fatalf("session finished=%v ok=%v, want both true", finished, sessionOK)
+	}
+	if collected.Len() != 0 {
+		t.Errorf("collected %d bytes from an idle device", collected.Len())
+	}
+}

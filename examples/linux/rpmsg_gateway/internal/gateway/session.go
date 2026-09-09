@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/fxamacker/cbor/v2"
 
@@ -16,9 +17,12 @@ import (
 )
 
 // infoFlagDeviceProvisioned is set by the device once the cloud holds its
-// certificate. The remaining seven bits are unused - the natural place for a
-// future capability exchange.
+// certificate. The remaining bits are the capability exchange.
 const infoFlagDeviceProvisioned = 1 << 0
+
+// infoFlagFwSignedURL is set by a device built with the signed-URL handoff. It
+// is what tells us the time and URL channels exist on the other end.
+const infoFlagFwSignedURL = 1 << 1
 
 // deviceInfo is the CBOR map the device sends on the INFO channel.
 type deviceInfo struct {
@@ -48,10 +52,16 @@ type Gateway struct {
 
 	maxFrame int
 
+	// baseCtx outlives any one session, so a download started by one can
+	// finish after it. Set by New from the process context.
+	baseCtx context.Context
+
 	// Firmware carries MCU-mediated updates when set. relay persists across
-	// sessions because the image arrives a chunk at a time.
-	Firmware *FirmwareOptions
-	relay    fwRelay
+	// sessions because the image arrives a chunk at a time, and downloads
+	// because an artifact takes longer to fetch than a session lasts.
+	Firmware  *FirmwareOptions
+	relay     fwRelay
+	downloads fwDownloads
 
 	// serverCert is fetched once and reused across sessions.
 	certOnce sync.Once
@@ -70,11 +80,20 @@ type FirmwareOptions struct {
 	// ForceReject reports a hash failure for an image that actually verified.
 	// It exists to exercise the device's retry path on demand.
 	ForceReject bool
+
+	// SignedURL accepts a signed artifact URL from the device and fetches the
+	// image ourselves, rather than having it relayed through the device.
+	SignedURL bool
+	// Downloader fetches those artifacts. Required when SignedURL is set.
+	Downloader *Downloader
+	// ApplyFile installs an artifact already on disk. Leaving it nil verifies
+	// and discards, which is what a bring-up run wants.
+	ApplyFile func(pkg, version, path string) error
 }
 
 // New returns a gateway that brokers between link and cloud.
-func New(link Link, cloud Cloud, maxFrame int, log *slog.Logger) *Gateway {
-	return &Gateway{link: link, cloud: cloud, maxFrame: maxFrame, log: log}
+func New(ctx context.Context, link Link, cloud Cloud, maxFrame int, log *slog.Logger) *Gateway {
+	return &Gateway{baseCtx: ctx, link: link, cloud: cloud, maxFrame: maxFrame, log: log}
 }
 
 // serverCert fetches the chain to provision, and the serial number the device
@@ -134,11 +153,14 @@ func (g *Gateway) RunSession(ctx context.Context) error {
 		node.ServerCertProvisioned = len(certSNR) > 0 &&
 			string(info.ServerCertSNR) == string(certSNR)
 		node.DeviceCertProvisioned = info.Flags&infoFlagDeviceProvisioned != 0
+		node.SignedURLCapable = info.Flags&infoFlagFwSignedURL != 0 &&
+			g.Firmware != nil && g.Firmware.SignedURL
 
 		g.log.Info("device info",
 			"flags", info.Flags,
 			"server_cert_provisioned", node.ServerCertProvisioned,
-			"device_cert_provisioned", node.DeviceCertProvisioned)
+			"device_cert_provisioned", node.DeviceCertProvisioned,
+			"signed_url", node.SignedURLCapable)
 	}}
 
 	// SERVER_CERT: push the chain so the device can authenticate the cloud.
@@ -257,6 +279,35 @@ func (g *Gateway) RunSession(ctx context.Context) error {
 		}
 	}
 
+	if g.Firmware != nil && g.Firmware.SignedURL {
+		// The device has no clock of its own, and signs against a validity
+		// window, so it needs ours before it can sign anything.
+		ep.Time = &serial.BufSender{
+			Data: func() []byte { return timeRecord(time.Now()) },
+			Done: func(ok bool) {
+				if ok {
+					g.log.Debug("reported the time to the device")
+				}
+			},
+		}
+
+		ep.FwURL = &serial.BufReceiver{Done: func(data []byte, ok bool) {
+			// An empty transfer is the normal answer: no artifact pending.
+			if !ok || len(data) == 0 {
+				return
+			}
+			rec, err := parseFwURLRecord(data)
+			if err != nil {
+				g.log.Error("signed-URL handoff", "err", err)
+				return
+			}
+			// Started here and finished long after this session ends: an
+			// artifact takes minutes, and holding the session open would stall
+			// the uplink and downlink behind a file transfer.
+			g.startDownload(g.baseCtx, rec)
+		}}
+	}
+
 	broker = serial.NewBroker(ep, g.log,
 		func(ok bool) {
 			finished = true
@@ -268,6 +319,29 @@ func (g *Gateway) RunSession(ctx context.Context) error {
 	)
 
 	broker.Start()
+
+	// A download that finished between sessions is reported now. The device is
+	// waiting on this verdict: it told the cloud to stop offering the component
+	// when it handed the URL over, so nothing else will remind it.
+	if res := g.takeDownloadResult(); res != nil {
+		fwVerdict = res.verdict
+
+		if fwVerdict == FwStatusOK && g.Firmware.ForceReject {
+			g.log.Warn("artifact verified, reporting a hash failure anyway " +
+				"to exercise the device's retry path")
+			fwVerdict = FwStatusHashFail
+		}
+		if fwVerdict == FwStatusOK && g.Firmware.ApplyFile != nil {
+			if err := g.Firmware.ApplyFile(res.pkg, res.version, res.path); err != nil {
+				g.log.Error("apply artifact", "err", err)
+				fwVerdict = FwStatusError
+			}
+		}
+
+		g.log.Info("reporting the artifact verdict",
+			"package", res.pkg, "version", res.version, "verdict", fwVerdict)
+		broker.SendFwStatus()
+	}
 
 	// Pump: drain everything the broker wants to say, then block for a frame.
 	for !finished {

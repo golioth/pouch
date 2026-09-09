@@ -22,8 +22,10 @@ const (
 	ChUplink     Channel = 4 // device -> broker: outbound pouches
 	ChFwStatus   Channel = 5 // broker -> device: firmware apply verdict
 	ChFw         Channel = 6 // device -> broker: firmware image relay
+	ChTime       Channel = 7 // broker -> device: wall-clock time
+	ChFwURL      Channel = 8 // device -> broker: signed firmware artifact URL
 
-	ChannelCount Channel = 7
+	ChannelCount Channel = 9
 )
 
 // Direction is encoded in the parity of the channel id: odd ids run

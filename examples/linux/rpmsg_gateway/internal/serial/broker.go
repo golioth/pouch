@@ -13,6 +13,10 @@ type Node struct {
 	// DeviceCertProvisioned is true once the device reports that the cloud has
 	// its certificate, so the DEVICE_CERT step can be skipped.
 	DeviceCertProvisioned bool
+	// SignedURLCapable is true once the device says it can be handed firmware
+	// as a signed URL. Until it does we neither report the time nor poll for a
+	// URL, so a device without those channels is never left waiting on one.
+	SignedURLCapable bool
 }
 
 // Endpoints supplies the five channel implementations. Info, DeviceCert and
@@ -30,6 +34,12 @@ type Endpoints struct {
 	// gateway that does not apply firmware wants.
 	Fw       Receiver
 	FwStatus Sender
+
+	// Time and FwURL carry the signed-URL handoff: we report our clock, the
+	// device hands back a URL for us to fetch. Also optional, and additionally
+	// gated on the device advertising support.
+	Time  Sender
+	FwURL Receiver
 }
 
 // Broker drives one Pouch Serial session against a single device.
@@ -43,10 +53,13 @@ type Broker struct {
 	log      *slog.Logger
 
 	infoRead     bool
+	timeDone     bool
 	syncStarted  bool
 	uplinkDone   bool
 	downlinkDone bool
 	fwDone       bool
+	fwURLStarted bool
+	fwURLDone    bool
 
 	// fwStatusPending is set when a verdict is waiting to go out, and cleared
 	// once it has been delivered. The session does not end while it is set.
@@ -70,6 +83,8 @@ func NewBroker(ep Endpoints, log *slog.Logger, done func(bool), wake func()) *Br
 	b.channels[ChUplink] = channel{id: ChUplink, receiver: ep.Uplink}
 	b.channels[ChFwStatus] = channel{id: ChFwStatus, sender: ep.FwStatus}
 	b.channels[ChFw] = channel{id: ChFw, receiver: ep.Fw}
+	b.channels[ChTime] = channel{id: ChTime, sender: ep.Time}
+	b.channels[ChFwURL] = channel{id: ChFwURL, receiver: ep.FwURL}
 
 	for i := range b.channels {
 		b.channels[i].closed = b.channelClosed
@@ -83,10 +98,13 @@ func (b *Broker) Node() *Node { return &b.node }
 // Start begins a session.
 func (b *Broker) Start() {
 	b.infoRead = false
+	b.timeDone = b.channels[ChTime].sender == nil
 	b.syncStarted = false
 	b.uplinkDone = false
 	b.downlinkDone = false
 	b.fwDone = b.channels[ChFw].receiver == nil
+	b.fwURLStarted = false
+	b.fwURLDone = b.channels[ChFwURL].receiver == nil
 	b.fwStatusPending = false
 	b.next()
 }
@@ -98,6 +116,17 @@ func (b *Broker) next() {
 	case !b.infoRead:
 		b.infoRead = true
 		b.channels[ChInfo].ready()
+
+	// Before anything that depends on it. A device loaded by remoteproc has no
+	// clock of its own, and it signs artifact URLs against a validity window,
+	// so a URL signed before this arrives would be refused by the cloud.
+	case !b.timeDone:
+		b.timeDone = true
+		if !b.node.SignedURLCapable {
+			b.next()
+			return
+		}
+		b.channels[ChTime].ready()
 
 	case !b.node.ServerCertProvisioned:
 		b.channels[ChServerCert].ready()
@@ -117,11 +146,23 @@ func (b *Broker) next() {
 			b.channels[ChFw].ready()
 		}
 
+	// Collected after the downlink rather than alongside it: the manifest that
+	// makes the device announce an artifact arrives on that downlink, so asking
+	// first would usually find nothing and cost a session.
+	case b.downlinkDone && !b.fwURLDone && !b.fwURLStarted:
+		if !b.node.SignedURLCapable {
+			b.fwURLDone = true
+			b.next()
+			return
+		}
+		b.fwURLStarted = true
+		b.channels[ChFwURL].ready()
+
 	// A verdict became available after the firmware transfer closed.
 	case b.fwStatusPending && !b.channels[ChFwStatus].pending && !b.channels[ChFwStatus].open:
 		b.channels[ChFwStatus].ready()
 
-	case b.uplinkDone && b.downlinkDone && b.fwDone && !b.fwStatusPending:
+	case b.uplinkDone && b.downlinkDone && b.fwDone && b.fwURLDone && !b.fwStatusPending:
 		if b.done != nil {
 			b.done(true)
 		}
@@ -139,10 +180,13 @@ func (b *Broker) next() {
 func (b *Broker) channelClosed(ch Channel, success bool) {
 	if !success {
 		b.infoRead = false
+		b.timeDone = false
 		b.syncStarted = false
 		b.uplinkDone = false
 		b.downlinkDone = false
 		b.fwDone = false
+		b.fwURLStarted = false
+		b.fwURLDone = false
 		b.fwStatusPending = false
 		if b.done != nil {
 			b.done(false)
@@ -159,6 +203,8 @@ func (b *Broker) channelClosed(ch Channel, success bool) {
 		b.downlinkDone = true
 	case ChFw:
 		b.fwDone = true
+	case ChFwURL:
+		b.fwURLDone = true
 	case ChFwStatus:
 		b.fwStatusPending = false
 	}

@@ -39,6 +39,14 @@ func main() {
 			"remoteproc node to apply firmware through, e.g. /sys/class/remoteproc/remoteproc1")
 		fwReject = flag.Bool("firmware-reject", false,
 			"report a hash failure for images that verify, to exercise the device's retry path")
+		signedURL = flag.Bool("signed-url", false,
+			"fetch firmware from a URL the device signs, instead of having it relayed")
+		dlDir = flag.String("download-dir", "",
+			"where to download signed-URL artifacts (default: -firmware-dir, else a temp dir)")
+		dlTimeout = flag.Duration("download-timeout", 10*time.Minute,
+			"how long one artifact download may take")
+		caFile = flag.String("ca", "",
+			"PEM bundle trusted for artifact downloads, in addition to the system roots")
 		verbose = flag.Bool("v", false, "debug logging")
 	)
 	flag.Parse()
@@ -90,7 +98,7 @@ func main() {
 		c = cloud.New(*server, *timeout)
 	}
 
-	gw := gateway.New(l, c, link.MaxFrame, log)
+	gw := gateway.New(ctx, l, c, link.MaxFrame, log)
 	var fwOpts *gateway.FirmwareOptions
 
 	// applied is set when an image lands on disk. The core is restarted after
@@ -98,8 +106,16 @@ func main() {
 	// first, and restarting mid-session would take the link down under it.
 	var applied string
 
-	if *firmware || *fwDir != "" || *fwReject || *rproc != "" {
-		opts := &gateway.FirmwareOptions{ForceReject: *fwReject}
+	// install records an image that has landed where the host can boot it. The
+	// two firmware paths differ only in how the bytes got there.
+	install := func(path string) {
+		applied = path
+		log.Info("firmware installed", "path", path)
+	}
+
+	if *firmware || *fwDir != "" || *fwReject || *rproc != "" || *signedURL {
+		opts := &gateway.FirmwareOptions{ForceReject: *fwReject, SignedURL: *signedURL}
+
 		if *fwDir != "" {
 			dir := *fwDir
 			opts.Apply = func(pkg, version string, image []byte) error {
@@ -110,11 +126,55 @@ func main() {
 				if err := os.WriteFile(path, image, 0o644); err != nil {
 					return err
 				}
-				applied = path
-				log.Info("firmware installed", "path", path, "bytes", len(image))
+				install(path)
 				return nil
 			}
 		}
+
+		if *signedURL {
+			httpc, err := gateway.NewHTTPClient(*caFile)
+			if err != nil {
+				log.Error("build artifact HTTP client", "err", err)
+				os.Exit(1)
+			}
+
+			// Downloaded straight into the firmware directory where possible,
+			// so applying is a rename away rather than a second copy.
+			dir := *dlDir
+			if dir == "" {
+				dir = *fwDir
+			}
+			if dir == "" {
+				dir = filepath.Join(os.TempDir(), "pouch-firmware")
+			}
+
+			opts.Downloader = &gateway.Downloader{
+				Client:  httpc,
+				Dir:     dir,
+				Timeout: *dlTimeout,
+				Log:     log,
+			}
+
+			if *fwDir != "" {
+				fwDirCopy, dlDirCopy := *fwDir, dir
+				opts.ApplyFile = func(pkg, version, path string) error {
+					if dlDirCopy == fwDirCopy {
+						install(path)
+						return nil
+					}
+					if err := os.MkdirAll(fwDirCopy, 0o755); err != nil {
+						return err
+					}
+					dst := filepath.Join(fwDirCopy, filepath.Base(path))
+					if err := copyFile(path, dst); err != nil {
+						return err
+					}
+					install(dst)
+					return nil
+				}
+			}
+		}
+
 		gw.Firmware = opts
 		fwOpts = opts
 	}
@@ -148,7 +208,7 @@ func main() {
 			}
 			l = nl
 			closeOnCancel(l)
-			gw = gateway.New(l, c, link.MaxFrame, log)
+			gw = gateway.New(ctx, l, c, link.MaxFrame, log)
 			gw.Firmware = fwOpts
 			log.Info("reattached after firmware apply", "device", *dev)
 		}
@@ -168,16 +228,21 @@ func main() {
 // This is the "host-side apply" half of an MCU-mediated update: the core has no
 // flash of its own, so applying means putting the file where remoteproc loads
 // from and cycling the core.
+// copyFile copies src to dst, replacing whatever was there.
+func copyFile(src, dst string) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, data, 0o644)
+}
+
 func applyViaRemoteproc(log *slog.Logger, node, image string) error {
 	name := filepath.Base(image)
 	dst := filepath.Join("/lib/firmware", name)
 
 	if dst != image {
-		data, err := os.ReadFile(image)
-		if err != nil {
-			return err
-		}
-		if err := os.WriteFile(dst, data, 0o644); err != nil {
+		if err := copyFile(image, dst); err != nil {
 			return err
 		}
 	}
