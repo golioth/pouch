@@ -8,6 +8,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -57,6 +58,18 @@ func main() {
 		os.Exit(1)
 	}
 	defer func() { _ = l.Close() }()
+
+	// A session spends most of its life waiting for the device to say
+	// something. Closing the link is what breaks that wait, so a signal has to
+	// reach the descriptor - cancelling the context alone would leave the
+	// process sitting in poll(2) until it was killed outright.
+	closeOnCancel := func(l *link.RPMsg) {
+		go func() {
+			<-ctx.Done()
+			_ = l.Close()
+		}()
+	}
+	closeOnCancel(l)
 
 	// The gateway authenticates upstream with its own certificate. It is a
 	// separate identity from the device's: the device's key never leaves the
@@ -109,9 +122,13 @@ func main() {
 
 	for {
 		start := time.Now()
-		if err := gw.RunSession(ctx); err != nil {
+		switch err := gw.RunSession(ctx); {
+		case errors.Is(err, link.ErrClosed) || ctx.Err() != nil:
+			log.Info("shutting down")
+			return
+		case err != nil:
 			log.Error("session failed", "err", err, "elapsed", time.Since(start))
-		} else {
+		default:
 			log.Info("session complete", "elapsed", time.Since(start))
 		}
 
@@ -130,6 +147,7 @@ func main() {
 				return
 			}
 			l = nl
+			closeOnCancel(l)
 			gw = gateway.New(l, c, link.MaxFrame, log)
 			gw.Firmware = fwOpts
 			log.Info("reattached after firmware apply", "device", *dev)
