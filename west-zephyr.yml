@@ -16,6 +16,8 @@ manifest:
           - cmsis_6
           - hal_nordic
           - hal_nxp
+          - libmetal
+          - open-amp
           - mbedtls
           - mcuboot
           - nrf_hw_models
