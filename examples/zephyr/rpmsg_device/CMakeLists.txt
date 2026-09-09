@@ -30,7 +30,8 @@ target_sources_ifdef(CONFIG_EXAMPLE_FW_SIGNED_URL app PRIVATE src/fw_signed_url.
 # arpa/inet.h pulls in zephyr/net/net_ip.h, where net_sa_family_t is defined
 # unconditionally. Nothing here calls inet_pton(); the declaration only has to
 # parse. Drop this once Zephyr's arpa/inet.h stops depending on a type it does
-# not define, or once signy stops requiring Zephyr's POSIX clock.
+# not define, or once signy stops requiring Zephyr's POSIX clock - reported as
+# https://github.com/golioth/signy/issues/18.
 #
 # Keyed on the headers being present rather than on this sample using signy:
 # enabling CONFIG_SIGNY is what puts them there, and that can outlive any one
