@@ -1,0 +1,48 @@
+name: "Test: Go Gateway"
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: Vet, build and test the Go gateway
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: examples/linux/rpmsg_gateway
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: examples/linux/rpmsg_gateway/go.mod
+          cache-dependency-path: examples/linux/rpmsg_gateway/go.sum
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build ./...
+
+      # The gateway runs on the Linux core of the SoC the device sits on, which
+      # is arm64 rather than the runner's architecture.
+      - name: Build for the target
+        run: GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build ./cmd/pouch-rpmsg-gateway
+
+      - name: Test
+        run: go test ./...

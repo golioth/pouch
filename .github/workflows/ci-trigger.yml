@@ -31,6 +31,10 @@ jobs:
       actions: write
     uses: ./.github/workflows/test-build-gateway.yml
     secrets: inherit
+  trigger-go:
+    name: Run Go Gateway Tests
+    uses: ./.github/workflows/test-go.yml
+    secrets: inherit
   trigger-twister:
     name: Run Twister
     permissions:
