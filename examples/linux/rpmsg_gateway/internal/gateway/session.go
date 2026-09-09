@@ -301,6 +301,11 @@ func (g *Gateway) RunSession(ctx context.Context) error {
 				g.log.Error("signed-URL handoff", "err", err)
 				return
 			}
+			// Debug only: the URL carries a short-lived signature, and seeing
+			// the exact bytes the device produced is the only way to tell a
+			// refused signature from a malformed one.
+			g.log.Debug("signed artifact URL", "url", rec.url)
+
 			// Started here and finished long after this session ends: an
 			// artifact takes minutes, and holding the session open would stall
 			// the uplink and downlink behind a file transfer.

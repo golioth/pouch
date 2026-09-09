@@ -101,8 +101,12 @@ stop offering the component when it handed the URL over.
 
 Signing needs a clock, and the device has none, so we report ours on the TIME
 channel before the certificate phases. **The gateway's own clock therefore has
-to be right** — NTP, or every URL the device signs falls outside its validity
-window and the cloud refuses it.
+to be right** — run NTP. The device stamps each URL "not before now", and
+Golioth refuses a not-before in the future with no tolerance whatsoever:
+measured against production, five seconds fast is already a 401. The clock we
+report is backdated a few seconds to absorb the ordinary case of being a moment
+ahead, but a host that is properly wrong cannot be rescued from here, and the
+symptom is every update silently falling back to the relay.
 
 **Relay** (`-firmware`). The device downloads the image through Pouch itself and
 streams the plaintext to us over the FW channel, and we verify the SHA-256

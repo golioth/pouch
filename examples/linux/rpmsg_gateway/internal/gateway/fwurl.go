@@ -38,6 +38,20 @@ const (
 	timeMagic     = 0x314D5450 // "PTM1" little endian
 )
 
+// timeSkewMargin backdates the clock we report to the device.
+//
+// The device stamps a signed URL with "not before now", and Golioth rejects a
+// not-before in the future with no tolerance at all - measured against
+// production, five seconds ahead is already a 401. The error is therefore
+// completely asymmetric: a clock we report slightly fast makes every update
+// fail, while one slightly slow costs a few seconds off a ninety-second
+// validity window and nothing else.
+//
+// So lean slow. This does not rescue a host whose clock is properly wrong -
+// nothing local can - but it absorbs the ordinary case of being a moment ahead,
+// plus the time the record spends in transit before it is used.
+const timeSkewMargin = 5 * time.Second
+
 // fwURLRecord is a device's request that we fetch an artifact on its behalf.
 type fwURLRecord struct {
 	pkg     string
@@ -101,10 +115,11 @@ func parseFwURLRecord(b []byte) (*fwURLRecord, error) {
 	return r, nil
 }
 
-// timeRecord encodes the wall clock for a device that has none of its own.
+// timeRecord encodes the wall clock for a device that has none of its own,
+// backdated by timeSkewMargin.
 func timeRecord(now time.Time) []byte {
 	b := make([]byte, timeRecordLen)
 	binary.LittleEndian.PutUint32(b[0:4], timeMagic)
-	binary.LittleEndian.PutUint64(b[4:12], uint64(now.Unix()))
+	binary.LittleEndian.PutUint64(b[4:12], uint64(now.Add(-timeSkewMargin).Unix()))
 	return b
 }

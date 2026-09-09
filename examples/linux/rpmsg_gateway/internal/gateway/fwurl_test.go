@@ -126,7 +126,14 @@ func TestTimeRecord(t *testing.T) {
 	if got := binary.LittleEndian.Uint32(b[0:4]); got != timeMagic {
 		t.Errorf("magic 0x%08x, want 0x%08x", got, timeMagic)
 	}
-	if got := binary.LittleEndian.Uint64(b[4:12]); got != 1757000000 {
-		t.Errorf("seconds %d, want 1757000000", got)
+
+	// Backdated, never ahead: the device stamps "not before now" onto a signed
+	// URL, and the server refuses a not-before in the future outright.
+	want := uint64(now.Add(-timeSkewMargin).Unix())
+	if got := binary.LittleEndian.Uint64(b[4:12]); got != want {
+		t.Errorf("seconds %d, want %d", got, want)
+	}
+	if got := binary.LittleEndian.Uint64(b[4:12]); got >= uint64(now.Unix()) {
+		t.Errorf("reported clock %d is not behind the real time %d", got, now.Unix())
 	}
 }
