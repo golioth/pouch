@@ -28,7 +28,15 @@ static const uint8_t device_crt[] = {
 #include "device_crt.der.inc"
 };
 
-static psa_key_id_t import_raw_pk(const uint8_t *private_key, size_t size)
+/*
+ * A PSA key carries one permitted algorithm and one usage mask, so the same key
+ * material has to be imported once per purpose: deriving the Pouch session key,
+ * and - where signed-URL updates are built in - signing.
+ */
+static psa_key_id_t import_raw_pk(const uint8_t *private_key,
+                                  size_t size,
+                                  psa_algorithm_t alg,
+                                  psa_key_usage_t usage)
 {
     mbedtls_pk_context pk;
     mbedtls_pk_init(&pk);
@@ -43,9 +51,9 @@ static psa_key_id_t import_raw_pk(const uint8_t *private_key, size_t size)
 
     psa_key_attributes_t attrs = PSA_KEY_ATTRIBUTES_INIT;
 
-    psa_set_key_algorithm(&attrs, PSA_ALG_ECDH);
+    psa_set_key_algorithm(&attrs, alg);
     psa_set_key_type(&attrs, PSA_KEY_TYPE_ECC_KEY_PAIR(PSA_ECC_FAMILY_SECP_R1));
-    psa_set_key_usage_flags(&attrs, PSA_KEY_USAGE_DERIVE);
+    psa_set_key_usage_flags(&attrs, usage);
 
     psa_key_id_t key_id;
     err = mbedtls_pk_import_into_psa(&pk, &attrs, &key_id);
@@ -61,8 +69,18 @@ static psa_key_id_t import_raw_pk(const uint8_t *private_key, size_t size)
 
 psa_key_id_t load_private_key(void)
 {
-    return import_raw_pk(device_key, sizeof(device_key));
+    return import_raw_pk(device_key, sizeof(device_key), PSA_ALG_ECDH, PSA_KEY_USAGE_DERIVE);
 }
+
+#if defined(CONFIG_EXAMPLE_FW_SIGNED_URL)
+psa_key_id_t load_signing_key(void)
+{
+    return import_raw_pk(device_key,
+                         sizeof(device_key),
+                         PSA_ALG_ECDSA(PSA_ALG_SHA_256),
+                         PSA_KEY_USAGE_SIGN_HASH);
+}
+#endif
 
 int load_certificate(struct pouch_cert *cert)
 {

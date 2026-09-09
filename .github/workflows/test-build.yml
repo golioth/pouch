@@ -30,6 +30,14 @@ jobs:
             example: rpmsg_device
             board: imx95_evk/mimx9596/m7
             no_sysbuild: true
+          # The same sample with the signed-URL handoff off, so the relay-only
+          # configuration keeps building: the two are independent, and only
+          # this entry compiles the fallback path on its own.
+          - manifest: west-zephyr.yml
+            example: rpmsg_device
+            board: imx95_evk/mimx9596/m7
+            no_sysbuild: true
+            extra_args: -DCONFIG_EXAMPLE_FW_SIGNED_URL=n
       fail-fast: false
     runs-on: ubuntu-24.04
     steps:
@@ -63,7 +71,9 @@ jobs:
             SYSBUILD_FLAG="--sysbuild"
           fi
 
-          west build ${SYSBUILD_FLAG} -p -b ${{ matrix.board }} pouch/examples/zephyr/${{ matrix.example }}
+          west build ${SYSBUILD_FLAG} -p -b ${{ matrix.board }} \
+            pouch/examples/zephyr/${{ matrix.example }} \
+            -- ${{ matrix.extra_args }}
 
   build-esp-idf:
     strategy:

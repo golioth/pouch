@@ -86,6 +86,52 @@ or `ble_gatt` examples for the filesystem-based provisioning pattern
 
 [pki]: https://docs.golioth.io/connectivity/credentials/
 
+## Firmware updates
+
+This core has no flash of its own - the host loads it through remoteproc at
+every boot - so it cannot apply an update itself. It is still the authenticated
+Pouch endpoint, so the cloud offers the update to it and it arranges for the
+host to install one. There are two ways to arrange that, and the sample builds
+both, preferring the first:
+
+**Signed URL** (`CONFIG_EXAMPLE_FW_SIGNED_URL`). This core signs a URL for its
+own artifact with the device key and hands the host that; the host fetches the
+image itself. No image byte crosses the link and nothing is buffered here. The
+signature is made with a key that never leaves this core, is valid for one
+artifact, and expires in about ninety seconds, so the host gains the ability to
+fetch that one file and nothing else. Signing needs a wall clock, which this
+core does not have - the host reports its own on the time channel, and being
+told the time is also how this core knows the host speaks the protocol at all.
+
+**Relay** (`CONFIG_EXAMPLE_FW_RELAY`). This core downloads its image through
+Pouch OTA and streams the plaintext out over the firmware channel, and the host
+verifies the SHA-256 from the manifest before installing. It works against any
+host that collects that channel, at the cost of an 8 KB buffer here and moving
+every byte twice. It is the fallback when a URL cannot be signed, and when a
+signed URL is refused - the sample retries an update three times and switches to
+the relay after a signed-URL attempt comes back rejected.
+
+Either way the host reports what it did on the apply verdict channel, which is
+the only notification this core gets: the cloud is told to stop offering the
+component as soon as the image is handed over, and the manifest that would
+otherwise re-offer it arrives once per connection.
+
+Signed URLs additionally require, on the cloud side:
+
+- The feature enabled for the project. It is off by default and available to
+  Teams and Enterprise organizations.
+- The CA that issued this device's certificate [uploaded to the project][pki],
+  since the certificate travels in the URL and the cloud verifies the signature
+  against it.
+
+> [!CAUTION]
+> The embedded placeholder credentials below are self-signed, so the cloud will
+> refuse any URL they sign and every update falls back to the relay. Signed-URL
+> updates need a real device certificate.
+
+The host side of both mechanisms is the gateway in
+[`examples/linux/rpmsg_gateway`](../../linux/rpmsg_gateway).
+
 ## Tuning notes
 
 The board config carries settings that were not obvious and are worth keeping if

@@ -4,13 +4,45 @@
 
 mainmenu "Pouch rpmsg device example"
 
+config EXAMPLE_FW_RELAY
+    bool "Relay the firmware image through this core"
+    depends on POUCH_SERIAL_FW_RELAY
+    default y
+    help
+      Download this core's image through Pouch OTA and stream the plaintext to
+      the host over the firmware channel. Works against any host that collects
+      that channel, and is the fallback when a URL cannot be signed.
+
+config EXAMPLE_FW_SIGNED_URL
+    bool "Hand the host a signed URL for the firmware image"
+    depends on POUCH_SERIAL_FW_SIGNED_URL
+    depends on SIGNY
+    default y
+    help
+      Sign a URL for this core's own artifact and let the host fetch the image
+      itself, so no image byte crosses the link. Preferred over the relay where
+      both are available.
+
+      Requires signed URLs to be enabled for the Golioth project and the CA
+      that issued the device certificate to be uploaded to it. A device whose
+      certificate the cloud will not accept falls back to the relay.
+
+config EXAMPLE_SIGNED_URL_BASE
+    string "Base URL for OTA artifacts"
+    depends on EXAMPLE_FW_SIGNED_URL
+    default "https://gw.golioth.io/.u/c/"
+    help
+      The artifact URL is this base followed by "package@version". The manifest
+      does carry a URI field, but the SDK does not decode it today, so the URL
+      is composed here instead.
+
 config EXAMPLE_FW_COMPONENT
     string "OTA component to use for firmware update"
-    depends on POUCH_SERIAL_FW_RELAY
+    depends on EXAMPLE_FW_RELAY || EXAMPLE_FW_SIGNED_URL
     default "rpmsg_device"
     help
       Name of the component in the OTA manifest carrying this core's firmware.
-      The image is relayed to the host, which verifies and applies it through
-      remoteproc - this core has no flash of its own.
+      The host verifies and applies it through remoteproc - this core has no
+      flash of its own.
 
 source "Kconfig.zephyr"

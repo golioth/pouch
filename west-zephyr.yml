@@ -6,6 +6,14 @@ manifest:
   group-filter: [+babblesim]
 
   projects:
+    # Signs artifact URLs on the device, so the host can fetch an image the
+    # device is entitled to without holding any credential of its own. Used by
+    # the rpmsg_device example; see examples/zephyr/rpmsg_device/README.md.
+    - name: signy
+      path: modules/lib/signy
+      revision: v0.2.0
+      url: https://github.com/golioth/signy.git
+
     - name: zephyr
       revision: v4.4.0
       url: https://github.com/zephyrproject-rtos/zephyr
