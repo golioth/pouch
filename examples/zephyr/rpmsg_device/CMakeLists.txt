@@ -31,6 +31,11 @@ target_sources_ifdef(CONFIG_EXAMPLE_FW_SIGNED_URL app PRIVATE src/fw_signed_url.
 # unconditionally. Nothing here calls inet_pton(); the declaration only has to
 # parse. Drop this once Zephyr's arpa/inet.h stops depending on a type it does
 # not define, or once signy stops requiring Zephyr's POSIX clock.
-if(CONFIG_EXAMPLE_FW_SIGNED_URL AND NOT CONFIG_NETWORKING)
+#
+# Keyed on the headers being present rather than on this sample using signy:
+# enabling CONFIG_SIGNY is what puts them there, and that can outlive any one
+# of the options above - a build with the transport support compiled but the
+# sample's signed-URL path switched off still needs this.
+if(CONFIG_POSIX_SYSTEM_INTERFACES AND NOT CONFIG_NETWORKING)
   zephyr_compile_definitions(sa_family_t=net_sa_family_t)
 endif()
