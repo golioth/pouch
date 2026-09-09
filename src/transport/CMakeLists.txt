@@ -12,6 +12,7 @@ pouch_config_enabled(_pouch_transport_serial_broker CONFIG_POUCH_TRANSPORT_SERIA
 pouch_config_enabled(_pouch_transport_serial_device CONFIG_POUCH_TRANSPORT_SERIAL_DEVICE)
 pouch_config_enabled(_pouch_serial_fw_relay CONFIG_POUCH_SERIAL_FW_RELAY)
 pouch_config_enabled(_pouch_serial_fw_status CONFIG_POUCH_SERIAL_FW_STATUS)
+pouch_config_enabled(_pouch_serial_fw_signed_url CONFIG_POUCH_SERIAL_FW_SIGNED_URL)
 
 # The device-side endpoints are only used by the transports that speak the
 # endpoint protocol: the GATT peripheral and the serial device. Builds without
@@ -120,6 +121,12 @@ if(_pouch_transport_serial)
         if (_pouch_serial_fw_relay)
             target_sources(${_pouch_target} PRIVATE
                 ${_pouch_transport_root}/endpoints/device/fw.c
+            )
+        endif()
+
+        if (_pouch_serial_fw_signed_url)
+            target_sources(${_pouch_target} PRIVATE
+                ${_pouch_transport_root}/endpoints/device/fw_url.c
             )
         endif()
     endif()

@@ -16,6 +16,11 @@
 enum info_flags
 {
     INFO_FLAG_PROVISIONED = (1 << 0),
+    /* Tells the broker this device can be handed firmware as a signed URL, so
+     * that a broker which supports it knows to push the time and collect the
+     * URL channel, and one which does not is unaffected.
+     */
+    INFO_FLAG_FW_SIGNED_URL = (1 << 1),
 };
 
 static struct
@@ -42,6 +47,10 @@ static int build_info_data(void)
     // TODO: Set the Provisioned flag once we have the functionality to know whether provisioning
     // has taken place.
     enum info_flags flags = 0;
+
+#if defined(CONFIG_POUCH_SERIAL_FW_SIGNED_URL)
+    flags |= INFO_FLAG_FW_SIGNED_URL;
+#endif
 
     struct pouch_gatt_info cbor = {
         .pouch_gatt_info_flags = flags,

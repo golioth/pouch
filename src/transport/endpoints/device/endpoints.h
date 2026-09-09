@@ -14,3 +14,5 @@ extern const struct pouch_endpoint pouch_device_endpoint_uplink;
 extern const struct pouch_endpoint pouch_device_endpoint_downlink;
 extern const struct pouch_endpoint pouch_device_endpoint_fw;
 extern const struct pouch_endpoint pouch_device_endpoint_fw_status;
+extern const struct pouch_endpoint pouch_device_endpoint_fw_url;
+extern const struct pouch_endpoint pouch_device_endpoint_time;

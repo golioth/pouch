@@ -30,6 +30,7 @@ target_compile_definitions(app PRIVATE CONFIG_POUCH_SERIAL_LOG_LEVEL=3)
 # is enabled, and these suites stub those endpoints, so enable it here.
 target_compile_definitions(app PRIVATE CONFIG_POUCH_SERIAL_FW_RELAY=1)
 target_compile_definitions(app PRIVATE CONFIG_POUCH_SERIAL_FW_STATUS=1)
+target_compile_definitions(app PRIVATE CONFIG_POUCH_SERIAL_FW_SIGNED_URL=1)
 
 # Serial transport core + the UART framing under test, plus the shared stub
 # endpoints from the serial exchange test.

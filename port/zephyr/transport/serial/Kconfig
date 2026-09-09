@@ -61,6 +61,41 @@ config POUCH_SERIAL_FW_BUF_SIZE
 
 endif # POUCH_SERIAL_FW_RELAY
 
+menuconfig POUCH_SERIAL_FW_SIGNED_URL
+    bool "Signed-URL firmware handoff"
+    depends on POUCH_TRANSPORT_SERIAL_DEVICE
+    select POUCH_SERIAL_FW_STATUS
+    help
+        Hand the broker a signed URL for this core's own firmware artifact and
+        let it fetch the image itself, for cores that remoteproc loads from the
+        host filesystem and so have no flash of their own. This core stays the
+        authenticated endpoint - it holds the key that signs the URL - but no
+        image byte crosses the link and nothing is buffered here, which is what
+        distinguishes this from POUCH_SERIAL_FW_RELAY. The two are independent;
+        a device may enable both and choose per update.
+
+        Off by default. The channel ids exist unconditionally so that every
+        build agrees on the wire format.
+
+        Requires a broker that pushes its wall-clock time and collects the URL
+        channel; the in-tree broker does neither. On the cloud side it requires
+        signed URLs to be enabled for the project, and the CA that issued the
+        device certificate to be uploaded to it.
+
+if POUCH_SERIAL_FW_SIGNED_URL
+
+config POUCH_SERIAL_FW_URL_MAX_LEN
+    int "Maximum signed URL length"
+    default 1024
+    help
+        Bytes reserved for the signed URL. A signed URL carries the validity
+        window, the device certificate and the signature on top of the artifact
+        location, so it is far longer than the URL that goes in: roughly 750
+        bytes for a 385-byte certificate. Must be at least as large as the
+        signer's own maximum, or a URL it produces will be refused as too long.
+
+endif # POUCH_SERIAL_FW_SIGNED_URL
+
 menuconfig POUCH_RPMSG_RSC_DEVICE
     bool "Pouch rpmsg device transport adapter (resource table)"
     depends on POUCH_TRANSPORT_SERIAL_DEVICE

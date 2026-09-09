@@ -27,6 +27,10 @@ static struct pouch_serial serial = {
 #if defined(CONFIG_POUCH_SERIAL_FW_RELAY)
             [POUCH_SERIAL_CH_FW] = CHANNEL(&pouch_device_endpoint_fw),
 #endif
+#if defined(CONFIG_POUCH_SERIAL_FW_SIGNED_URL)
+            [POUCH_SERIAL_CH_TIME] = CHANNEL(&pouch_device_endpoint_time),
+            [POUCH_SERIAL_CH_FW_URL] = CHANNEL(&pouch_device_endpoint_fw_url),
+#endif
         },
 };
 

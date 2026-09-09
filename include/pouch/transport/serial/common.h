@@ -17,6 +17,8 @@ enum pouch_serial_channel_id
     POUCH_SERIAL_CH_UPLINK,      /**< Device -> Broker: outbound pouches */
     POUCH_SERIAL_CH_FW_STATUS,   /**< Broker -> Device: firmware apply result */
     POUCH_SERIAL_CH_FW,          /**< Device -> Broker: firmware image relay */
+    POUCH_SERIAL_CH_TIME,        /**< Broker -> Device: wall-clock time */
+    POUCH_SERIAL_CH_FW_URL,      /**< Device -> Broker: signed firmware artifact URL */
 
     POUCH_SERIAL_CHANNEL_COUNT,
 };

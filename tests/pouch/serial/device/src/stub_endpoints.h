@@ -62,6 +62,8 @@ struct device_stubs
     struct stub_sender uplink;
     struct stub_receiver fw_status;
     struct stub_sender fw;
+    struct stub_receiver time;
+    struct stub_sender fw_url;
 };
 
 extern struct device_stubs device_stubs;

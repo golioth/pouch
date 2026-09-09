@@ -31,6 +31,14 @@
  * remaining bytes only arrive on the next session's downlink.
  */
 
+/**
+ * Longest package or version name a firmware record carries.
+ *
+ * The length fields on the wire are single bytes, and this matches the Golioth
+ * OTA defaults, so a longer name could not be described anyway.
+ */
+#define POUCH_SERIAL_FW_MAX_NAME_LEN 32
+
 /** Size of the fixed part of the firmware chunk header. */
 #define POUCH_SERIAL_FW_HDR_FIXED_LEN 46
 

@@ -1184,6 +1184,25 @@ ZTEST(serial_broker, test_unconfigured_channel_is_ignored)
     len = build_frame(buf, sizeof(buf), &data, payload, sizeof(payload));
     zassert_equal(pouch_serial_broker_recv(test_broker, buf, len), -ENODEV);
 
+    /* The signed-URL channels are unconfigured here too: the in-tree broker
+     * neither reports its clock nor collects a URL. A device that has them
+     * enabled must not be able to disturb a broker that has not.
+     */
+    struct pouch_serial_header url_ack = {
+        .is_data = false,
+        .channel = POUCH_SERIAL_CH_FW_URL,
+    };
+    len = build_frame(buf, sizeof(buf), &url_ack, NULL, 0);
+    zassert_equal(pouch_serial_broker_recv(test_broker, buf, len), -ENODEV);
+
+    struct pouch_serial_header time_data = {
+        .is_data = true,
+        .first = true,
+        .channel = POUCH_SERIAL_CH_TIME,
+    };
+    len = build_frame(buf, sizeof(buf), &time_data, payload, sizeof(payload));
+    zassert_equal(pouch_serial_broker_recv(test_broker, buf, len), -ENODEV);
+
     /* Those frames left no response queued, and the broker still runs a normal
      * session afterwards. */
     zassert_equal(pouch_serial_broker_frame_get(test_broker, buf, sizeof(buf)),

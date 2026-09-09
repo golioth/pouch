@@ -44,7 +44,9 @@ void stubs_reset(void)
     receiver_reset(&device_stubs.downlink);
     sender_reset(&device_stubs.uplink);
     receiver_reset(&device_stubs.fw_status);
+    receiver_reset(&device_stubs.time);
     sender_reset(&device_stubs.fw);
+    sender_reset(&device_stubs.fw_url);
 
     receiver_reset(&broker_stubs.info);
     sender_reset(&broker_stubs.server_cert);
@@ -495,4 +497,57 @@ static enum pouch_result d_fw_send(struct pouch_bearer *bearer, void *dst, size_
 const struct pouch_endpoint pouch_device_endpoint_fw = {
     .start = d_fw_start,
     .send = d_fw_send,
+};
+
+/* TIME: device receives the broker's wall clock (receiver) */
+
+static int d_time_start(struct pouch_bearer *bearer)
+{
+    (void) bearer;
+    return receiver_start_helper(&device_stubs.time);
+}
+
+static int d_time_recv(struct pouch_bearer *bearer, const void *buf, size_t len)
+{
+    (void) bearer;
+    return receiver_push(&device_stubs.time, buf, len);
+}
+
+static void d_time_end(struct pouch_bearer *bearer, bool success)
+{
+    (void) bearer;
+    if (success)
+    {
+        device_stubs.time.end_success_count++;
+    }
+    else
+    {
+        device_stubs.time.end_fail_count++;
+    }
+}
+
+const struct pouch_endpoint pouch_device_endpoint_time = {
+    .start = d_time_start,
+    .recv = d_time_recv,
+    .end = d_time_end,
+};
+
+/* FW_URL: device hands the broker a signed artifact URL (sender) */
+
+static int d_fw_url_start(struct pouch_bearer *bearer)
+{
+    (void) bearer;
+    return sender_start_helper(&device_stubs.fw_url);
+}
+
+static enum pouch_result d_fw_url_send(struct pouch_bearer *bearer, void *dst, size_t *dst_len)
+{
+    (void) bearer;
+    return sender_fill(&device_stubs.fw_url, dst, dst_len);
+}
+
+/* No end() callback, matching the real pouch_device_endpoint_fw_url. */
+const struct pouch_endpoint pouch_device_endpoint_fw_url = {
+    .start = d_fw_url_start,
+    .send = d_fw_url_send,
 };
