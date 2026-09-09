@@ -41,8 +41,16 @@ struct pouch_gateway_uplink
     void *end_cb_arg;
 };
 
-static void cleanup_uplink(struct pouch_gateway_uplink *uplink)
+static void end_uplink(struct pouch_gateway_uplink *uplink, int err)
 {
+    if (uplink->downlink)
+    {
+        pouch_gateway_downlink_end_cb(err, uplink->downlink);
+    }
+
+    uplink->end_cb(uplink->end_cb_arg,
+                   err ? POUCH_GATEWAY_UPLINK_ERROR_CLOUD : POUCH_GATEWAY_UPLINK_SUCCESS);
+
     struct pouch_buf *block;
 
     if (uplink->drain_block != NULL)
@@ -148,16 +156,14 @@ static void send_uplink_via_cloud(struct pouch_gateway_uplink *uplink)
     if (uplink->total_len == 0)
     {
         POUCH_LOG_DBG("No uplink data to send");
-        uplink->end_cb(uplink->end_cb_arg, POUCH_GATEWAY_UPLINK_SUCCESS);
-        cleanup_uplink(uplink);
+        end_uplink(uplink, 0);
         return;
     }
 
     if (!IS_ENABLED(CONFIG_POUCH_GATEWAY_CLOUD))
     {
         POUCH_LOG_INF("Cloud disabled, discarding %zu bytes of peripheral data", uplink->total_len);
-        uplink->end_cb(uplink->end_cb_arg, POUCH_GATEWAY_UPLINK_SUCCESS);
-        cleanup_uplink(uplink);
+        end_uplink(uplink, 0);
         return;
     }
 
@@ -172,22 +178,11 @@ static void send_uplink_via_cloud(struct pouch_gateway_uplink *uplink)
     if (err)
     {
         POUCH_LOG_ERR("Cloud forward failed: %d", err);
-        if (uplink->downlink)
-        {
-            pouch_gateway_downlink_end_cb(err, uplink->downlink);
-        }
-        uplink->end_cb(uplink->end_cb_arg, POUCH_GATEWAY_UPLINK_ERROR_CLOUD);
-    }
-    else
-    {
-        if (uplink->downlink)
-        {
-            pouch_gateway_downlink_end_cb(0, uplink->downlink);
-        }
-        uplink->end_cb(uplink->end_cb_arg, POUCH_GATEWAY_UPLINK_SUCCESS);
+        end_uplink(uplink, err);
+        return;
     }
 
-    cleanup_uplink(uplink);
+    end_uplink(uplink, 0);
 }
 
 int pouch_gateway_uplink_write(struct pouch_gateway_uplink *uplink,
