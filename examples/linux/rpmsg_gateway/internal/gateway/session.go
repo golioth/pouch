@@ -42,6 +42,9 @@ type Cloud interface {
 	ServerCert(ctx context.Context) ([]byte, error)
 	RegisterDevice(ctx context.Context, cert []byte) error
 	Forward(ctx context.Context, uplink []byte) ([]byte, error)
+	// ClockOffset reports how far the server's clock runs ahead of ours, and
+	// whether one has been observed yet.
+	ClockOffset() (time.Duration, bool)
 }
 
 // Gateway brokers sessions for one device.
@@ -62,6 +65,10 @@ type Gateway struct {
 	Firmware  *FirmwareOptions
 	relay     fwRelay
 	downloads fwDownloads
+
+	// lastSkewLogged rate-limits the warning about a wrong local clock to
+	// once per whole second of drift, rather than once per session.
+	lastSkewLogged time.Duration
 
 	// serverCert is fetched once and reused across sessions.
 	certOnce sync.Once
@@ -281,9 +288,9 @@ func (g *Gateway) RunSession(ctx context.Context) error {
 
 	if g.Firmware != nil && g.Firmware.SignedURL {
 		// The device has no clock of its own, and signs against a validity
-		// window, so it needs ours before it can sign anything.
+		// window, so it needs one from us before it can sign anything.
 		ep.Time = &serial.BufSender{
-			Data: func() []byte { return timeRecord(time.Now()) },
+			Data: func() []byte { return timeRecord(g.serverNow()) },
 			Done: func(ok bool) {
 				if ok {
 					g.log.Debug("reported the time to the device")

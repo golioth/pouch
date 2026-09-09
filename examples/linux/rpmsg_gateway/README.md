@@ -99,14 +99,30 @@ runs in the background and its verdict goes out on the next session, one
 `-interval` later. The device is waiting for exactly that: it told the cloud to
 stop offering the component when it handed the URL over.
 
-Signing needs a clock, and the device has none, so we report ours on the TIME
-channel before the certificate phases. **The gateway's own clock therefore has
-to be right** — run NTP. The device stamps each URL "not before now", and
-Golioth refuses a not-before in the future with no tolerance whatsoever:
-measured against production, five seconds fast is already a 401. The clock we
-report is backdated a few seconds to absorb the ordinary case of being a moment
-ahead, but a host that is properly wrong cannot be rescued from here, and the
-symptom is every update silently falling back to the relay.
+Signing needs a clock, and the device has none, so we report one on the TIME
+channel before the certificate phases. The device stamps each URL "not before
+now" with whatever we give it, and Golioth refuses a not-before in the future
+with no tolerance whatsoever: measured against production, five seconds ahead is
+already a 401.
+
+What matters is therefore not whether this host's clock is right, but whether
+the stamp is one the server will accept — so we report **the server's** clock,
+not ours. It is learned from the `Date` header of responses we are already
+making, including error responses, so it costs no extra request and is
+re-learned every session rather than fixed at startup. A host running twenty
+seconds fast still produces working URLs.
+
+Two things it does not do. The estimate is good to about a second, since `Date`
+has one-second resolution and the round trip adds a little, so the reported
+clock is additionally backdated a few seconds. And before the first response
+there is nothing to correct by, so the very first session falls back to the
+local clock. Run NTP anyway: a badly wrong host clock breaks certificate
+validity windows and log timestamps regardless, and the gateway warns when it
+notices.
+
+Without this, the failure is invisible. A refused URL makes the device fall back
+to relaying, so the update still succeeds and only this gateway's log says
+why.
 
 **Relay** (`-firmware`). The device downloads the image through Pouch itself and
 streams the plaintext to us over the FW channel, and we verify the SHA-256

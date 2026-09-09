@@ -15,6 +15,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 )
 
@@ -30,6 +31,48 @@ const (
 type Client struct {
 	Address string
 	HTTP    *http.Client
+
+	// The server's clock, as observed from its Date header. It is tracked
+	// because the server is the authority on time for anything it validates:
+	// a device signing an artifact URL stamps it with a not-before, and this
+	// server rejects one in the future outright. Handing the device our own
+	// clock therefore fails whenever we are fast, so we hand it this instead.
+	clockMu     sync.Mutex
+	clockOffset time.Duration
+	clockValid  bool
+}
+
+// ClockOffset returns how far the server's clock runs ahead of ours, and
+// whether one has been observed yet. Add it to a local timestamp to express it
+// on the server's terms.
+func (c *Client) ClockOffset() (time.Duration, bool) {
+	c.clockMu.Lock()
+	defer c.clockMu.Unlock()
+	return c.clockOffset, c.clockValid
+}
+
+// observeClock records the server's clock from one response.
+//
+// sent and received bracket the request, so the instant the server stamped its
+// Date lies somewhere between them. Taking the midpoint removes the round trip
+// from the estimate; what remains is the header's one-second resolution and
+// half the asymmetry of the path.
+func (c *Client) observeClock(resp *http.Response, sent, received time.Time) {
+	date := resp.Header.Get("Date")
+	if date == "" {
+		return
+	}
+	serverTime, err := http.ParseTime(date)
+	if err != nil {
+		return
+	}
+
+	midpoint := sent.Add(received.Sub(sent) / 2)
+
+	c.clockMu.Lock()
+	defer c.clockMu.Unlock()
+	c.clockOffset = serverTime.Sub(midpoint)
+	c.clockValid = true
 }
 
 // New returns a client for address, e.g. "https://gw.golioth.io".
@@ -62,11 +105,16 @@ func (c *Client) do(ctx context.Context, method, path string, body []byte) ([]by
 	if client == nil {
 		client = http.DefaultClient
 	}
+	sent := time.Now()
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("%s %s: %w", method, path, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+
+	// Before the status check: an error response carries the header too, and a
+	// gateway that cannot reach the cloud yet still wants to learn its clock.
+	c.observeClock(resp, sent, time.Now())
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
