@@ -49,6 +49,7 @@ enum session_flags
     SESSION_VALID,
     SESSION_ACTIVE,
     SESSION_HAS_POUCH,
+    SESSION_POUCH_OPEN,
 };
 
 struct session
@@ -60,7 +61,7 @@ struct session
     struct
     {
         pouch_id_t id;
-        uint32_t block_index;
+        uint16_t block_index;
         uint8_t ad[AD_LEN];
     } pouch;
 };
