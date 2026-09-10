@@ -13,6 +13,7 @@
 #include <pouch/port.h>
 
 #include "../buf.h"
+#include "../block.h"
 
 POUCH_LOG_REGISTER(gw_downlink, CONFIG_POUCH_GATEWAY_LOG_LEVEL);
 
@@ -69,40 +70,59 @@ int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_las
     pouch_timepoint_t deadline =
         pouch_timepoint_get(POUCH_SECONDS(CONFIG_POUCH_GATEWAY_DOWNLINK_BLOCK_TIMEOUT));
 
-    struct pouch_buf *block = blockbuf_alloc(pouch_timepoint_timeout(deadline));
-    if (block == NULL)
-    {
-        POUCH_LOG_ERR("Failed to allocate block");
-        return -ENOMEM;
-    }
-
-    buf_write(block, data, len);
-
-    /* Record the last block's pointer BEFORE submitting so the
-     * consumer sees it as soon as it dequeues this buffer.
+    /* A single received CoAP block payload may be larger than a block-pool
+     * element: CONFIG_POUCH_COAP_BLOCK_SIZE is independent of
+     * CONFIG_POUCH_BLOCK_SIZE (and defaults larger), and a misbehaving or
+     * hostile server can return an oversized datagram. A block-pool element
+     * holds at most MAX_PLAINTEXT_BLOCK_SIZE payload bytes, and buf_write() is
+     * unchecked, so bound every write to the element capacity and split the
+     * payload across as many blocks as needed. The consumer
+     * (pouch_gateway_downlink_get_data) drains queued blocks as a byte stream,
+     * so splitting is transparent; only the final chunk carries is_last.
      */
-    if (is_last)
+    do
     {
-        downlink->last_block = block;
-    }
+        size_t take = MIN(len, (size_t) MAX_PLAINTEXT_BLOCK_SIZE);
+        bool last_chunk = is_last && (take == len);
 
-    int err = pouch_msgq_put(&downlink->block_queue, &block, pouch_timepoint_timeout(deadline));
-    if (err)
-    {
-        POUCH_LOG_ERR("Failed to enqueue block: %d", err);
-        if (is_last)
+        struct pouch_buf *block = blockbuf_alloc(pouch_timepoint_timeout(deadline));
+        if (block == NULL)
         {
-            downlink->last_block = NULL;
+            POUCH_LOG_ERR("Failed to allocate block");
+            return -ENOMEM;
         }
-        blockbuf_free(block);
-        return -ENOMEM;
-    }
 
-    if (NULL == downlink->current_block
-        && pouch_atomic_test_and_clear_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING))
-    {
-        downlink->data_available_cb(downlink->cb_arg);
-    }
+        buf_write(block, data, take);
+
+        /* Record the last block's pointer BEFORE submitting so the
+         * consumer sees it as soon as it dequeues this buffer.
+         */
+        if (last_chunk)
+        {
+            downlink->last_block = block;
+        }
+
+        int err = pouch_msgq_put(&downlink->block_queue, &block, pouch_timepoint_timeout(deadline));
+        if (err)
+        {
+            POUCH_LOG_ERR("Failed to enqueue block: %d", err);
+            if (last_chunk)
+            {
+                downlink->last_block = NULL;
+            }
+            blockbuf_free(block);
+            return -ENOMEM;
+        }
+
+        if (NULL == downlink->current_block
+            && pouch_atomic_test_and_clear_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING))
+        {
+            downlink->data_available_cb(downlink->cb_arg);
+        }
+
+        data += take;
+        len -= take;
+    } while (len);
 
     return 0;
 }
