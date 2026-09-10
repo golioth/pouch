@@ -220,6 +220,7 @@ int pouch_uplink_pouch_open(void)
     if (err)
     {
         pouch_atomic_clear_bit(uplink.flags, POUCH_ACTIVE);
+        end_session();
         return err;
     }
 

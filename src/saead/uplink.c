@@ -66,6 +66,12 @@ int saead_uplink_session_start(psa_algorithm_t algorithm, psa_key_id_t private_k
 
 int saead_uplink_pouch_start(void)
 {
+    if (uplink.pouch.id == SESSION_POUCH_ID_MAX)
+    {
+        POUCH_LOG_ERR("Session exhausted");
+        return -ENOSPC;
+    }
+
     return session_pouch_start(&uplink, uplink.pouch.id + 1);
 }
 
