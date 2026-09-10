@@ -173,7 +173,16 @@ int saead_downlink_block_decrypt(const struct pouch_buf *block, struct pouch_buf
     if (downlink.id.initiator == POUCH_ROLE_SERVER
         && downlink.id.type == SESSION_ID_TYPE_SEQUENTIAL)
     {
-        server.seqnum = downlink.id.value.sequential.seqnum;
+        // Advance the replay high-water mark only upward. A block that decrypts
+        // with a stale (<= current) seqnum must never lower it: SESSION_VALID is
+        // cleared on every session start, so a replayed session can reach this
+        // point on the "no previous session" branch of is_valid_downlink(), and an
+        // unconditional write there would roll the mark back and re-open the replay
+        // window for (new_seqnum, old_seqnum].
+        if (downlink.id.value.sequential.seqnum > server.seqnum)
+        {
+            server.seqnum = downlink.id.value.sequential.seqnum;
+        }
     }
 
     return 0;
