@@ -14,6 +14,7 @@
 #define SESSION_ID_TAG_LEN (SESSION_ID_LEN - sizeof(uint64_t))
 #define AUTH_TAG_LEN 16
 #define AD_LEN AUTH_TAG_LEN
+#define SESSION_POUCH_ID_MAX 0xffff
 
 /** The format of the session ID */
 enum session_id_type
