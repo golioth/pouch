@@ -159,14 +159,11 @@ jobs:
     timeout-minutes: 30
 
     container:
-      image: golioth/golioth-twister-base:sdk-1.0.1
+      image: golioth/golioth-twister-base:pr-84-sdk-1.0.1
       volumes:
         - /dev:/dev
         - /home/golioth/credentials:/opt/credentials
       options: --privileged
-      env:
-        ZEPHYR_SDK_INSTALL_DIR: /opt/toolchains/zephyr-sdk-1.0.1
-
 
     steps:
       - name: Checkout repository
