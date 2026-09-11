@@ -21,8 +21,13 @@
 
 enum flags
 {
+    /** Set by pouch_uplink_start(), cleared by pouch_uplink_finish(). */
     SESSION_ACTIVE,
+    /** Set by pouch_uplink_pouch_open(), cleared by pouch_uplink_pouch_close(). */
+    POUCH_ACTIVE,
+    /** Pouch-scoped: reset on each pouch_uplink_pouch_open(). */
     POUCH_CLOSING,
+    /** Pouch-scoped: reset on each pouch_uplink_pouch_open(). */
     POUCH_CLOSED,
 };
 
@@ -155,7 +160,7 @@ uint32_t uplink_session_id(void)
 // emit uplink calls in event handler to ensure that they run in the pouch processing thread.
 static void event_handler(enum pouch_event evt, void *ctx)
 {
-    if (evt != POUCH_EVENT_SESSION_START)
+    if (evt != POUCH_EVENT_POUCH_OPEN)
     {
         return;
     }
@@ -175,40 +180,59 @@ POUCH_EVENT_HANDLER(event_handler, NULL);
 
 // Transport API:
 
-struct pouch_uplink *pouch_uplink_start(void)
+int pouch_uplink_start(void)
 {
     int err;
 
     if (pouch_atomic_test_and_set_bit(uplink.flags, SESSION_ACTIVE))
     {
-        return NULL;
+        return 0;
     }
 
     err = crypto_session_start();
     if (err)
     {
         pouch_atomic_clear_bit(uplink.flags, SESSION_ACTIVE);
-        return NULL;
+        return err;
     }
 
-    err = crypto_pouch_start();
+    pouch_event_emit(POUCH_EVENT_SESSION_START);
+
+    return 0;
+}
+
+int pouch_uplink_pouch_open(void)
+{
+    if (!session_is_active())
+    {
+        return -ENOTCONN;
+    }
+
+    if (pouch_atomic_test_and_set_bit(uplink.flags, POUCH_ACTIVE))
+    {
+        return -EALREADY;
+    }
+
+    pouch_atomic_clear_bit(uplink.flags, POUCH_CLOSING);
+    pouch_atomic_clear_bit(uplink.flags, POUCH_CLOSED);
+
+    int err = crypto_pouch_start();
     if (err)
     {
-        pouch_atomic_clear_bit(uplink.flags, SESSION_ACTIVE);
-        crypto_session_end();
-        return NULL;
+        pouch_atomic_clear_bit(uplink.flags, POUCH_ACTIVE);
+        end_session();
+        return err;
     }
 
     // Create the header, but don't push it to the queue until we have data to send:
     uplink.header = pouch_header_create();
     if (!uplink.header)
     {
-        pouch_atomic_clear_bit(uplink.flags, SESSION_ACTIVE);
-        crypto_session_end();
-        return NULL;
+        pouch_atomic_clear_bit(uplink.flags, POUCH_ACTIVE);
+        return -ENOMEM;
     }
 
-    pouch_event_emit(POUCH_EVENT_SESSION_START);
+    pouch_event_emit(POUCH_EVENT_POUCH_OPEN);
 
     // Process any pending blocks:
     if (!buf_queue_is_empty(&uplink.processing.queue))
@@ -216,15 +240,15 @@ struct pouch_uplink *pouch_uplink_start(void)
         pouch_work_submit_to_queue(&uplink.processing.work_queue, &uplink.processing.work);
     }
 
-    return &uplink;
+    return 0;
 }
 
-int pouch_wait_for_queue(struct pouch_uplink *uplink, pouch_timeout_t timeout)
+int pouch_wait_for_queue(pouch_timeout_t timeout)
 {
-    return pouch_sem_take(&uplink->transport.has_queue_sem, timeout);
+    return pouch_sem_take(&uplink.transport.has_queue_sem, timeout);
 }
 
-enum pouch_result pouch_uplink_fill(struct pouch_uplink *uplink, uint8_t *dst, size_t *len)
+enum pouch_result pouch_uplink_fill(uint8_t *dst, size_t *len)
 {
     size_t maxlen = *len;
     *len = 0;
@@ -236,27 +260,27 @@ enum pouch_result pouch_uplink_fill(struct pouch_uplink *uplink, uint8_t *dst, s
 
     while (*len < maxlen)
     {
-        if (!pouch_bufview_is_ready(&uplink->transport.reader))
+        if (!pouch_bufview_is_ready(&uplink.transport.reader))
         {
-            struct pouch_buf *buf = buf_queue_get(&uplink->transport.queue);
+            struct pouch_buf *buf = buf_queue_get(&uplink.transport.queue);
             if (buf == NULL)
             {
                 break;
             }
 
-            pouch_bufview_init(&uplink->transport.reader, buf);
+            pouch_bufview_init(&uplink.transport.reader, buf);
         }
 
-        *len += pouch_bufview_memcpy(&uplink->transport.reader, &dst[*len], maxlen - *len);
+        *len += pouch_bufview_memcpy(&uplink.transport.reader, &dst[*len], maxlen - *len);
 
-        if (!pouch_bufview_available(&uplink->transport.reader))
+        if (!pouch_bufview_available(&uplink.transport.reader))
         {
-            pouch_bufview_free(&uplink->transport.reader);
+            pouch_bufview_free(&uplink.transport.reader);
         }
     }
 
-    if (pouch_is_open() || pouch_bufview_available(&uplink->transport.reader)
-        || !buf_queue_is_empty(&uplink->transport.queue))
+    if (pouch_is_open() || pouch_bufview_available(&uplink.transport.reader)
+        || !buf_queue_is_empty(&uplink.transport.queue))
     {
         return POUCH_MORE_DATA;
     }
@@ -264,35 +288,53 @@ enum pouch_result pouch_uplink_fill(struct pouch_uplink *uplink, uint8_t *dst, s
     return POUCH_NO_MORE_DATA;
 }
 
-int pouch_uplink_error(struct pouch_uplink *uplink)
+int pouch_uplink_error(void)
 {
-    return uplink->error;
+    return uplink.error;
 }
 
-void pouch_uplink_finish(struct pouch_uplink *uplink)
+static void pouch_close_internal(void)
 {
-    if (NULL == uplink)
-    {
-        return;
-    }
-
     // Free any remaining blocks, as they won't be valid in the next pouch:
     struct pouch_buf *buf;
-    while ((buf = buf_queue_get(&uplink->transport.queue)))
+    while ((buf = buf_queue_get(&uplink.transport.queue)))
     {
         buf_free(buf);
     }
 
-    pouch_bufview_free(&uplink->transport.reader);
+    pouch_bufview_free(&uplink.transport.reader);
 
-    if (uplink->header)
+    if (uplink.header)
     {
-        buf_free(uplink->header);
-        uplink->header = NULL;
+        buf_free(uplink.header);
+        uplink.header = NULL;
     }
 
-    pouch_atomic_inc(&uplink->id);
-    if (pouch_atomic_clear(uplink->flags) & BIT(SESSION_ACTIVE))
+    pouch_atomic_clear_bit(uplink.flags, POUCH_ACTIVE);
+}
+
+int pouch_uplink_pouch_close(void)
+{
+    if (!pouch_atomic_test_bit(uplink.flags, POUCH_ACTIVE))
+    {
+        return -EALREADY;
+    }
+
+    pouch_close_internal();
+
+    return 0;
+}
+
+void pouch_uplink_finish(void)
+{
+    // Force-close a still-open pouch so nothing leaks on an abnormal/error path:
+    if (pouch_atomic_test_bit(uplink.flags, POUCH_ACTIVE))
+    {
+        pouch_close_internal();
+    }
+
+    pouch_atomic_inc(&uplink.id);
+    if (pouch_atomic_clear(uplink.flags) & BIT(SESSION_ACTIVE))
     {
         /* Emit POUCH_EVENT_SESSION_END only after the transport has
          * declared the uplink session done, so subscribers (e.g. a

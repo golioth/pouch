@@ -50,7 +50,6 @@ static struct sync_context
     http_event_handle_cb event_cb;
     char url_buf[CONFIG_POUCH_HTTP_CLIENT_URL_BUF_SIZE];
 
-    struct pouch_uplink *uplink;
     uint8_t scratch[CONFIG_POUCH_HTTP_SCRATCH_BUF_SIZE];
 
     int64_t downlink_pos;
@@ -290,7 +289,7 @@ static int pouch_http_client_uplink_payload_send(struct sync_context *sync,
     do
     {
         pouch_data_len = sizeof(sync->scratch);
-        res = pouch_uplink_fill(sync->uplink, sync->scratch, &pouch_data_len);
+        res = pouch_uplink_fill(sync->scratch, &pouch_data_len);
         if (POUCH_ERROR == res)
         {
             ESP_LOGE(TAG, "Error getting pouch data: %d", err);
@@ -346,17 +345,24 @@ static int pouch_http_client_uplink_payload_send(struct sync_context *sync,
 
 static int send_pouch_uplink(struct sync_context *sync)
 {
-    sync->uplink = pouch_uplink_start();
-    if (NULL == sync->uplink)
+    int err = pouch_uplink_start();
+    if (0 != err)
     {
-        ESP_LOGE(TAG, "Failed to start uplink");
-        return -ENOMEM;
+        ESP_LOGE(TAG, "Failed to start uplink session");
+        return err;
+    }
+
+    err = pouch_uplink_pouch_open();
+    if (0 != err)
+    {
+        ESP_LOGE(TAG, "Failed to open uplink pouch: %d", err);
+        return err;
     }
 
     sync->downlink_pos = 0;
     sync->event_cb = pouch_uplink_response_callback;
 
-    int err = set_url(sync, HTTP_PATH_POUCH);
+    err = set_url(sync, HTTP_PATH_POUCH);
     if (0 != err)
     {
         goto finish_and_return;
@@ -406,8 +412,7 @@ static int send_pouch_uplink(struct sync_context *sync)
     err = 0;
 
 finish_and_return:
-    pouch_uplink_finish(sync->uplink);
-    sync->uplink = NULL;
+    pouch_uplink_pouch_close();
 
     return err;
 }
@@ -520,6 +525,8 @@ clear_and_return:
         esp_http_client_close(sync->client);
         esp_http_client_cleanup(sync->client);
         sync->client = NULL;
+
+        pouch_uplink_finish();
     }
     return err;
 }

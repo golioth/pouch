@@ -4,6 +4,7 @@
 #include <zephyr/ztest.h>
 #include <zephyr/sys/byteorder.h>
 #include <zcbor_decode.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include "mocks/transport.h"
@@ -310,6 +311,58 @@ ZTEST(uplink, test_submit_after_close)
     len = read_data(&buf, CONFIG_POUCH_BLOCK_SIZE);
     zassert_equal(len, 42);  // just pulling the second entry
     zassert_mem_equal(&buf[42 - sizeof(data2)], data2, sizeof(data2));
+}
+
+ZTEST(uplink, test_multiple_pouches_in_one_session)
+{
+    const char *path = "test/path";
+    const uint8_t data1[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
+    const uint8_t data2[] = {0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C};
+
+    transport_session_start();  // starts the session, and opens the first pouch
+
+    // A second pouch can't be opened while one is already open:
+    zassert_equal(transport_pouch_open(), -EALREADY);
+
+    zassert_ok(pouch_uplink_entry_write(path,
+                                        POUCH_CONTENT_TYPE_OCTET_STREAM,
+                                        data1,
+                                        sizeof(data1),
+                                        POUCH_FOREVER));
+
+    // let the auto-close event and processing run:
+    k_sleep(K_MSEC(1));
+
+    uint8_t *buf;
+    size_t len = read_data(&buf, CONFIG_POUCH_BLOCK_SIZE);
+    zassert_equal(len, 42, "Unexpected pouch 1 length %d", len);
+
+    // the first pouch should now be fully drained:
+    len = CONFIG_POUCH_BLOCK_SIZE;
+    zassert_equal(transport_pull_data(buf, &len), POUCH_NO_MORE_DATA);
+    zassert_equal(len, 0);
+
+    // closing the pouch does not end the session:
+    zassert_ok(transport_pouch_close());
+    zassert_equal(transport_pouch_close(), -EALREADY);
+
+    // a second pouch can now be opened, without restarting the session:
+    zassert_ok(transport_pouch_open());
+
+    zassert_ok(pouch_uplink_entry_write(path,
+                                        POUCH_CONTENT_TYPE_OCTET_STREAM,
+                                        data2,
+                                        sizeof(data2),
+                                        POUCH_FOREVER));
+
+    // let the auto-close event and processing run:
+    k_sleep(K_MSEC(1));
+
+    len = read_data(&buf, CONFIG_POUCH_BLOCK_SIZE);
+    zassert_equal(len, 42, "Unexpected pouch 2 length %d", len);
+    zassert_mem_equal(&buf[42 - sizeof(data2)], data2, sizeof(data2));
+
+    transport_session_end();
 }
 
 ZTEST(uplink, test_multithread_writer)
