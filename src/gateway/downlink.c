@@ -130,6 +130,14 @@ void pouch_gateway_downlink_end_cb(int status, void *arg)
                 downlink->data_available_cb(downlink->cb_arg);
             }
         }
+        return;
+    }
+
+    if (downlink->last_block == NULL)
+    {
+        // We never received the last block (or likely any data at all).
+        // Pass an empty dummy last block down to let the normal end-of-downlink mechanism run:
+        pouch_gateway_downlink_block_cb(NULL, 0, true, downlink);
     }
 }
 
