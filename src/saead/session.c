@@ -335,3 +335,30 @@ int session_decrypt_block(struct session *session,
 
     return 0;
 }
+
+int session_match(const struct session *session,
+                  const struct session_id *id,
+                  uint8_t max_block_size_log,
+                  psa_algorithm_t algorithm)
+{
+    if (!pouch_atomic_test_bit(&session->flags, SESSION_VALID))
+    {
+        // session ID and parameters are unset.
+        return 0;
+    }
+
+    if (!session_id_is_equal(id, &session->id))
+    {
+        // not the same session
+        return 0;
+    }
+
+    if (max_block_size_log != session->max_block_size_log || session->algorithm != algorithm)
+    {
+        // parameters have changed.
+        return -EINVAL;
+    }
+
+    // everything matches
+    return 1;
+}
