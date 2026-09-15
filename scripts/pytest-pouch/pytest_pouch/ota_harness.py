@@ -53,8 +53,6 @@ def fw_update_ver(request: pytest.FixtureRequest, ota_mode: str) -> str:
 
 @pytest.fixture(scope="module")
 def pouch_ota_package(request: pytest.FixtureRequest, ota_mode: str) -> str:
-    if ota_mode == "dummy":
-        return "ci_ota_fw"
     cli = request.config.getoption("--fw-update-pkg-name")
     if cli:
         return cli
@@ -64,6 +62,8 @@ def pouch_ota_package(request: pytest.FixtureRequest, ota_mode: str) -> str:
             return pkg
     except pytest.FixtureLookupError:
         pass
+    if ota_mode == "dummy":
+        return "ci_ota_fw"
     pytest.fail(
         "OTA package name not provided. Pass --fw-update-pkg-name via "
         "--pytest-args, use --ota-mode=dummy, or load a harness plugin that "
