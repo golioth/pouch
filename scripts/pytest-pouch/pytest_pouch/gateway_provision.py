@@ -85,47 +85,84 @@ def gateway_creds(creds, creds_dir, gateway_creds_dir, gateway_cloud_device, pro
     logger.info("Generate gateway device private key and cert (signed by shared CA)")
 
     subprocess.run(
-        f"openssl ecparam -name prime256v1 -genkey -noout -out {name}.key.pem",
+        [
+            "openssl",
+            "ecparam",
+            "-name",
+            "prime256v1",
+            "-genkey",
+            "-noout",
+            "-out",
+            f"{name}.key.pem",
+        ],
         check=True,
-        shell=True,
         cwd=gateway_creds_dir,
     )
     subprocess.run(
-        f"""\
-    openssl req -new \
-        -key {name}.key.pem \
-        -subj "/C=US/O={project.id}/CN={name}" \
-        -out {name}.csr.pem""",
+        [
+            "openssl",
+            "req",
+            "-new",
+            "-key",
+            f"{name}.key.pem",
+            "-subj",
+            f"/C=US/O={project.id}/CN={name}",
+            "-out",
+            f"{name}.csr.pem",
+        ],
         check=True,
-        shell=True,
         cwd=gateway_creds_dir,
     )
     subprocess.run(
-        f"""\
-    openssl x509 -req \
-        -in "{name}.csr.pem" \
-        -CA "{ca_cert}" \
-        -CAkey "{ca_key}" \
-        -CAcreateserial \
-        -out "{name}.crt.pem" \
-        -days 500 -sha256""",
+        [
+            "openssl",
+            "x509",
+            "-req",
+            "-in",
+            f"{name}.csr.pem",
+            "-CA",
+            ca_cert,
+            "-CAkey",
+            ca_key,
+            "-CAcreateserial",
+            "-out",
+            f"{name}.crt.pem",
+            "-days",
+            "500",
+            "-sha256",
+        ],
         check=True,
-        shell=True,
         cwd=gateway_creds_dir,
     )
 
     logger.info("Convert gateway key and cert to DER format")
 
     subprocess.run(
-        f"openssl x509 -in {name}.crt.pem -outform DER -out crt.der",
+        [
+            "openssl",
+            "x509",
+            "-in",
+            f"{name}.crt.pem",
+            "-outform",
+            "DER",
+            "-out",
+            "crt.der",
+        ],
         check=True,
-        shell=True,
         cwd=gateway_creds_dir,
     )
     subprocess.run(
-        f"openssl ec -in {name}.key.pem -outform DER -out key.der",
+        [
+            "openssl",
+            "ec",
+            "-in",
+            f"{name}.key.pem",
+            "-outform",
+            "DER",
+            "-out",
+            "key.der",
+        ],
         check=True,
-        shell=True,
         cwd=gateway_creds_dir,
     )
 
