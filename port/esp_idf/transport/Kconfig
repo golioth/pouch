@@ -33,12 +33,5 @@ endchoice
 
 rsource "../../../src/transport/Kconfig"
 
-config POUCH_TRANSPORT_ACK_TIMEOUT_MS
-    int "Pouch Transport ACK timeout (ms)"
-    default 1000
-    help
-        The timeout, in milliseconds, that a receiver will wait
-        for new packets before retransmitting an acknowledgement
-
 rsource "http/Kconfig"
 rsource "gatt/Kconfig"

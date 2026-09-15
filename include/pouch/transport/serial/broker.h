@@ -86,10 +86,8 @@ struct pouch_serial_broker *pouch_serial_broker_create(
  * fails. Only one exchange may be in progress at a time.
  *
  * @param broker  Broker instance.
- *
- * @return 0 on success, negative error code if the exchange cannot be started.
  */
-int pouch_serial_broker_start(struct pouch_serial_broker *broker);
+void pouch_serial_broker_start(struct pouch_serial_broker *broker);
 
 /**
  * Deliver a received frame from the device to the broker transport layer.
@@ -97,6 +95,10 @@ int pouch_serial_broker_start(struct pouch_serial_broker *broker);
  * Called by the transport adapter with each complete frame received from the
  * device. The first byte of @p frame is the encoded header; the remaining
  * bytes are the payload.
+ *
+ * On a protocol error the broker restarts the exchange from the top before
+ * returning, so the adapter does not need to drive recovery itself. The error
+ * code is still returned, for logging and diagnostics.
  *
  * @param broker  Broker instance.
  * @param frame   Frame bytes, starting with the 1-byte header.

@@ -230,6 +230,7 @@ static void before(void *f)
 
     /* Re-init to clear channel state from previous test */
     pouch_serial_device_init(ready_cb);
+    pouch_serial_device_sync();  // unsuspend device
 }
 
 ZTEST_SUITE(serial_device, NULL, setup, before, NULL, NULL);
@@ -410,9 +411,9 @@ ZTEST(serial_device, test_sender_start_error)
     device_stubs.uplink.start_err = -ENOMEM;
 
     int err = send_ack(POUCH_SERIAL_CH_UPLINK, false);
-    zassert_ok(err);
+    zassert_equal(err, -ENOMEM);
 
-    /* Device should produce an error DATA frame */
+    /* Device should also produce an error DATA frame */
     uint8_t buf[FRAME_BUF_SIZE];
     struct pouch_serial_header hdr;
     const uint8_t *payload;
@@ -426,7 +427,7 @@ ZTEST(serial_device, test_sender_start_error)
     zassert_true(hdr.last);
 
     zassert_equal(device_stubs.uplink.start_count, 1);
-    zassert_equal(device_stubs.uplink.end_fail_count, 1);
+    zassert_equal(device_stubs.uplink.end_fail_count, 0);  // never started
 }
 
 /*
@@ -601,6 +602,7 @@ ZTEST(serial_device, test_receiver_missing_first_flag)
     zassert_not_equal(err, 0, "expected error for missing FIRST flag");
 
     /* Endpoint should not have been started successfully */
+    zassert_equal(device_stubs.downlink.start_count, 0);
     zassert_equal(device_stubs.downlink.end_success_count, 0);
 }
 
@@ -716,8 +718,10 @@ ZTEST(serial_device, test_interrupt_ongoing_receive)
     int err = send_data(POUCH_SERIAL_CH_DOWNLINK, true, false, false, frag, sizeof(frag));
     zassert_not_equal(err, 0, "expected error when sending FIRST to already-open channel");
 
-    /* The first transfer should have been aborted */
-    zassert_equal(device_stubs.downlink.end_fail_count, 1);
+    /* The first transfer should not have been aborted, but the second transfer should have been
+     * ignored */
+    zassert_equal(device_stubs.downlink.end_fail_count, 0);
+    zassert_equal(device_stubs.downlink.start_count, 1);
 }
 
 ZTEST(serial_device, test_concurrent_sender_and_receiver)
@@ -916,6 +920,8 @@ ZTEST(serial_device, test_successive_sender_transfers)
     zassert_equal(device_stubs.uplink.end_success_count, 1);
 
     /* Second uplink transfer */
+    pouch_serial_device_sync();  // unsuspend device
+
     stub_sender_set_data(&device_stubs.uplink, data2, sizeof(data2));
     zassert_ok(send_ack(POUCH_SERIAL_CH_UPLINK, false));
 
@@ -938,6 +944,7 @@ ZTEST(serial_device, test_init_with_null_callback)
 {
     /* Should not crash with NULL ready callback */
     pouch_serial_device_init(NULL);
+    pouch_serial_device_sync();
 
     static const uint8_t payload[] = {0x01};
     stub_sender_set_data(&device_stubs.uplink, payload, sizeof(payload));
