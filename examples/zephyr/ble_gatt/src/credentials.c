@@ -13,8 +13,8 @@
 LOG_MODULE_REGISTER(credentials);
 
 #define CERT_DIR CONFIG_EXAMPLE_CREDENTIALS_DIR
-#define CERT_FILE CERT_DIR "/crt.der"
-#define KEY_FILE CERT_DIR "/key.der"
+#define CERT_FILE CERT_DIR "/" CONFIG_EXAMPLE_POUCH_DEVICE_CRT_FILENAME
+#define KEY_FILE CERT_DIR "/" CONFIG_EXAMPLE_POUCH_DEVICE_KEY_FILENAME
 
 /** Load the raw private key data into PSA */
 static psa_key_id_t import_raw_pk(const uint8_t *private_key, size_t size)
