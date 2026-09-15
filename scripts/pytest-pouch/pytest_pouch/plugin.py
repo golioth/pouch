@@ -141,18 +141,38 @@ async def creds(creds_dir, device, project):
     logger.info("Generate CA private key and cert")
 
     await anyio.run_process(
-        "openssl ecparam -name prime256v1 -genkey -noout -out ca.key.pem",
+        [
+            "openssl",
+            "ecparam",
+            "-name",
+            "prime256v1",
+            "-genkey",
+            "-noout",
+            "-out",
+            "ca.key.pem",
+        ],
         check=True,
         cwd=creds_dir,
         stdout=None,
         stderr=None,
     )
     await anyio.run_process(
-        """\
-    openssl req -x509 -new -nodes \
-        -key ca.key.pem \
-        -sha256 -subj "/C=US/CN=Root CA" \
-        -days 14 -out ca.crt.pem""",
+        [
+            "openssl",
+            "req",
+            "-x509",
+            "-new",
+            "-nodes",
+            "-key",
+            "ca.key.pem",
+            "-sha256",
+            "-subj",
+            "/C=US/CN=Root CA",
+            "-days",
+            "14",
+            "-out",
+            "ca.crt.pem",
+        ],
         check=True,
         cwd=creds_dir,
         stdout=None,
@@ -162,32 +182,56 @@ async def creds(creds_dir, device, project):
     logger.info("Generate edge node private key, csr and cert")
 
     await anyio.run_process(
-        f"openssl ecparam -name prime256v1 -genkey -noout -out {device.name}.key.pem",
+        [
+            "openssl",
+            "ecparam",
+            "-name",
+            "prime256v1",
+            "-genkey",
+            "-noout",
+            "-out",
+            f"{device.name}.key.pem",
+        ],
         check=True,
         cwd=creds_dir,
         stdout=None,
         stderr=None,
     )
     await anyio.run_process(
-        f"""\
-    openssl req -new \
-        -key {device.name}.key.pem \
-        -subj "/C=US/O={project.id}/CN={device.name}" \
-        -out {device.name}.csr.pem""",
+        [
+            "openssl",
+            "req",
+            "-new",
+            "-key",
+            f"{device.name}.key.pem",
+            "-subj",
+            f"/C=US/O={project.id}/CN={device.name}",
+            "-out",
+            f"{device.name}.csr.pem",
+        ],
         check=True,
         cwd=creds_dir,
         stdout=None,
         stderr=None,
     )
     await anyio.run_process(
-        f"""\
-    openssl x509 -req \
-        -in "{device.name}.csr.pem" \
-        -CA "ca.crt.pem" \
-        -CAkey "ca.key.pem" \
-        -CAcreateserial \
-        -out "{device.name}.crt.pem" \
-        -days 500 -sha256""",
+        [
+            "openssl",
+            "x509",
+            "-req",
+            "-in",
+            f"{device.name}.csr.pem",
+            "-CA",
+            "ca.crt.pem",
+            "-CAkey",
+            "ca.key.pem",
+            "-CAcreateserial",
+            "-out",
+            f"{device.name}.crt.pem",
+            "-days",
+            "500",
+            "-sha256",
+        ],
         check=True,
         cwd=creds_dir,
         stdout=None,
@@ -197,14 +241,32 @@ async def creds(creds_dir, device, project):
     logger.info("Convert key and cert to DER format")
 
     await anyio.run_process(
-        f"openssl x509 -in {device.name}.crt.pem -outform DER -out crt.der",
+        [
+            "openssl",
+            "x509",
+            "-in",
+            f"{device.name}.crt.pem",
+            "-outform",
+            "DER",
+            "-out",
+            "crt.der",
+        ],
         check=True,
         cwd=creds_dir,
         stdout=None,
         stderr=None,
     )
     await anyio.run_process(
-        f"openssl ec -in {device.name}.key.pem -outform DER -out key.der",
+        [
+            "openssl",
+            "ec",
+            "-in",
+            f"{device.name}.key.pem",
+            "-outform",
+            "DER",
+            "-out",
+            "key.der",
+        ],
         check=True,
         cwd=creds_dir,
         stdout=None,
