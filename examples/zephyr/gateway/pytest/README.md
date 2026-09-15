@@ -14,4 +14,18 @@ Zephyr. Keep the shared `creds` directory beside the image build directories.
 
 Gateway-only settings runs register the CA and generate gateway credentials
 without requiring `peripheral_ble_gatt_example_0`. If that image is present,
-its identity is generated using its configured DER filenames.
+its identity is generated using its configured DER filenames. OTA package
+discovery still requires the peripheral's build configuration when requested
+through `fw_update_package`; it is not an autouse dependency.
+
+## OTA Integrity
+
+`pouch.gateway.ota` uses the shared dummy OTA size of 400 KiB
+(`400 * 1024 = 409600` bytes), matching the direct-client tests. It downloads
+the image through the gateway over BLE and compares the peripheral's SHA256
+with the uploaded artifact's digest. This checks multi-block integrity, not
+deterministic backpressure or a firmware reboot.
+
+The shared digest wait is 180 seconds; the Twister scenario timeout is
+300 seconds, including fixture setup and teardown. The larger scenario cap
+does not extend the digest wait.
