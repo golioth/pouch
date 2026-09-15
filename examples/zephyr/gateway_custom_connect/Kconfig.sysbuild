@@ -70,12 +70,13 @@ endmenu
 config PERIPHERAL_MOUNT_CREDS
 	bool "Mount peripheral credentials under /creds directory"
 	help
-	  Mount credentials located ${BUILD_DIR}/creds under /creds mountpoint in Zephyr.
+	  Mount ../creds relative to each peripheral image's runtime working
+	  directory at /creds.
 
 config GATEWAY_MOUNT_CREDS
 	bool "Mount gateway credentials under /creds directory"
 	help
-	  Mount gateway DTLS credentials located ${BUILD_DIR}/gateway/creds
-	  under /creds mountpoint in the gateway application.
+	  Mount ../creds relative to the gateway image's runtime working
+	  directory at /creds.
 
 source "share/sysbuild/Kconfig"

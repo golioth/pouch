@@ -15,11 +15,14 @@ from pathlib import Path
 sys.path.insert(
     0, str(Path(__file__).resolve().parents[4] / "scripts" / "pytest-pouch")
 )
+sys.path.insert(0, str(Path(os.environ["ZEPHYR_BASE"]) / "scripts" / "west_commands"))
 
 pytest_plugins = ["pytest_pouch.plugin"]
 
 import anyio
 import pytest
+from pytest_pouch.plugin import generate_device_credentials
+from runners.core import BuildConfiguration
 from twister_harness.device.device_adapter import DeviceAdapter
 from twister_harness.twister_harness_config import TwisterHarnessConfig
 
@@ -89,148 +92,86 @@ async def dut(
 
 
 @pytest.fixture(scope="module")
-def creds_dir(twister_harness_config: TwisterHarnessConfig):
-    """Override default creds_dir for gateway sysbuild layout."""
-    return (
-        twister_harness_config.devices[0].build_dir
-        / "peripheral_ble_gatt_example_0"
-        / "creds"
+def peripheral_build_conf(twister_harness_config: TwisterHarnessConfig):
+    """Resolved configuration of the Pouch peripheral image."""
+    return BuildConfiguration(
+        str(
+            twister_harness_config.devices[0].build_dir
+            / "peripheral_ble_gatt_example_0"
+        )
     )
 
 
 @pytest.fixture(scope="module")
-def gateway_creds_dir(twister_harness_config: TwisterHarnessConfig):
-    """Credential directory for the gateway application (DTLS certs).
-
-    Supports both the 'gateway' and 'gateway_custom_connect' image names.
-    """
+def gateway_build_dir(twister_harness_config: TwisterHarnessConfig):
+    """Build directory for either gateway application."""
     build_dir = twister_harness_config.devices[0].build_dir
     for name in ["gateway", "gateway_custom_connect"]:
         if (build_dir / name).exists():
-            return build_dir / name / "creds"
+            return build_dir / name
     # Default fallback
-    return build_dir / "gateway" / "creds"
+    return build_dir / "gateway"
 
 
 @pytest.fixture(scope="module")
-async def gateway_creds(gateway_creds_dir, gateway, creds_dir, creds, project):
-    """Generate gateway DTLS credentials using the same CA as the peripheral.
+def gateway_build_conf(gateway_build_dir):
+    return BuildConfiguration(str(gateway_build_dir))
 
-    This fixture depends on `creds` so the CA key/cert are already
-    generated in `creds_dir` before we run.
-    """
-    gateway_creds_dir.mkdir(mode=0o755, exist_ok=True, parents=True)
 
-    ca_key = creds_dir / "ca.key.pem"
-    ca_cert = creds_dir / "ca.crt.pem"
+@pytest.fixture(scope="module")
+async def creds(ca, project):
+    """Register the shared CA independently of optional peripheral images."""
+    cert_pem = await anyio.Path(ca.cert).read_bytes()
+    root_cert = await project.certificates.add(cert_pem, "root")
+    yield root_cert["data"]["id"]
+    await project.certificates.delete(root_cert["data"]["id"])
 
-    logger.info("Generate gateway device private key and cert (signed by shared CA)")
 
-    await anyio.run_process(
-        [
-            "openssl",
-            "ecparam",
-            "-name",
-            "prime256v1",
-            "-genkey",
-            "-noout",
-            "-out",
-            f"{gateway.name}.key.pem",
-        ],
-        check=True,
-        cwd=gateway_creds_dir,
-        stdout=None,
-        stderr=None,
-    )
-    await anyio.run_process(
-        [
-            "openssl",
-            "req",
-            "-new",
-            "-key",
-            f"{gateway.name}.key.pem",
-            "-subj",
-            f"/C=US/O={project.id}/CN={gateway.name}",
-            "-out",
-            f"{gateway.name}.csr.pem",
-        ],
-        check=True,
-        cwd=gateway_creds_dir,
-        stdout=None,
-        stderr=None,
-    )
-    await anyio.run_process(
-        [
-            "openssl",
-            "x509",
-            "-req",
-            "-in",
-            f"{gateway.name}.csr.pem",
-            "-CA",
-            ca_cert,
-            "-CAkey",
-            ca_key,
-            "-CAcreateserial",
-            "-out",
-            f"{gateway.name}.crt.pem",
-            "-days",
-            "500",
-            "-sha256",
-        ],
-        check=True,
-        cwd=gateway_creds_dir,
-        stdout=None,
-        stderr=None,
+@pytest.fixture(scope="module")
+async def peripheral_creds(
+    request, twister_harness_config, creds_dir, ca, device, project
+):
+    """Write the BLE identity only when the peripheral image is present."""
+    build_dir = twister_harness_config.devices[0].build_dir
+    if not (build_dir / "peripheral_ble_gatt_example_0").exists():
+        return
+
+    peripheral_build_conf = request.getfixturevalue("peripheral_build_conf")
+    await generate_device_credentials(
+        creds_dir,
+        device.name,
+        project.id,
+        ca.key,
+        ca.cert,
+        crt_der_name=peripheral_build_conf.get(
+            "CONFIG_EXAMPLE_POUCH_DEVICE_CRT_FILENAME", "crt.der"
+        ),
+        key_der_name=peripheral_build_conf.get(
+            "CONFIG_EXAMPLE_POUCH_DEVICE_KEY_FILENAME", "key.der"
+        ),
     )
 
-    logger.info("Convert gateway key and cert to DER format")
 
-    await anyio.run_process(
-        [
-            "openssl",
-            "x509",
-            "-in",
-            f"{gateway.name}.crt.pem",
-            "-outform",
-            "DER",
-            "-out",
-            "crt.der",
-        ],
-        check=True,
-        cwd=gateway_creds_dir,
-        stdout=None,
-        stderr=None,
-    )
-    await anyio.run_process(
-        [
-            "openssl",
-            "ec",
-            "-in",
-            f"{gateway.name}.key.pem",
-            "-outform",
-            "DER",
-            "-out",
-            "key.der",
-        ],
-        check=True,
-        cwd=gateway_creds_dir,
-        stdout=None,
-        stderr=None,
-    )
-
-    logger.info("Convert CA cert to DER for gateway DTLS")
-
-    await anyio.run_process(
-        ["openssl", "x509", "-in", ca_cert, "-outform", "DER", "-out", "ca.der"],
-        check=True,
-        cwd=gateway_creds_dir,
-        stdout=None,
-        stderr=None,
+@pytest.fixture(scope="module")
+async def gateway_creds(gateway, ca, creds_dir, project, gateway_build_conf):
+    """Write the gateway DTLS identity alongside the peripheral and shared CA."""
+    await generate_device_credentials(
+        creds_dir,
+        gateway.name,
+        project.id,
+        ca.key,
+        ca.cert,
+        crt_der_name=gateway_build_conf.get(
+            "CONFIG_EXAMPLE_COAP_CLIENT_GW_DEVICE_CRT_FILENAME", "crt.der"
+        ),
+        key_der_name=gateway_build_conf.get(
+            "CONFIG_EXAMPLE_COAP_CLIENT_GW_DEVICE_KEY_FILENAME", "key.der"
+        ),
     )
 
 
 @pytest.fixture(scope="module", autouse=True)
-async def setup(project, device, gateway, creds):
+async def setup(project, device, gateway, creds, peripheral_creds):
     logger.info("Delete existing device-level LED setting")
 
     settings = await device.settings.get_all()
