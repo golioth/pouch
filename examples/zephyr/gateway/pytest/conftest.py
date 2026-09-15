@@ -17,7 +17,7 @@ sys.path.insert(
 )
 sys.path.insert(0, str(Path(os.environ["ZEPHYR_BASE"]) / "scripts" / "west_commands"))
 
-pytest_plugins = ["pytest_pouch.plugin"]
+pytest_plugins = ["pytest_pouch.plugin", "pytest_pouch.ota_harness"]
 
 import anyio
 import pytest
@@ -100,6 +100,12 @@ def peripheral_build_conf(twister_harness_config: TwisterHarnessConfig):
             / "peripheral_ble_gatt_example_0"
         )
     )
+
+
+@pytest.fixture(scope="module")
+def fw_update_package(peripheral_build_conf):
+    """OTA package configured on the peripheral, not the gateway."""
+    return peripheral_build_conf["CONFIG_EXAMPLE_FW_UPDATE_COMPONENT"]
 
 
 @pytest.fixture(scope="module")
