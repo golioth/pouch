@@ -33,6 +33,8 @@ tests:
       - CONFIG_EXAMPLE_HTTP_CLIENT_SYNC_PERIOD_S=10
       - CONFIG_GOLIOTH_OTA_MAX_PACKAGE_NAME_LEN=64
       - CONFIG_GOLIOTH_OTA_MAX_VERSION_LEN=64
+      # The auto negotiation timeout is normally 4 seconds, which often ends up failing:
+      - CONFIG_PHY_AUTONEG_TIMEOUT_MS=30000
       - 'platform:frdm_rw612/rw612:CONFIG_EXAMPLE_FW_UPDATE_COMPONENT="hil_ota_frdm_rw612_http_client"'
     platform_allow:
       - frdm_rw612
