@@ -55,7 +55,6 @@ struct pouch_characteristic
 
     // session context:
     const struct bt_gatt_attr *attr;
-    struct bt_conn *conn;
 
     // higher level handler:
     enum characteristic_type type;
@@ -66,24 +65,31 @@ struct pouch_characteristic
     };
 };
 
+static struct bt_conn *gateway_conn;
+
 static int bearer_send(struct pouch_bearer *bearer, const uint8_t *buf, size_t len)
 {
+    if (gateway_conn == NULL)
+    {
+        return -ENOTCONN;
+    }
+
     struct pouch_characteristic *c = CONTAINER_OF(bearer, struct pouch_characteristic, bearer);
 
     LOG_DBG("%p: tx: %u", c, len);
     LOG_HEXDUMP_DBG(buf, len, "tx");
 
-    return bt_gatt_notify(c->conn, c->attr, buf, len);
+    return bt_gatt_notify(gateway_conn, c->attr, buf, len);
 }
 
 static void bearer_close(struct pouch_bearer *bearer, bool success)
 {
     struct pouch_characteristic *c = CONTAINER_OF(bearer, struct pouch_characteristic, bearer);
 
-    if (!success)
+    if (!success && gateway_conn)
     {
         LOG_DBG("%p: close", c);
-        bt_conn_disconnect(c->conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+        bt_conn_disconnect(gateway_conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
     }
 }
 
@@ -178,6 +184,13 @@ static ssize_t ccc_write(struct bt_conn *conn, const struct bt_gatt_attr *ccc_at
         return sizeof(value);
     }
 
+    // Once a gateway connects and starts operating on one of our characteristics, we won't accept
+    // any other gateways until our current one has disconnected:
+    if (gateway_conn != NULL && gateway_conn != conn)
+    {
+        return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
+    }
+
     // NOTIFY enabled - the transport is open:
     uint16_t mtu = bt_gatt_get_mtu(conn);
     if (mtu <= BT_ATT_OVERHEAD)
@@ -187,13 +200,19 @@ static ssize_t ccc_write(struct bt_conn *conn, const struct bt_gatt_attr *ccc_at
 
     LOG_DBG("%p: open", c);
 
-    c->conn = conn;
+    bool was_connected = (gateway_conn != NULL);
+    gateway_conn = conn;
     c->attr = attr;
     c->bearer.maxlen = mtu - BT_ATT_OVERHEAD;
 
     int err = open(c);
     if (err)
     {
+        c->attr = NULL;
+        if (!was_connected)
+        {
+            gateway_conn = NULL;
+        }
         return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
     }
 
@@ -212,7 +231,6 @@ static void ccc_changed(const struct bt_gatt_attr *ccc_attr, uint16_t value)
     LOG_DBG("%p: close", c);
     close(c);
 
-    c->conn = NULL;
     c->attr = NULL;
 }
 
@@ -278,7 +296,11 @@ BT_GATT_SERVICE_DEFINE(pouch,
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
-    pouch_uplink_finish();
+    if (conn == gateway_conn)
+    {
+        gateway_conn = NULL;
+        pouch_uplink_finish();
+    }
 }
 
 BT_CONN_CB_DEFINE(conn_callbacks) = {
