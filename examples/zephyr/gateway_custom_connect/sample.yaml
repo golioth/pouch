@@ -5,7 +5,7 @@ common:
   harness: pytest
   harness_config:
     pytest_root:
-      - "../gateway/pytest"
+      - "../gateway/pytest/test_sample.py"
     pytest_dut_scope: module
   sysbuild: true
   platform_allow:

@@ -29,8 +29,13 @@ if(BOARD MATCHES "bsim")
   # Root X1 unless EXAMPLE_COAP_CLIENT_DTLS_LOAD_CA_FROM_FILESYSTEM is set.
   if(SB_CONFIG_GATEWAY_MOUNT_CREDS)
     set_config_bool(${DEFAULT_IMAGE} CONFIG_FILE_SYSTEM_NSIM_MOUNT y)
-    set_config_string(${DEFAULT_IMAGE} CONFIG_NATIVE_EXTRA_CMDLINE_ARGS "-volume=creds:/creds")
+    set_config_string(${DEFAULT_IMAGE} CONFIG_NATIVE_EXTRA_CMDLINE_ARGS "-volume=../creds:/creds")
     set_config_string(${DEFAULT_IMAGE} CONFIG_EXAMPLE_CREDENTIALS_DIR "/creds")
+    # Per-image filenames keep identities distinct in the shared credentials directory.
+    set_config_string(${DEFAULT_IMAGE} CONFIG_EXAMPLE_POUCH_DEVICE_CRT_FILENAME "${DEFAULT_IMAGE}_crt.der")
+    set_config_string(${DEFAULT_IMAGE} CONFIG_EXAMPLE_POUCH_DEVICE_KEY_FILENAME "${DEFAULT_IMAGE}_key.der")
+    set_config_string(${DEFAULT_IMAGE} CONFIG_EXAMPLE_COAP_CLIENT_GW_DEVICE_CRT_FILENAME "${DEFAULT_IMAGE}_crt.der")
+    set_config_string(${DEFAULT_IMAGE} CONFIG_EXAMPLE_COAP_CLIENT_GW_DEVICE_KEY_FILENAME "${DEFAULT_IMAGE}_key.der")
   endif()
 
   function(add_peripheral name path)
@@ -54,8 +59,10 @@ if(BOARD MATCHES "bsim")
 
         # Mount /creds, which need to be generated before running BabbleSim
         if(SB_CONFIG_PERIPHERAL_MOUNT_CREDS)
-          set_config_string(${target_name} CONFIG_NATIVE_EXTRA_CMDLINE_ARGS "-volume=creds:/creds")
+          set_config_string(${target_name} CONFIG_NATIVE_EXTRA_CMDLINE_ARGS "-volume=../creds:/creds")
           set_config_string(${target_name} CONFIG_EXAMPLE_CREDENTIALS_DIR "/creds")
+          set_config_string(${target_name} CONFIG_EXAMPLE_POUCH_DEVICE_CRT_FILENAME "${target_name}_crt.der")
+          set_config_string(${target_name} CONFIG_EXAMPLE_POUCH_DEVICE_KEY_FILENAME "${target_name}_key.der")
         endif()
 
         if(name STREQUAL "ble_gatt_example" AND

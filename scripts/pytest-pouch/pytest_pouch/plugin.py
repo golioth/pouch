@@ -6,6 +6,8 @@
 
 import logging
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 
 import anyio
 import pytest
@@ -135,7 +137,8 @@ def creds_dir(request: pytest.FixtureRequest):
 
 
 @pytest.fixture(scope="module")
-async def creds(creds_dir, device, project):
+async def ca(creds_dir):
+    """Generate a shared CA, with PEM files for signing and DER for firmware."""
     creds_dir.mkdir(mode=0o755, exist_ok=True, parents=True)
 
     logger.info("Generate CA private key and cert")
@@ -179,103 +182,144 @@ async def creds(creds_dir, device, project):
         stderr=None,
     )
 
-    logger.info("Generate edge node private key, csr and cert")
-
     await anyio.run_process(
-        [
-            "openssl",
-            "ecparam",
-            "-name",
-            "prime256v1",
-            "-genkey",
-            "-noout",
-            "-out",
-            f"{device.name}.key.pem",
-        ],
-        check=True,
-        cwd=creds_dir,
-        stdout=None,
-        stderr=None,
-    )
-    await anyio.run_process(
-        [
-            "openssl",
-            "req",
-            "-new",
-            "-key",
-            f"{device.name}.key.pem",
-            "-subj",
-            f"/C=US/O={project.id}/CN={device.name}",
-            "-out",
-            f"{device.name}.csr.pem",
-        ],
-        check=True,
-        cwd=creds_dir,
-        stdout=None,
-        stderr=None,
-    )
-    await anyio.run_process(
-        [
-            "openssl",
-            "x509",
-            "-req",
-            "-in",
-            f"{device.name}.csr.pem",
-            "-CA",
-            "ca.crt.pem",
-            "-CAkey",
-            "ca.key.pem",
-            "-CAcreateserial",
-            "-out",
-            f"{device.name}.crt.pem",
-            "-days",
-            "500",
-            "-sha256",
-        ],
+        ["openssl", "x509", "-in", "ca.crt.pem", "-outform", "DER", "-out", "ca.der"],
         check=True,
         cwd=creds_dir,
         stdout=None,
         stderr=None,
     )
 
-    logger.info("Convert key and cert to DER format")
-
-    await anyio.run_process(
-        [
-            "openssl",
-            "x509",
-            "-in",
-            f"{device.name}.crt.pem",
-            "-outform",
-            "DER",
-            "-out",
-            "crt.der",
-        ],
-        check=True,
-        cwd=creds_dir,
-        stdout=None,
-        stderr=None,
+    return SimpleNamespace(
+        key=creds_dir / "ca.key.pem",
+        cert=creds_dir / "ca.crt.pem",
+        der=creds_dir / "ca.der",
     )
-    await anyio.run_process(
-        [
-            "openssl",
-            "ec",
-            "-in",
-            f"{device.name}.key.pem",
-            "-outform",
-            "DER",
-            "-out",
-            "key.der",
-        ],
-        check=True,
-        cwd=creds_dir,
-        stdout=None,
-        stderr=None,
+
+
+async def generate_device_credentials(
+    dest_dir: Path,
+    device_name: str,
+    project_id: str,
+    ca_key: Path,
+    ca_cert: Path,
+    *,
+    crt_der_name: str = "crt.der",
+    key_der_name: str = "key.der",
+) -> None:
+    """Sign temporary device credentials and publish only the named DER files.
+
+    The CA files remain in their original directory; this does not copy ca.der.
+    """
+    dest_dir.mkdir(mode=0o755, exist_ok=True, parents=True)
+
+    logger.info("Generate device private key, csr and cert for '%s'", device_name)
+
+    with TemporaryDirectory() as work_dir:
+        await anyio.run_process(
+            [
+                "openssl",
+                "ecparam",
+                "-name",
+                "prime256v1",
+                "-genkey",
+                "-noout",
+                "-out",
+                "key.pem",
+            ],
+            check=True,
+            cwd=work_dir,
+            stdout=None,
+            stderr=None,
+        )
+        await anyio.run_process(
+            [
+                "openssl",
+                "req",
+                "-new",
+                "-key",
+                "key.pem",
+                "-subj",
+                f"/C=US/O={project_id}/CN={device_name}",
+                "-out",
+                "csr.pem",
+            ],
+            check=True,
+            cwd=work_dir,
+            stdout=None,
+            stderr=None,
+        )
+        await anyio.run_process(
+            [
+                "openssl",
+                "x509",
+                "-req",
+                "-in",
+                "csr.pem",
+                "-CA",
+                str(ca_cert.resolve()),
+                "-CAkey",
+                str(ca_key.resolve()),
+                "-CAserial",
+                "ca.srl",
+                "-CAcreateserial",
+                "-out",
+                "crt.pem",
+                "-days",
+                "500",
+                "-sha256",
+            ],
+            check=True,
+            cwd=work_dir,
+            stdout=None,
+            stderr=None,
+        )
+
+        logger.info("Convert key and cert to DER format")
+
+        await anyio.run_process(
+            [
+                "openssl",
+                "x509",
+                "-in",
+                "crt.pem",
+                "-outform",
+                "DER",
+                "-out",
+                str((dest_dir / crt_der_name).resolve()),
+            ],
+            check=True,
+            cwd=work_dir,
+            stdout=None,
+            stderr=None,
+        )
+        await anyio.run_process(
+            [
+                "openssl",
+                "ec",
+                "-in",
+                "key.pem",
+                "-outform",
+                "DER",
+                "-out",
+                str((dest_dir / key_der_name).resolve()),
+            ],
+            check=True,
+            cwd=work_dir,
+            stdout=None,
+            stderr=None,
+        )
+
+
+@pytest.fixture(scope="module")
+async def creds(creds_dir, ca, device, project):
+    await generate_device_credentials(
+        creds_dir, device.name, project.id, ca.key, ca.cert
     )
 
     logger.info("Upload root public key to Golioth server")
 
-    cert_pem = await anyio.Path(creds_dir / "ca.crt.pem").read_bytes()
+    cert_pem = await anyio.Path(ca.cert).read_bytes()
 
     root_cert = await project.certificates.add(cert_pem, "root")
     yield root_cert["data"]["id"]
