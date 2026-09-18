@@ -1,2 +1,2 @@
-ruff==0.16.6
-clang-format==23.1.0
+ruff==0.16.7
+clang-format==23.1.1
