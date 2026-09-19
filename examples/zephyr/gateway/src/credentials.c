@@ -7,7 +7,9 @@
 #include <stdlib.h>
 
 #include <zephyr/fs/fs.h>
+#include <zephyr/init.h>
 #include <zephyr/net/tls_credentials.h>
+#include <zephyr/sys/util.h>
 
 #include <mbedtls/pk.h>
 #include <mbedtls/psa_util.h>
@@ -69,7 +71,7 @@ static psa_key_id_t import_raw_pk(const uint8_t *private_key, size_t size)
     return key_id;
 }
 
-static void ensure_credentials_dir(void)
+static int ensure_credentials_dir(void)
 {
     struct fs_dirent dirent;
 
@@ -83,7 +85,12 @@ static void ensure_credentials_dir(void)
     {
         LOG_ERR("Failed to create credentials dir: %d", err);
     }
+
+    return err;
 }
+
+/* Run after filesystem mounts, before SMP provisioning */
+SYS_INIT(ensure_credentials_dir, APPLICATION, 85);
 
 static ssize_t get_file_size(const char *path)
 {
@@ -105,9 +112,6 @@ static ssize_t get_file_size(const char *path)
 
 static ssize_t read_file(const char *path, uint8_t **out)
 {
-    /* Ensure the credentials directory exists, so the user does not need to create it manually. */
-    ensure_credentials_dir();
-
     ssize_t size = get_file_size(path);
     if (size <= 0)
     {

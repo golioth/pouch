@@ -87,6 +87,9 @@ The example is set up with
 support for transferring credentials into the device's built-in file system over
 a serial connection.
 
+See [Credential Provisioning and Boot Order](../credential-provisioning.md) for
+mounting, directory creation, and initialization priorities.
+
 ### Provisioning with MCUmgr:
 
 [The MCUmgr CLI](https://github.com/apache/mynewt-mcumgr) is available as a
