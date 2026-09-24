@@ -18,7 +18,10 @@
 #include <zephyr/kernel.h>
 #include <zephyr/ztest.h>
 
+#include "block.h"
 #include "gateway/downlink.h"
+
+#include "stub_blockbuf.h"
 
 /* Number of times the data_available callback has fired. */
 static int data_available_calls;
@@ -33,6 +36,7 @@ static void downlink_setup(void *fixture)
 {
     ARG_UNUSED(fixture);
     data_available_calls = 0;
+    stub_blockbuf_reset_counters();
 }
 
 ZTEST_SUITE(downlink, NULL, NULL, downlink_setup, NULL, NULL);
@@ -148,6 +152,36 @@ ZTEST(downlink, test_block_cb_rejected_after_abort)
     zassert_equal(err, -ECANCELED);
 
     pouch_gateway_downlink_close(dl);
+}
+
+/* The callback argument points at the context the notification aborts. */
+static void abort_from_notification_cb(void *arg)
+{
+    struct pouch_gateway_downlink_context **dl = arg;
+
+    data_available_calls++;
+    pouch_gateway_downlink_abort(*dl);
+}
+
+ZTEST(downlink, test_abort_from_notification_stops_a_split_payload_mid_callback)
+{
+    /* Two full chunks, so the loop has one left when the notification for
+     * the first one aborts the downlink.
+     */
+    static const uint8_t payload[2 * MAX_PLAINTEXT_BLOCK_SIZE];
+    struct pouch_gateway_downlink_context *dl;
+
+    dl = pouch_gateway_downlink_open(abort_from_notification_cb, &dl);
+    zassert_not_null(dl);
+
+    int err = pouch_gateway_downlink_block_cb(payload, sizeof(payload), true, dl);
+    zassert_equal(data_available_calls, 1, "the abort has to land inside the loop");
+    zassert_equal(stub_blockbuf_alloc_count(), 1, "a chunk was allocated after the abort");
+    zassert_equal(err, -ECANCELED);
+
+    /* As the cloud transport does after a failed block_cb(). */
+    pouch_gateway_downlink_end_cb(-ECANCELED, dl);
+    zassert_equal(stub_blockbuf_in_use(), 0);
 }
 
 ZTEST(downlink, test_end_cb_failure_makes_drain_complete_with_is_last)
