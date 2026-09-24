@@ -29,6 +29,7 @@ enum bearer_flags
     BEARER_EXPECT_SEND,
     BEARER_EXPECT_CLOSE,
     BEARER_FAIL_SEND_ONCE,
+    BEARER_READY_IN_CLOSE,
 };
 
 static struct
@@ -36,7 +37,11 @@ static struct
     size_t sent_data;
     atomic_t sent_packets;
     atomic_t flags;
+    unsigned int close_calls;
+    bool close_success;
 } test_bearer;
+
+static struct pouch_sender sender;
 
 static void bearer_ready(struct pouch_bearer *bearer)
 {
@@ -79,6 +84,13 @@ static void bearer_close(struct pouch_bearer *bearer, bool success)
 {
     zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE));
     atomic_set_bit(&test_bearer.flags, BEARER_CLOSED);
+    test_bearer.close_calls++;
+    test_bearer.close_success = success;
+
+    if (atomic_test_bit(&test_bearer.flags, BEARER_READY_IN_CLOSE))
+    {
+        pouch_sender_ready(&sender);
+    }
 }
 
 static struct pouch_bearer bearer = {
@@ -654,4 +666,85 @@ ZTEST(transport_sar_sender, test_recv_after_close)
     // Verify no crash or use-after-free occurred
     zassert_equal(sender.bearer, NULL);
     zassert_equal(sender.buf, NULL);
+}
+
+ZTEST(transport_sar_sender, test_ready_in_ready_state_sends_first_fragment)
+{
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_DATA_REQ);
+    zassert_ok(pouch_sender_open(&sender, &bearer));
+
+    const struct pouch_sar_rx_pkt ack = {
+        .code = POUCH_RECEIVER_CODE_ACK,
+        .seq = POUCH_SAR_SEQ_MAX,
+        .window = 1,
+    };
+    uint8_t buf[POUCH_SAR_RX_PKT_LEN];
+    pouch_sar_rx_pkt_encode(&ack, buf);
+
+    // The window opens before the endpoint has data:
+    zassert_ok(pouch_sender_recv(&sender, buf, sizeof(buf)));
+    zassert_equal(atomic_get(&test_endpoint.send_calls), 1);
+    zassert_equal(atomic_get(&test_bearer.sent_packets), 0);
+
+    test_endpoint.available_data = 4;
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_SEND);
+    pouch_sender_ready(&sender);
+    zassert_equal(atomic_get(&test_endpoint.send_calls), 2);
+    zassert_equal(atomic_get(&test_bearer.sent_packets), 1);
+    zassert_equal(test_bearer.sent_data, 4);
+
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+    pouch_sender_close(&sender);
+}
+
+ZTEST(transport_sar_sender, test_delayed_ready_after_last_preserves_success)
+{
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_DATA_REQ);
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_SEND);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+    zassert_ok(pouch_sender_open(&sender, &bearer));
+
+    struct pouch_sar_rx_pkt ack = {
+        .code = POUCH_RECEIVER_CODE_ACK,
+        .seq = POUCH_SAR_SEQ_MAX,
+        .window = 4,
+    };
+    uint8_t buf[POUCH_SAR_RX_PKT_LEN];
+    pouch_sar_rx_pkt_encode(&ack, buf);
+    zassert_ok(pouch_sender_recv(&sender, buf, sizeof(buf)));
+    zassert_equal(atomic_get(&test_bearer.sent_packets), 0);
+
+    test_endpoint.available_data = 1;
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_CLOSED);
+    zassert_ok(pouch_sender_recv(&sender, buf, sizeof(buf)));
+    zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_SENT_LAST_PACKET));
+    zassert_equal(atomic_get(&test_bearer.sent_packets), 1);
+
+    // Readiness arrives after LAST was sent:
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_FAILED);
+    pouch_sender_ready(&sender);
+    zassert_equal(atomic_get(&test_endpoint.send_calls),
+                  2,
+                  "delayed ready read the endpoint again after LAST");
+    zassert_equal(test_bearer.close_calls, 0);
+    zassert_equal(test_endpoint.end_calls, 0);
+
+    ack.seq = 0;
+    pouch_sar_rx_pkt_encode(&ack, buf);
+    atomic_set_bit(&test_bearer.flags, BEARER_READY_IN_CLOSE);
+    zassert_ok(pouch_sender_recv(&sender, buf, sizeof(buf)));
+    zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_SENT_FIN));
+    zassert_equal(test_endpoint.end_calls, 1);
+    zassert_true(test_endpoint.end_success);
+    zassert_equal(test_bearer.close_calls, 1);
+    zassert_true(test_bearer.close_success);
+
+    pouch_sender_ready(&sender);
+    pouch_sender_close(&sender);
+    zassert_equal(test_endpoint.end_calls, 1);
+    zassert_equal(test_bearer.close_calls, 1);
 }

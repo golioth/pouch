@@ -39,6 +39,8 @@ static struct
     size_t received_data;
     atomic_t send_calls;
     atomic_t recv_calls;
+    unsigned int end_calls;
+    bool end_success;
     atomic_t flags;
     int open_retval;
 } test_endpoint;
@@ -89,6 +91,8 @@ static void end(struct pouch_bearer *bearer, bool success)
     zassert_false(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
 
     atomic_set_bit(&test_endpoint.flags, ENDPOINT_ENDED);
+    test_endpoint.end_calls++;
+    test_endpoint.end_success = success;
 }
 
 static int recv(struct pouch_bearer *bearer, const void *buf, size_t len)
