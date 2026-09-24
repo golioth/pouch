@@ -45,7 +45,9 @@ void pouch_gateway_downlink_abort(struct pouch_gateway_downlink_context *downlin
  * @param dst Destination buffer.
  * @param[in,out] dst_len Length of the destination buffer. Set to the number of bytes written.
  * @param[out] is_last Set to true if this is the last chunk.
- * @return 0 on success, negative on error.
+ *
+ * @retval 0 Data was written, or none is available yet.
+ * @retval -ENODATA The last chunk has already been returned.
  */
 int pouch_gateway_downlink_get_data(struct pouch_gateway_downlink_context *downlink,
                                     void *dst,
