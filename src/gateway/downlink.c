@@ -62,11 +62,6 @@ int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_las
 {
     struct pouch_gateway_downlink_context *downlink = arg;
 
-    if (pouch_atomic_test_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED))
-    {
-        return -ECANCELED;
-    }
-
     pouch_timepoint_t deadline =
         pouch_timepoint_get(POUCH_SECONDS(CONFIG_POUCH_GATEWAY_DOWNLINK_BLOCK_TIMEOUT));
 
@@ -76,6 +71,11 @@ int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_las
      */
     do
     {
+        if (pouch_atomic_test_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED))
+        {
+            return -ECANCELED;
+        }
+
         size_t take = MIN(len, (size_t) MAX_PLAINTEXT_BLOCK_SIZE);
         bool last_chunk = is_last && (take == len);
 
