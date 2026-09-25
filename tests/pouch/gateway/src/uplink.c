@@ -254,7 +254,7 @@ ZTEST(uplink, test_failed_open_does_not_acquire_downlink)
     assert_all_released();
 }
 
-ZTEST(uplink, test_aborted_downlink_lives_until_uplink_ends)
+ZTEST(uplink, test_closed_downlink_lives_until_uplink_ends)
 {
     struct pouch_gateway_downlink_context *dl = pouch_gateway_downlink_open(dl_armed_cb, NULL);
     zassert_not_null(dl);
@@ -263,7 +263,7 @@ ZTEST(uplink, test_aborted_downlink_lives_until_uplink_ends)
     struct pouch_gateway_uplink *up = pouch_gateway_uplink_open(dl, on_end, NULL);
     zassert_not_null(up);
 
-    pouch_gateway_downlink_abort(dl);
+    pouch_gateway_downlink_close(dl);
     zassert_equal(wrap_free_count(), 0, "freed while the uplink holds a reference");
 
     /* An empty uplink forwards nothing and ends the downlink with status 0. */

@@ -281,15 +281,13 @@ bool pouch_gateway_downlink_is_complete(const struct pouch_gateway_downlink_cont
 
 void pouch_gateway_downlink_close(struct pouch_gateway_downlink_context *downlink)
 {
+    if (!pouch_gateway_downlink_is_complete(downlink))
+    {
+        POUCH_LOG_INF("Aborting downlink");
+    }
+
     pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED);
     release(downlink);
-}
-
-void pouch_gateway_downlink_abort(struct pouch_gateway_downlink_context *downlink)
-{
-    POUCH_LOG_INF("Aborting downlink");
-
-    pouch_gateway_downlink_close(downlink);
 }
 
 void pouch_gateway_downlink_acquire(struct pouch_gateway_downlink_context *downlink)

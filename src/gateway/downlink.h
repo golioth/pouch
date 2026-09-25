@@ -16,8 +16,8 @@ typedef void (*pouch_gateway_downlink_data_available_cb)(void *);
 /**
  * Initialize a downlink context.
  *
- * The caller holds the consumer reference until it calls pouch_gateway_downlink_close() or
- * pouch_gateway_downlink_abort(). Consumer calls on the context must not overlap.
+ * The caller holds the consumer reference until it calls pouch_gateway_downlink_close().
+ * Consumer calls on the context must not overlap.
  * @p data_available_cb and @p arg must stay valid until pouch_gateway_downlink_end_cb() returns,
  * even after the consumer reference is released.
  *
@@ -42,21 +42,11 @@ void pouch_gateway_downlink_acquire(struct pouch_gateway_downlink_context *downl
 /**
  * Release the consumer reference, cancelling a running transport.
  *
- * Does not wait for running producer callbacks. Call once, and not together with
- * pouch_gateway_downlink_abort().
+ * Does not wait for running producer callbacks. Call once.
  *
  * @param downlink The downlink context.
  */
 void pouch_gateway_downlink_close(struct pouch_gateway_downlink_context *downlink);
-
-/**
- * Log the abort, then act as pouch_gateway_downlink_close().
- *
- * Call once, and not together with pouch_gateway_downlink_close().
- *
- * @param downlink The downlink context.
- */
-void pouch_gateway_downlink_abort(struct pouch_gateway_downlink_context *downlink);
 
 /**
  * Get data from the downlink context.

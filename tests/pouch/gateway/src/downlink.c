@@ -152,19 +152,17 @@ ZTEST(downlink, test_multi_block_concatenation_and_is_last)
     assert_all_released();
 }
 
-ZTEST(downlink, test_block_cb_rejected_after_abort)
+ZTEST(downlink, test_block_cb_rejected_after_close)
 {
     struct pouch_gateway_downlink_context *dl =
         pouch_gateway_downlink_open(data_available_cb, NULL);
     wrap_free_watch(dl);
     pouch_gateway_downlink_acquire(dl);
 
-    /* Push one block, then abort.  Abort marks the downlink as
-     * aborted; subsequent block_cb calls must be rejected.
-     */
+    /* Push one block, then close; subsequent block_cb calls must be rejected. */
     zassert_ok(pouch_gateway_downlink_block_cb((const uint8_t *) "x", 1, false, dl));
 
-    pouch_gateway_downlink_abort(dl);
+    pouch_gateway_downlink_close(dl);
 
     int err = pouch_gateway_downlink_block_cb((const uint8_t *) "y", 1, false, dl);
     zassert_equal(err, -ECANCELED);
@@ -173,31 +171,31 @@ ZTEST(downlink, test_block_cb_rejected_after_abort)
     assert_all_released();
 }
 
-/* The callback argument points at the context the notification aborts. */
-static void abort_from_notification_cb(void *arg)
+/* The callback argument points at the context the notification closes. */
+static void close_from_notification_cb(void *arg)
 {
     struct pouch_gateway_downlink_context **dl = arg;
 
     data_available_calls++;
-    pouch_gateway_downlink_abort(*dl);
+    pouch_gateway_downlink_close(*dl);
 }
 
-ZTEST(downlink, test_abort_from_notification_stops_a_split_payload_mid_callback)
+ZTEST(downlink, test_close_from_notification_stops_a_split_payload_mid_callback)
 {
     /* Two full chunks, so the loop has one left when the notification for
-     * the first one aborts the downlink.
+     * the first one closes the downlink.
      */
     static const uint8_t payload[2 * MAX_PLAINTEXT_BLOCK_SIZE];
     struct pouch_gateway_downlink_context *dl;
 
-    dl = pouch_gateway_downlink_open(abort_from_notification_cb, &dl);
+    dl = pouch_gateway_downlink_open(close_from_notification_cb, &dl);
     zassert_not_null(dl);
     wrap_free_watch(dl);
     pouch_gateway_downlink_acquire(dl);
 
     int err = pouch_gateway_downlink_block_cb(payload, sizeof(payload), true, dl);
-    zassert_equal(data_available_calls, 1, "the abort has to land inside the loop");
-    zassert_equal(stub_blockbuf_alloc_count(), 1, "a chunk was allocated after the abort");
+    zassert_equal(data_available_calls, 1, "the close has to land inside the loop");
+    zassert_equal(stub_blockbuf_alloc_count(), 1, "a chunk was allocated after the close");
     zassert_equal(err, -ECANCELED);
 
     /* As the cloud transport does after a failed block_cb(). */
