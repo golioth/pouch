@@ -76,6 +76,7 @@ bool pouch_gateway_downlink_is_complete(const struct pouch_gateway_downlink_cont
  * Block callback for downlink data.
  *
  * Called by the transport (CoAP) when a response block arrives.
+ * An empty payload queues nothing and does not end the stream, even with @p is_last.
  *
  * @param data The data received.
  * @param len The length of the data.
@@ -88,7 +89,8 @@ int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_las
 /**
  * End callback for downlink.
  *
- * Called once when the transport exchange completes, after its last block callback. Releases
+ * Called once when the transport exchange completes, after its last block callback. Ends the
+ * stream once the queued blocks are drained, also when none of them was flagged last. Releases
  * the producer reference.
  *
  * @param status 0 on success, negative errno on error.

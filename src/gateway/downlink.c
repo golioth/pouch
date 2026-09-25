@@ -22,7 +22,7 @@ enum
     DOWNLINK_FLAG_COMPLETE,
     DOWNLINK_FLAG_TRANSPORT_ABORTED,
     DOWNLINK_FLAG_TRANSPORT_WAITING,
-    DOWNLINK_FLAG_COAP_ERROR,
+    DOWNLINK_FLAG_ENDED,
     DOWNLINK_FLAG_COUNT,
 };
 
@@ -89,9 +89,10 @@ int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_las
 
     /* A block-pool element holds at most MAX_PLAINTEXT_BLOCK_SIZE payload
      * bytes and buf_write() is unchecked, so split the payload across as
-     * many blocks as needed to stay within that capacity.
+     * many blocks as needed to stay within that capacity. An empty payload
+     * queues nothing; end_cb() ends the stream.
      */
-    do
+    while (len)
     {
         if (pouch_atomic_test_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED))
         {
@@ -137,7 +138,7 @@ int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_las
 
         data += take;
         len -= take;
-    } while (len);
+    }
 
     return 0;
 }
@@ -149,20 +150,10 @@ void pouch_gateway_downlink_end_cb(int status, void *arg)
     if (0 != status)
     {
         POUCH_LOG_ERR("Downlink ending due to error %d", status);
-
-        if (!pouch_atomic_test_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED))
-        {
-            pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_COAP_ERROR);
-            notify_waiting(downlink);
-        }
-    }
-    else if (downlink->last_block == NULL)
-    {
-        // We never received the last block (or likely any data at all).
-        // Pass an empty dummy last block down to let the normal end-of-downlink mechanism run:
-        pouch_gateway_downlink_block_cb(NULL, 0, true, downlink);
     }
 
+    pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_ENDED);
+    notify_waiting(downlink);
     release(downlink);
 }
 
@@ -186,7 +177,7 @@ struct pouch_gateway_downlink_context *pouch_gateway_downlink_open(
     downlink->offset = 0;
     pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_COMPLETE);
     pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED);
-    pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_COAP_ERROR);
+    pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_ENDED);
     pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING);
     pouch_atomic_set(&downlink->refs, 1);
 
@@ -231,7 +222,7 @@ int pouch_gateway_downlink_get_data(struct pouch_gateway_downlink_context *downl
                 }
 
                 *dst_len = total_bytes_copied;
-                if (flags & BIT(DOWNLINK_FLAG_COAP_ERROR))
+                if (flags & BIT(DOWNLINK_FLAG_ENDED))
                 {
                     *is_last = true;
                     pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_COMPLETE);
