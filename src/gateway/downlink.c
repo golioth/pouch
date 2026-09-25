@@ -71,6 +71,15 @@ static void release(struct pouch_gateway_downlink_context *downlink)
     free(downlink);
 }
 
+static void notify_waiting(struct pouch_gateway_downlink_context *downlink)
+{
+    if (!pouch_atomic_test_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED)
+        && pouch_atomic_test_and_clear_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING))
+    {
+        downlink->data_available_cb(downlink->cb_arg);
+    }
+}
+
 int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_last, void *arg)
 {
     struct pouch_gateway_downlink_context *downlink = arg;
@@ -124,11 +133,7 @@ int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_las
             return -ENOMEM;
         }
 
-        if (NULL == downlink->current_block
-            && pouch_atomic_test_and_clear_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING))
-        {
-            downlink->data_available_cb(downlink->cb_arg);
-        }
+        notify_waiting(downlink);
 
         data += take;
         len -= take;
@@ -148,13 +153,7 @@ void pouch_gateway_downlink_end_cb(int status, void *arg)
         if (!pouch_atomic_test_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED))
         {
             pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_COAP_ERROR);
-
-            if (NULL == downlink->current_block
-                && pouch_atomic_test_and_clear_bit(downlink->flags,
-                                                   DOWNLINK_FLAG_TRANSPORT_WAITING))
-            {
-                downlink->data_available_cb(downlink->cb_arg);
-            }
+            notify_waiting(downlink);
         }
     }
     else if (downlink->last_block == NULL)
@@ -221,16 +220,22 @@ int pouch_gateway_downlink_get_data(struct pouch_gateway_downlink_context *downl
             if (pouch_msgq_get(&downlink->block_queue, &downlink->current_block, POUCH_NO_WAIT)
                 != 0)
             {
+                pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING);
+                long flags = pouch_atomic_get_value(downlink->flags);
+
+                if (pouch_msgq_get(&downlink->block_queue, &downlink->current_block, POUCH_NO_WAIT)
+                    == 0)
+                {
+                    pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING);
+                    continue;
+                }
+
                 *dst_len = total_bytes_copied;
-                if (pouch_atomic_test_bit(downlink->flags, DOWNLINK_FLAG_COAP_ERROR))
+                if (flags & BIT(DOWNLINK_FLAG_COAP_ERROR))
                 {
                     *is_last = true;
                     pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_COMPLETE);
-                    return 0;
-                }
-                if (0 == total_bytes_copied)
-                {
-                    pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING);
+                    pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING);
                 }
                 return 0;
             }
@@ -253,13 +258,8 @@ int pouch_gateway_downlink_get_data(struct pouch_gateway_downlink_context *downl
             bool drained_last = (downlink->current_block == downlink->last_block);
 
             blockbuf_free(downlink->current_block);
+            downlink->current_block = NULL;
             downlink->offset = 0;
-
-            if (pouch_msgq_get(&downlink->block_queue, &downlink->current_block, POUCH_NO_WAIT)
-                != 0)
-            {
-                downlink->current_block = NULL;
-            }
 
             if (drained_last)
             {
