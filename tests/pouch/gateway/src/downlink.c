@@ -41,7 +41,13 @@ static void downlink_setup(void *fixture)
     stub_blockbuf_reset_counters();
 }
 
-ZTEST_SUITE(downlink, NULL, NULL, downlink_setup, NULL, NULL);
+static void downlink_after(void *fixture)
+{
+    ARG_UNUSED(fixture);
+    wrap_hooks_disarm();
+}
+
+ZTEST_SUITE(downlink, NULL, NULL, downlink_setup, downlink_after, NULL);
 
 ZTEST(downlink, test_open_close)
 {
@@ -304,5 +310,160 @@ ZTEST(downlink, test_close_from_end_notification_keeps_context_until_end_returns
 
     pouch_gateway_downlink_end_cb(-EIO, dl);
     zassert_equal(data_available_calls, 1);
+    assert_all_released();
+}
+
+/*
+ * Opens a downlink held by both users and consumes the notification that open() arms, so that
+ * WAITING is clear and notifications are counted from zero.
+ */
+static struct pouch_gateway_downlink_context *open_and_consume_first_notification(void)
+{
+    struct pouch_gateway_downlink_context *dl =
+        pouch_gateway_downlink_open(data_available_cb, NULL);
+    zassert_not_null(dl);
+    wrap_free_watch(dl);
+    pouch_gateway_downlink_acquire(dl);
+
+    uint8_t byte;
+    size_t len = 1;
+    bool is_last;
+
+    zassert_ok(pouch_gateway_downlink_block_cb((const uint8_t *) "a", 1, false, dl));
+    zassert_equal(data_available_calls, 1);
+    /* One byte drains the block without reaching the empty queue. */
+    zassert_ok(pouch_gateway_downlink_get_data(dl, &byte, &len, &is_last));
+    zassert_equal(len, 1);
+    data_available_calls = 0;
+
+    return dl;
+}
+
+static void queue_block(void *arg)
+{
+    zassert_ok(pouch_gateway_downlink_block_cb((const uint8_t *) "b", 1, false, arg));
+}
+
+static void end_with_error(void *arg)
+{
+    pouch_gateway_downlink_end_cb(-EIO, arg);
+}
+
+static void queue_block_and_end_with_error(void *arg)
+{
+    queue_block(arg);
+    end_with_error(arg);
+}
+
+ZTEST(downlink, test_block_queued_before_the_drain_waits_is_returned)
+{
+    struct pouch_gateway_downlink_context *dl = open_and_consume_first_notification();
+    uint8_t byte;
+    size_t len = 1;
+    bool is_last;
+
+    wrap_msgq_get_empty_hook(1, queue_block, dl);
+    zassert_ok(pouch_gateway_downlink_get_data(dl, &byte, &len, &is_last));
+    zassert_false(wrap_hook_pending(), "the drain never found the queue empty");
+    zassert_equal(len, 1, "block queued before WAITING was armed is neither returned nor notified");
+    zassert_equal(byte, 'b');
+    zassert_false(is_last);
+    zassert_equal(data_available_calls, 0);
+
+    zassert_ok(pouch_gateway_downlink_block_cb((const uint8_t *) "c", 1, true, dl));
+    zassert_equal(data_available_calls, 0, "notified a consumer that is not waiting");
+
+    len = 1;
+    zassert_ok(pouch_gateway_downlink_get_data(dl, &byte, &len, &is_last));
+    zassert_equal(byte, 'c');
+    zassert_true(is_last);
+
+    pouch_gateway_downlink_end_cb(0, dl);
+    pouch_gateway_downlink_close(dl);
+    assert_all_released();
+}
+
+ZTEST(downlink, test_end_published_before_the_drain_waits_skips_no_block)
+{
+    struct pouch_gateway_downlink_context *dl = open_and_consume_first_notification();
+    uint8_t buf[8];
+    size_t len = sizeof(buf);
+    bool is_last;
+
+    wrap_msgq_get_empty_hook(1, queue_block_and_end_with_error, dl);
+    zassert_ok(pouch_gateway_downlink_get_data(dl, buf, &len, &is_last));
+    zassert_false(wrap_hook_pending(), "the drain never found the queue empty");
+    zassert_equal(len, 1, "the block queued before the end was skipped");
+    zassert_equal(buf[0], 'b');
+    zassert_true(is_last);
+    zassert_equal(data_available_calls, 0);
+
+    pouch_gateway_downlink_close(dl);
+    assert_all_released();
+}
+
+ZTEST(downlink, test_end_published_after_the_snapshot_is_not_lost)
+{
+    struct pouch_gateway_downlink_context *dl = open_and_consume_first_notification();
+    uint8_t buf[8];
+    size_t len = sizeof(buf);
+    bool is_last;
+
+    wrap_atomic_get_value_hook(end_with_error, dl);
+    zassert_ok(pouch_gateway_downlink_get_data(dl, buf, &len, &is_last));
+    zassert_false(wrap_hook_pending(), "the drain took no flags snapshot");
+    zassert_equal(len, 0);
+    zassert_false(is_last);
+    zassert_equal(data_available_calls, 1, "the end did not wake the waiting consumer");
+
+    len = sizeof(buf);
+    zassert_ok(pouch_gateway_downlink_get_data(dl, buf, &len, &is_last));
+    zassert_equal(len, 0);
+    zassert_true(is_last);
+
+    pouch_gateway_downlink_close(dl);
+    assert_all_released();
+}
+
+ZTEST(downlink, test_block_and_end_published_after_the_snapshot_are_returned)
+{
+    struct pouch_gateway_downlink_context *dl = open_and_consume_first_notification();
+    uint8_t buf[8];
+    size_t len = sizeof(buf);
+    bool is_last;
+
+    wrap_atomic_get_value_hook(queue_block_and_end_with_error, dl);
+    zassert_ok(pouch_gateway_downlink_get_data(dl, buf, &len, &is_last));
+    zassert_false(wrap_hook_pending(), "the drain took no flags snapshot");
+    zassert_equal(data_available_calls, 1, "the waiting consumer was not woken exactly once");
+    zassert_equal(len, 1);
+    zassert_equal(buf[0], 'b');
+    zassert_true(is_last);
+
+    pouch_gateway_downlink_close(dl);
+    assert_all_released();
+}
+
+ZTEST(downlink, test_end_published_after_the_recheck_skips_no_block)
+{
+    struct pouch_gateway_downlink_context *dl = open_and_consume_first_notification();
+    uint8_t buf[8];
+    size_t len = sizeof(buf);
+    bool is_last;
+
+    wrap_msgq_get_empty_hook(2, queue_block_and_end_with_error, dl);
+    zassert_ok(pouch_gateway_downlink_get_data(dl, buf, &len, &is_last));
+    zassert_false(wrap_hook_pending(), "the drain did not recheck the queue");
+    zassert_false(is_last, "the block queued before the end was skipped");
+    zassert_equal(len, 0);
+    zassert_equal(data_available_calls, 1, "the block did not wake the waiting consumer");
+
+    len = sizeof(buf);
+    zassert_ok(pouch_gateway_downlink_get_data(dl, buf, &len, &is_last));
+    zassert_equal(len, 1);
+    zassert_equal(buf[0], 'b');
+    zassert_true(is_last);
+
+    pouch_gateway_downlink_close(dl);
     assert_all_released();
 }
