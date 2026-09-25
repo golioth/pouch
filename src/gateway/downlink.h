@@ -16,6 +16,11 @@ typedef void (*pouch_gateway_downlink_data_available_cb)(void *);
 /**
  * Initialize a downlink context.
  *
+ * The caller holds the consumer reference until it calls pouch_gateway_downlink_close() or
+ * pouch_gateway_downlink_abort(). Consumer calls on the context must not overlap.
+ * @p data_available_cb and @p arg must stay valid until pouch_gateway_downlink_end_cb() returns,
+ * even after the consumer reference is released.
+ *
  * @param data_available_cb Callback for when data is available.
  * @param arg Argument for the callback.
  * @return Pointer to the downlink context.
@@ -25,14 +30,29 @@ struct pouch_gateway_downlink_context *pouch_gateway_downlink_open(
     void *arg);
 
 /**
- * Finish the downlink context.
+ * Take the producer reference.
+ *
+ * Call while the consumer reference is held, before handing the context to the transport.
+ * pouch_gateway_downlink_end_cb() releases it.
+ *
+ * @param downlink The downlink context.
+ */
+void pouch_gateway_downlink_acquire(struct pouch_gateway_downlink_context *downlink);
+
+/**
+ * Release the consumer reference, cancelling a running transport.
+ *
+ * Does not wait for running producer callbacks. Call once, and not together with
+ * pouch_gateway_downlink_abort().
  *
  * @param downlink The downlink context.
  */
 void pouch_gateway_downlink_close(struct pouch_gateway_downlink_context *downlink);
 
 /**
- * Abort the downlink context.
+ * Log the abort, then act as pouch_gateway_downlink_close().
+ *
+ * Call once, and not together with pouch_gateway_downlink_close().
  *
  * @param downlink The downlink context.
  */
@@ -78,7 +98,8 @@ int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_las
 /**
  * End callback for downlink.
  *
- * Called when the transport exchange completes.
+ * Called once when the transport exchange completes, after its last block callback. Releases
+ * the producer reference.
  *
  * @param status 0 on success, negative errno on error.
  * @param arg User argument (downlink context).

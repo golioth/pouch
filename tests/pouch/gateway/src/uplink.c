@@ -38,6 +38,9 @@ static struct
     size_t payload_len;
     pouch_gateway_cloud_block2_cb_t resp_cb;
     void *resp_arg;
+    /* Delivered as a single final Block2 response block when not NULL. */
+    const uint8_t *response;
+    size_t response_len;
 } stub;
 
 static int stub_forward(pouch_gateway_cloud_upload_chunk_cb_t chunk_cb,
@@ -73,6 +76,15 @@ static int stub_forward(pouch_gateway_cloud_upload_chunk_cb_t chunk_cb,
             {
                 break;
             }
+        }
+    }
+
+    if (stub.response != NULL)
+    {
+        int err = resp_cb(stub.response, stub.response_len, true, resp_arg);
+        if (err)
+        {
+            return err;
         }
     }
 
@@ -195,6 +207,9 @@ ZTEST(uplink, test_forwards_to_downlink_via_resp_cb)
     struct pouch_gateway_downlink_context *dl = pouch_gateway_downlink_open(dl_armed_cb, NULL);
     zassert_not_null(dl);
 
+    stub.response = (const uint8_t *) "RESP";
+    stub.response_len = 4;
+
     struct pouch_gateway_uplink *up = pouch_gateway_uplink_open(dl, on_end, NULL);
     zassert_not_null(up);
     zassert_ok(pouch_gateway_uplink_write(up, (const uint8_t *) "p", 1));
@@ -206,12 +221,6 @@ ZTEST(uplink, test_forwards_to_downlink_via_resp_cb)
     zassert_equal(stub.forward_calls, 1);
     zassert_not_null(stub.resp_cb);
     zassert_equal_ptr(stub.resp_arg, dl);
-
-    /* Push a synthetic response block through the wire to mimic a
-     * cloud Block2 response.  This must complete the downlink.
-     */
-    int err = stub.resp_cb((const uint8_t *) "RESP", 4, true, stub.resp_arg);
-    zassert_ok(err);
 
     /* Drain the downlink and verify "RESP". */
     uint8_t out[8] = {0};

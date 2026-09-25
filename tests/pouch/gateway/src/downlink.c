@@ -56,6 +56,7 @@ ZTEST(downlink, test_get_data_empty_returns_no_bytes_and_arms_callback)
     struct pouch_gateway_downlink_context *dl =
         pouch_gateway_downlink_open(data_available_cb, NULL);
     zassert_not_null(dl);
+    pouch_gateway_downlink_acquire(dl);
 
     uint8_t buf[32];
     size_t dst_len = sizeof(buf);
@@ -72,6 +73,7 @@ ZTEST(downlink, test_get_data_empty_returns_no_bytes_and_arms_callback)
     zassert_ok(err);
     zassert_equal(data_available_calls, 1);
 
+    pouch_gateway_downlink_end_cb(0, dl);
     pouch_gateway_downlink_close(dl);
 }
 
@@ -79,6 +81,7 @@ ZTEST(downlink, test_single_block_round_trip)
 {
     struct pouch_gateway_downlink_context *dl =
         pouch_gateway_downlink_open(data_available_cb, NULL);
+    pouch_gateway_downlink_acquire(dl);
 
     const uint8_t chunk[] = {'p', 'o', 'u', 'c', 'h'};
     int err = pouch_gateway_downlink_block_cb(chunk, sizeof(chunk), true, dl);
@@ -95,6 +98,7 @@ ZTEST(downlink, test_single_block_round_trip)
     zassert_true(is_last);
     zassert_true(pouch_gateway_downlink_is_complete(dl));
 
+    pouch_gateway_downlink_end_cb(0, dl);
     pouch_gateway_downlink_close(dl);
 }
 
@@ -102,6 +106,7 @@ ZTEST(downlink, test_multi_block_concatenation_and_is_last)
 {
     struct pouch_gateway_downlink_context *dl =
         pouch_gateway_downlink_open(data_available_cb, NULL);
+    pouch_gateway_downlink_acquire(dl);
 
     const uint8_t a[] = {'a', 'b', 'c'};
     const uint8_t b[] = {'d', 'e', 'f', 'g'};
@@ -133,6 +138,7 @@ ZTEST(downlink, test_multi_block_concatenation_and_is_last)
     zassert_mem_equal(buf, "abcdefghi", 9);
     zassert_true(pouch_gateway_downlink_is_complete(dl));
 
+    pouch_gateway_downlink_end_cb(0, dl);
     pouch_gateway_downlink_close(dl);
 }
 
@@ -140,6 +146,7 @@ ZTEST(downlink, test_block_cb_rejected_after_abort)
 {
     struct pouch_gateway_downlink_context *dl =
         pouch_gateway_downlink_open(data_available_cb, NULL);
+    pouch_gateway_downlink_acquire(dl);
 
     /* Push one block, then abort.  Abort marks the downlink as
      * aborted; subsequent block_cb calls must be rejected.
@@ -151,7 +158,7 @@ ZTEST(downlink, test_block_cb_rejected_after_abort)
     int err = pouch_gateway_downlink_block_cb((const uint8_t *) "y", 1, false, dl);
     zassert_equal(err, -ECANCELED);
 
-    pouch_gateway_downlink_close(dl);
+    pouch_gateway_downlink_end_cb(-ECANCELED, dl);
 }
 
 /* The callback argument points at the context the notification aborts. */
@@ -173,6 +180,7 @@ ZTEST(downlink, test_abort_from_notification_stops_a_split_payload_mid_callback)
 
     dl = pouch_gateway_downlink_open(abort_from_notification_cb, &dl);
     zassert_not_null(dl);
+    pouch_gateway_downlink_acquire(dl);
 
     int err = pouch_gateway_downlink_block_cb(payload, sizeof(payload), true, dl);
     zassert_equal(data_available_calls, 1, "the abort has to land inside the loop");
@@ -188,6 +196,7 @@ ZTEST(downlink, test_end_cb_failure_makes_drain_complete_with_is_last)
 {
     struct pouch_gateway_downlink_context *dl =
         pouch_gateway_downlink_open(data_available_cb, NULL);
+    pouch_gateway_downlink_acquire(dl);
 
     /* Simulate a cloud-side error before any block was queued. */
     pouch_gateway_downlink_end_cb(-EIO, dl);

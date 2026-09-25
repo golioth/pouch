@@ -46,16 +46,29 @@ struct pouch_gateway_downlink_context
     struct pouch_buf *last_block;
 
     POUCH_ATOMIC_DEFINE(flags, DOWNLINK_FLAG_COUNT);
+    pouch_atomic_t refs;
 };
 
-static void flush_block_queue(struct pouch_gateway_downlink_context *downlink)
+static void release(struct pouch_gateway_downlink_context *downlink)
 {
+    if (pouch_atomic_dec(&downlink->refs) != 1)
+    {
+        return;
+    }
+
     struct pouch_buf *block;
 
     while (pouch_msgq_get(&downlink->block_queue, &block, POUCH_NO_WAIT) == 0)
     {
         blockbuf_free(block);
     }
+
+    if (NULL != downlink->current_block)
+    {
+        blockbuf_free(downlink->current_block);
+    }
+
+    free(downlink);
 }
 
 int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_last, void *arg)
@@ -132,11 +145,7 @@ void pouch_gateway_downlink_end_cb(int status, void *arg)
     {
         POUCH_LOG_ERR("Downlink ending due to error %d", status);
 
-        if (pouch_atomic_test_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED))
-        {
-            pouch_gateway_downlink_close(downlink);
-        }
-        else
+        if (!pouch_atomic_test_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED))
         {
             pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_COAP_ERROR);
 
@@ -147,15 +156,15 @@ void pouch_gateway_downlink_end_cb(int status, void *arg)
                 downlink->data_available_cb(downlink->cb_arg);
             }
         }
-        return;
     }
-
-    if (downlink->last_block == NULL)
+    else if (downlink->last_block == NULL)
     {
         // We never received the last block (or likely any data at all).
         // Pass an empty dummy last block down to let the normal end-of-downlink mechanism run:
         pouch_gateway_downlink_block_cb(NULL, 0, true, downlink);
     }
+
+    release(downlink);
 }
 
 struct pouch_gateway_downlink_context *pouch_gateway_downlink_open(
@@ -180,6 +189,7 @@ struct pouch_gateway_downlink_context *pouch_gateway_downlink_open(
     pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED);
     pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_COAP_ERROR);
     pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING);
+    pouch_atomic_set(&downlink->refs, 1);
 
     pouch_msgq_init(&downlink->block_queue,
                     downlink->block_queue_buf,
@@ -271,24 +281,18 @@ bool pouch_gateway_downlink_is_complete(const struct pouch_gateway_downlink_cont
 
 void pouch_gateway_downlink_close(struct pouch_gateway_downlink_context *downlink)
 {
-    flush_block_queue(downlink);
-
-    if (NULL != downlink->current_block)
-    {
-        blockbuf_free(downlink->current_block);
-    }
-
-    free(downlink);
+    pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED);
+    release(downlink);
 }
 
 void pouch_gateway_downlink_abort(struct pouch_gateway_downlink_context *downlink)
 {
     POUCH_LOG_INF("Aborting downlink");
 
-    pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED);
+    pouch_gateway_downlink_close(downlink);
+}
 
-    if (pouch_gateway_downlink_is_complete(downlink))
-    {
-        pouch_gateway_downlink_close(downlink);
-    }
+void pouch_gateway_downlink_acquire(struct pouch_gateway_downlink_context *downlink)
+{
+    pouch_atomic_inc(&downlink->refs);
 }
