@@ -158,6 +158,37 @@ ZTEST(downlink, test_multi_block_concatenation_and_is_last)
     assert_all_released();
 }
 
+ZTEST(downlink, test_split_final_payload_ends_with_its_last_chunk)
+{
+    static uint8_t payload[MAX_PLAINTEXT_BLOCK_SIZE + 3];
+    static uint8_t out[sizeof(payload)];
+
+    for (size_t i = 0; i < sizeof(payload); i++)
+    {
+        payload[i] = (uint8_t) i;
+    }
+
+    struct pouch_gateway_downlink_context *dl =
+        pouch_gateway_downlink_open(data_available_cb, NULL);
+    zassert_not_null(dl);
+    wrap_free_watch(dl);
+    pouch_gateway_downlink_acquire(dl);
+
+    zassert_ok(pouch_gateway_downlink_block_cb(payload, sizeof(payload), true, dl));
+    zassert_equal(stub_blockbuf_alloc_count(), 2, "the payload was not split");
+
+    size_t len = sizeof(out);
+    bool is_last = false;
+    zassert_ok(pouch_gateway_downlink_get_data(dl, out, &len, &is_last));
+    zassert_equal(len, sizeof(payload), "the stream ended before the last chunk");
+    zassert_mem_equal(out, payload, sizeof(payload));
+    zassert_true(is_last);
+
+    pouch_gateway_downlink_end_cb(0, dl);
+    pouch_gateway_downlink_close(dl);
+    assert_all_released();
+}
+
 ZTEST(downlink, test_block_cb_rejected_after_close)
 {
     struct pouch_gateway_downlink_context *dl =
