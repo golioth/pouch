@@ -602,3 +602,177 @@ ZTEST(downlink, test_end_published_after_the_recheck_skips_no_block)
     pouch_gateway_downlink_close(dl);
     assert_all_released();
 }
+
+/* Opens a downlink held by both users. */
+static struct pouch_gateway_downlink_context *open_with_producer(void)
+{
+    struct pouch_gateway_downlink_context *dl =
+        pouch_gateway_downlink_open(data_available_cb, NULL);
+    zassert_not_null(dl);
+    wrap_free_watch(dl);
+    pouch_gateway_downlink_acquire(dl);
+
+    return dl;
+}
+
+/* The next read returns exactly the @p len bytes of @p data, not flagged last. */
+static void assert_reads(struct pouch_gateway_downlink_context *dl, const char *data, size_t len)
+{
+    uint8_t buf[8];
+    size_t got = len;
+    bool is_last = true;
+
+    zassert_ok(pouch_gateway_downlink_get_data(dl, buf, &got, &is_last));
+    zassert_equal(got, len);
+    zassert_mem_equal(buf, data, len);
+    zassert_false(is_last);
+}
+
+/* The next read fails with -EIO, returns no bytes and ends the stream. */
+static void assert_ends_truncated(struct pouch_gateway_downlink_context *dl)
+{
+    uint8_t buf[8];
+    size_t len = sizeof(buf);
+    bool is_last = true;
+
+    zassert_equal(pouch_gateway_downlink_get_data(dl, buf, &len, &is_last),
+                  -EIO,
+                  "the truncation was not reported");
+    zassert_equal(len, 0, "the failing read returned bytes");
+    zassert_false(is_last);
+    zassert_true(pouch_gateway_downlink_is_complete(dl));
+}
+
+ZTEST(downlink, test_refusal_before_any_data_reports_truncation)
+{
+    struct pouch_gateway_downlink_context *dl = open_with_producer();
+
+    stub_blockbuf_fail_alloc_from(1);
+    zassert_equal(pouch_gateway_downlink_block_cb((const uint8_t *) "ab", 2, true, dl), -ENOMEM);
+    pouch_gateway_downlink_end_cb(-ENOMEM, dl);
+    assert_ends_truncated(dl);
+
+    pouch_gateway_downlink_close(dl);
+    assert_all_released();
+}
+
+ZTEST(downlink, test_refusal_after_data_reports_truncation_despite_a_clean_end)
+{
+    struct pouch_gateway_downlink_context *dl = open_with_producer();
+
+    zassert_ok(pouch_gateway_downlink_block_cb((const uint8_t *) "ab", 2, false, dl));
+    stub_blockbuf_fail_alloc_from(2);
+    zassert_equal(pouch_gateway_downlink_block_cb((const uint8_t *) "cd", 2, false, dl), -ENOMEM);
+    stub_blockbuf_fail_alloc_from(0);
+    /* A transport that ignores the refusal and still delivers the final block. */
+    int err = pouch_gateway_downlink_block_cb((const uint8_t *) "ef", 2, true, dl);
+    pouch_gateway_downlink_end_cb(0, dl);
+    assert_reads(dl, "ab", 2);
+    assert_ends_truncated(dl);
+    zassert_equal(err, -ENOMEM, "the final block after the refusal was accepted");
+    zassert_equal(stub_blockbuf_alloc_count(), 1, "a block was taken after the refusal");
+
+    pouch_gateway_downlink_close(dl);
+    assert_all_released();
+}
+
+ZTEST(downlink, test_full_queue_reports_truncation_despite_a_clean_end)
+{
+    static const char data[] = "abcdefgh";
+    struct pouch_gateway_downlink_context *dl = open_with_producer();
+
+    BUILD_ASSERT(CONFIG_POUCH_GATEWAY_NUM_BLOCKS < sizeof(data));
+    for (size_t i = 0; i < CONFIG_POUCH_GATEWAY_NUM_BLOCKS; i++)
+    {
+        zassert_ok(pouch_gateway_downlink_block_cb((const uint8_t *) &data[i], 1, false, dl));
+    }
+
+    /* The put waits for CONFIG_POUCH_GATEWAY_DOWNLINK_BLOCK_TIMEOUT, then fails. */
+    zassert_equal(pouch_gateway_downlink_block_cb((const uint8_t *) "z", 1, true, dl), -ENOMEM);
+    zassert_equal(stub_blockbuf_alloc_count(),
+                  CONFIG_POUCH_GATEWAY_NUM_BLOCKS + 1,
+                  "the block was not refused by the queue");
+    pouch_gateway_downlink_end_cb(0, dl);
+    assert_reads(dl, data, CONFIG_POUCH_GATEWAY_NUM_BLOCKS);
+    assert_ends_truncated(dl);
+
+    pouch_gateway_downlink_close(dl);
+    assert_all_released();
+}
+
+ZTEST(downlink, test_transport_error_after_data_reports_truncation)
+{
+    struct pouch_gateway_downlink_context *dl = open_with_producer();
+
+    zassert_ok(pouch_gateway_downlink_block_cb((const uint8_t *) "ab", 2, false, dl));
+    zassert_ok(pouch_gateway_downlink_block_cb((const uint8_t *) "cd", 2, false, dl));
+    pouch_gateway_downlink_end_cb(-EIO, dl);
+    assert_reads(dl, "abc", 3);
+    /* The failing read also drops the "d" it copied. */
+    assert_ends_truncated(dl);
+
+    pouch_gateway_downlink_close(dl);
+    assert_all_released();
+}
+
+ZTEST(downlink, test_transport_error_after_the_final_block_skips_no_data)
+{
+    struct pouch_gateway_downlink_context *dl = open_with_producer();
+
+    zassert_ok(pouch_gateway_downlink_block_cb((const uint8_t *) "abc", 3, true, dl));
+    pouch_gateway_downlink_end_cb(-EIO, dl);
+
+    uint8_t buf[8];
+    size_t len = sizeof(buf);
+    bool is_last = false;
+    zassert_ok(pouch_gateway_downlink_get_data(dl, buf, &len, &is_last));
+    zassert_equal(len, 3);
+    zassert_mem_equal(buf, "abc", 3);
+    zassert_true(is_last);
+
+    pouch_gateway_downlink_close(dl);
+    assert_all_released();
+}
+
+static void end_with_error(void *arg)
+{
+    pouch_gateway_downlink_end_cb(-EIO, arg);
+}
+
+static void queue_block_and_end_with_error(void *arg)
+{
+    queue_block(arg);
+    end_with_error(arg);
+}
+
+ZTEST(downlink, test_truncation_published_before_the_drain_waits_skips_no_block)
+{
+    struct pouch_gateway_downlink_context *dl = open_and_consume_first_notification();
+
+    wrap_msgq_get_empty_hook(1, queue_block_and_end_with_error, dl);
+    assert_reads(dl, "b", 1);
+    zassert_false(wrap_hook_pending(), "the drain never found the queue empty");
+    assert_ends_truncated(dl);
+
+    pouch_gateway_downlink_close(dl);
+    assert_all_released();
+}
+
+ZTEST(downlink, test_truncation_published_after_the_snapshot_is_not_lost)
+{
+    struct pouch_gateway_downlink_context *dl = open_and_consume_first_notification();
+    uint8_t buf[8];
+    size_t len = sizeof(buf);
+    bool is_last;
+
+    wrap_atomic_get_value_hook(end_with_error, dl);
+    zassert_ok(pouch_gateway_downlink_get_data(dl, buf, &len, &is_last));
+    zassert_false(wrap_hook_pending(), "the drain took no flags snapshot");
+    zassert_equal(len, 0);
+    zassert_false(is_last);
+    zassert_equal(data_available_calls, 1, "the truncation did not wake the waiting consumer");
+    assert_ends_truncated(dl);
+
+    pouch_gateway_downlink_close(dl);
+    assert_all_released();
+}
