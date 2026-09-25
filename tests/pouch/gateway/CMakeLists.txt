@@ -14,12 +14,15 @@ target_sources(app PRIVATE
   src/downlink.c
   src/uplink.c
   src/stub_blockbuf.c
+  src/wrap.c
   ${ZEPHYR_POUCH_MODULE_DIR}/src/gateway/cloud.c
   ${ZEPHYR_POUCH_MODULE_DIR}/src/gateway/downlink.c
   ${ZEPHYR_POUCH_MODULE_DIR}/src/gateway/uplink.c
   ${ZEPHYR_POUCH_MODULE_DIR}/src/block.c
   ${ZEPHYR_POUCH_MODULE_DIR}/src/buf.c
 )
+
+target_link_options(app PUBLIC -Wl,--wrap=free)
 
 target_include_directories(app PRIVATE
   ${ZEPHYR_POUCH_MODULE_DIR}/include

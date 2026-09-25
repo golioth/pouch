@@ -20,6 +20,7 @@
 
 static size_t alloc_count;
 static size_t free_count;
+static size_t fail_from;
 
 size_t stub_blockbuf_alloc_count(void)
 {
@@ -35,11 +36,22 @@ void stub_blockbuf_reset_counters(void)
 {
     alloc_count = 0;
     free_count = 0;
+    fail_from = 0;
+}
+
+void stub_blockbuf_fail_alloc_from(size_t nth)
+{
+    fail_from = nth;
 }
 
 struct pouch_buf *blockbuf_alloc(pouch_timeout_t timeout)
 {
     (void) timeout;
+
+    if (fail_from != 0 && alloc_count + 1 >= fail_from)
+    {
+        return NULL;
+    }
 
     struct pouch_buf *buf = buf_alloc(STUB_BLOCKBUF_SIZE);
     if (buf != NULL)
