@@ -479,15 +479,15 @@ static void queue_block(void *arg)
     zassert_ok(pouch_gateway_downlink_block_cb((const uint8_t *) "b", 1, false, arg));
 }
 
-static void end_with_error(void *arg)
+static void end_cleanly(void *arg)
 {
-    pouch_gateway_downlink_end_cb(-EIO, arg);
+    pouch_gateway_downlink_end_cb(0, arg);
 }
 
-static void queue_block_and_end_with_error(void *arg)
+static void queue_block_and_end_cleanly(void *arg)
 {
     queue_block(arg);
-    end_with_error(arg);
+    end_cleanly(arg);
 }
 
 ZTEST(downlink, test_block_queued_before_the_drain_waits_is_returned)
@@ -525,7 +525,7 @@ ZTEST(downlink, test_end_published_before_the_drain_waits_skips_no_block)
     size_t len = sizeof(buf);
     bool is_last;
 
-    wrap_msgq_get_empty_hook(1, queue_block_and_end_with_error, dl);
+    wrap_msgq_get_empty_hook(1, queue_block_and_end_cleanly, dl);
     zassert_ok(pouch_gateway_downlink_get_data(dl, buf, &len, &is_last));
     zassert_false(wrap_hook_pending(), "the drain never found the queue empty");
     zassert_equal(len, 1, "the block queued before the end was skipped");
@@ -544,7 +544,7 @@ ZTEST(downlink, test_end_published_after_the_snapshot_is_not_lost)
     size_t len = sizeof(buf);
     bool is_last;
 
-    wrap_atomic_get_value_hook(end_with_error, dl);
+    wrap_atomic_get_value_hook(end_cleanly, dl);
     zassert_ok(pouch_gateway_downlink_get_data(dl, buf, &len, &is_last));
     zassert_false(wrap_hook_pending(), "the drain took no flags snapshot");
     zassert_equal(len, 0);
@@ -567,7 +567,7 @@ ZTEST(downlink, test_block_and_end_published_after_the_snapshot_are_returned)
     size_t len = sizeof(buf);
     bool is_last;
 
-    wrap_atomic_get_value_hook(queue_block_and_end_with_error, dl);
+    wrap_atomic_get_value_hook(queue_block_and_end_cleanly, dl);
     zassert_ok(pouch_gateway_downlink_get_data(dl, buf, &len, &is_last));
     zassert_false(wrap_hook_pending(), "the drain took no flags snapshot");
     zassert_equal(data_available_calls, 1, "the waiting consumer was not woken exactly once");
@@ -586,7 +586,7 @@ ZTEST(downlink, test_end_published_after_the_recheck_skips_no_block)
     size_t len = sizeof(buf);
     bool is_last;
 
-    wrap_msgq_get_empty_hook(2, queue_block_and_end_with_error, dl);
+    wrap_msgq_get_empty_hook(2, queue_block_and_end_cleanly, dl);
     zassert_ok(pouch_gateway_downlink_get_data(dl, buf, &len, &is_last));
     zassert_false(wrap_hook_pending(), "the drain did not recheck the queue");
     zassert_false(is_last, "the block queued before the end was skipped");

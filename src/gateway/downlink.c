@@ -23,6 +23,7 @@ enum
     DOWNLINK_FLAG_TRANSPORT_ABORTED,
     DOWNLINK_FLAG_TRANSPORT_WAITING,
     DOWNLINK_FLAG_ENDED,
+    DOWNLINK_FLAG_TRUNCATED,
     DOWNLINK_FLAG_COUNT,
 };
 
@@ -44,6 +45,11 @@ struct pouch_gateway_downlink_context
     struct downlink_block current;
     /* Offset into current.block for the next byte to read. */
     size_t offset;
+
+    /* Producer-owned: a chunk was queued. */
+    bool received;
+    /* Producer-owned: block_cb() refused data. */
+    bool dropped;
 
     POUCH_ATOMIC_DEFINE(flags, DOWNLINK_FLAG_COUNT);
     pouch_atomic_t refs;
@@ -99,6 +105,11 @@ int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_las
             return -ECANCELED;
         }
 
+        if (downlink->dropped)
+        {
+            return -ENOMEM;
+        }
+
         size_t take = MIN(len, (size_t) MAX_PLAINTEXT_BLOCK_SIZE);
         bool last_chunk = is_last && (take == len);
 
@@ -106,6 +117,7 @@ int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_las
         if (block == NULL)
         {
             POUCH_LOG_ERR("Failed to allocate block");
+            downlink->dropped = true;
             return -ENOMEM;
         }
 
@@ -117,12 +129,11 @@ int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_las
         {
             POUCH_LOG_ERR("Failed to enqueue block: %d", err);
             blockbuf_free(block);
-            // TODO: We're potentially leaving a partial payload in the pouch here,
-            // without notifying the receiver about the error.
-            // Tracked in golioth/firmware-issue-tracker#1061
+            downlink->dropped = true;
             return -ENOMEM;
         }
 
+        downlink->received = true;
         notify_waiting(downlink);
 
         data += take;
@@ -141,7 +152,10 @@ void pouch_gateway_downlink_end_cb(int status, void *arg)
         POUCH_LOG_ERR("Downlink ending due to error %d", status);
     }
 
-    pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_ENDED);
+    bool truncated = downlink->dropped || (0 != status && downlink->received);
+
+    pouch_atomic_set_bit(downlink->flags,
+                         truncated ? DOWNLINK_FLAG_TRUNCATED : DOWNLINK_FLAG_ENDED);
     notify_waiting(downlink);
     release(downlink);
 }
@@ -163,9 +177,12 @@ struct pouch_gateway_downlink_context *pouch_gateway_downlink_open(
     downlink->cb_arg = cb_arg;
     downlink->current.block = NULL;
     downlink->offset = 0;
+    downlink->received = false;
+    downlink->dropped = false;
     pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_COMPLETE);
     pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED);
     pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_ENDED);
+    pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_TRUNCATED);
     pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING);
     pouch_atomic_set(&downlink->refs, 1);
 
@@ -205,6 +222,14 @@ int pouch_gateway_downlink_get_data(struct pouch_gateway_downlink_context *downl
                 {
                     pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING);
                     continue;
+                }
+
+                if (flags & BIT(DOWNLINK_FLAG_TRUNCATED))
+                {
+                    pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_COMPLETE);
+                    pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING);
+                    *dst_len = 0;
+                    return -EIO;
                 }
 
                 *dst_len = total_bytes_copied;
