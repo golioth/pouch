@@ -77,6 +77,7 @@ bool pouch_gateway_downlink_is_complete(const struct pouch_gateway_downlink_cont
  *
  * Called by the transport (CoAP) when a response block arrives.
  * An empty payload queues nothing and does not end the stream, even with @p is_last.
+ * The first block flagged last ends the stream once it is drained.
  *
  * @param data The data received.
  * @param len The length of the data.

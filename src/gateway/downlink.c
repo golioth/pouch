@@ -26,24 +26,24 @@ enum
     DOWNLINK_FLAG_COUNT,
 };
 
+struct downlink_block
+{
+    struct pouch_buf *block;
+    bool is_last;
+};
+
 struct pouch_gateway_downlink_context
 {
     pouch_gateway_downlink_data_available_cb data_available_cb;
     void *cb_arg;
 
     pouch_msgq_t block_queue;
-    uint8_t block_queue_buf[CONFIG_POUCH_GATEWAY_NUM_BLOCKS * sizeof(struct pouch_buf *)];
+    uint8_t block_queue_buf[CONFIG_POUCH_GATEWAY_NUM_BLOCKS * sizeof(struct downlink_block)];
 
     /* Currently being drained.  Owned by the consumer thread. */
-    struct pouch_buf *current_block;
-    /* Offset into current_block for the next byte to read. */
+    struct downlink_block current;
+    /* Offset into current.block for the next byte to read. */
     size_t offset;
-    /* The block that was flagged as last by the producer.  Compared
-     * against current_block on consumption to determine end-of-stream.
-     * Single-writer (producer), single-reader (consumer); the
-     * happens-before across the msgq put/get makes this safe.
-     */
-    struct pouch_buf *last_block;
 
     POUCH_ATOMIC_DEFINE(flags, DOWNLINK_FLAG_COUNT);
     pouch_atomic_t refs;
@@ -56,16 +56,16 @@ static void release(struct pouch_gateway_downlink_context *downlink)
         return;
     }
 
-    struct pouch_buf *block;
+    struct downlink_block item;
 
-    while (pouch_msgq_get(&downlink->block_queue, &block, POUCH_NO_WAIT) == 0)
+    while (pouch_msgq_get(&downlink->block_queue, &item, POUCH_NO_WAIT) == 0)
     {
-        blockbuf_free(block);
+        blockbuf_free(item.block);
     }
 
-    if (NULL != downlink->current_block)
+    if (NULL != downlink->current.block)
     {
-        blockbuf_free(downlink->current_block);
+        blockbuf_free(downlink->current.block);
     }
 
     free(downlink);
@@ -111,22 +111,11 @@ int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_las
 
         buf_write(block, data, take);
 
-        /* Record the last block's pointer BEFORE submitting so the
-         * consumer sees it as soon as it dequeues this buffer.
-         */
-        if (last_chunk)
-        {
-            downlink->last_block = block;
-        }
-
-        int err = pouch_msgq_put(&downlink->block_queue, &block, pouch_timepoint_timeout(deadline));
+        struct downlink_block item = {.block = block, .is_last = last_chunk};
+        int err = pouch_msgq_put(&downlink->block_queue, &item, pouch_timepoint_timeout(deadline));
         if (err)
         {
             POUCH_LOG_ERR("Failed to enqueue block: %d", err);
-            if (last_chunk)
-            {
-                downlink->last_block = NULL;
-            }
             blockbuf_free(block);
             // TODO: We're potentially leaving a partial payload in the pouch here,
             // without notifying the receiver about the error.
@@ -172,8 +161,7 @@ struct pouch_gateway_downlink_context *pouch_gateway_downlink_open(
 
     downlink->data_available_cb = data_available_cb;
     downlink->cb_arg = cb_arg;
-    downlink->current_block = NULL;
-    downlink->last_block = NULL;
+    downlink->current.block = NULL;
     downlink->offset = 0;
     pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_COMPLETE);
     pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED);
@@ -184,7 +172,7 @@ struct pouch_gateway_downlink_context *pouch_gateway_downlink_open(
     pouch_msgq_init(&downlink->block_queue,
                     downlink->block_queue_buf,
                     sizeof(downlink->block_queue_buf),
-                    sizeof(struct pouch_buf *));
+                    sizeof(struct downlink_block));
 
     return downlink;
 }
@@ -206,16 +194,14 @@ int pouch_gateway_downlink_get_data(struct pouch_gateway_downlink_context *downl
 
     while (*dst_len)
     {
-        if (NULL == downlink->current_block)
+        if (NULL == downlink->current.block)
         {
-            if (pouch_msgq_get(&downlink->block_queue, &downlink->current_block, POUCH_NO_WAIT)
-                != 0)
+            if (pouch_msgq_get(&downlink->block_queue, &downlink->current, POUCH_NO_WAIT) != 0)
             {
                 pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING);
                 long flags = pouch_atomic_get_value(downlink->flags);
 
-                if (pouch_msgq_get(&downlink->block_queue, &downlink->current_block, POUCH_NO_WAIT)
-                    == 0)
+                if (pouch_msgq_get(&downlink->block_queue, &downlink->current, POUCH_NO_WAIT) == 0)
                 {
                     pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING);
                     continue;
@@ -233,7 +219,7 @@ int pouch_gateway_downlink_get_data(struct pouch_gateway_downlink_context *downl
         }
 
         struct pouch_bufview v;
-        pouch_bufview_init(&v, downlink->current_block);
+        pouch_bufview_init(&v, downlink->current.block);
         v.offset = downlink->offset;
 
         size_t bytes_to_copy = MIN(*dst_len, pouch_bufview_available(&v));
@@ -244,12 +230,12 @@ int pouch_gateway_downlink_get_data(struct pouch_gateway_downlink_context *downl
         dst = (void *) ((intptr_t) dst + bytes_to_copy);
         total_bytes_copied += bytes_to_copy;
 
-        if (buf_size_get(downlink->current_block) == downlink->offset)
+        if (buf_size_get(downlink->current.block) == downlink->offset)
         {
-            bool drained_last = (downlink->current_block == downlink->last_block);
+            bool drained_last = downlink->current.is_last;
 
-            blockbuf_free(downlink->current_block);
-            downlink->current_block = NULL;
+            blockbuf_free(downlink->current.block);
+            downlink->current.block = NULL;
             downlink->offset = 0;
 
             if (drained_last)
