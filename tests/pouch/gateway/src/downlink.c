@@ -235,6 +235,110 @@ ZTEST(downlink, test_end_cb_failure_makes_drain_complete_with_is_last)
     assert_all_released();
 }
 
+/* The next read returns no bytes and ends the stream. */
+static void assert_ends_empty(struct pouch_gateway_downlink_context *dl)
+{
+    uint8_t buf[8];
+    size_t len = sizeof(buf);
+    bool is_last = false;
+
+    zassert_ok(pouch_gateway_downlink_get_data(dl, buf, &len, &is_last));
+    zassert_equal(len, 0);
+    zassert_true(is_last, "the stream did not end");
+    zassert_true(pouch_gateway_downlink_is_complete(dl));
+}
+
+ZTEST(downlink, test_clean_end_without_final_block_allocates_no_block)
+{
+    struct pouch_gateway_downlink_context *dl =
+        pouch_gateway_downlink_open(data_available_cb, NULL);
+    zassert_not_null(dl);
+    wrap_free_watch(dl);
+    pouch_gateway_downlink_acquire(dl);
+
+    pouch_gateway_downlink_end_cb(0, dl);
+    zassert_equal(stub_blockbuf_alloc_count(), 0, "the end took a block");
+    zassert_equal(data_available_calls, 1);
+    assert_ends_empty(dl);
+
+    pouch_gateway_downlink_close(dl);
+    assert_all_released();
+}
+
+ZTEST(downlink, test_clean_end_with_the_pool_exhausted_ends_the_stream)
+{
+    struct pouch_gateway_downlink_context *dl =
+        pouch_gateway_downlink_open(data_available_cb, NULL);
+    zassert_not_null(dl);
+    wrap_free_watch(dl);
+    pouch_gateway_downlink_acquire(dl);
+    stub_blockbuf_fail_alloc_from(1);
+
+    pouch_gateway_downlink_end_cb(0, dl);
+    zassert_equal(data_available_calls, 1, "the end did not wake the consumer");
+    assert_ends_empty(dl);
+
+    pouch_gateway_downlink_close(dl);
+    assert_all_released();
+}
+
+/* An empty final response with @p data as its payload, then a clean end. */
+static void end_with_an_empty_final_response(const uint8_t *data)
+{
+    struct pouch_gateway_downlink_context *dl =
+        pouch_gateway_downlink_open(data_available_cb, NULL);
+    zassert_not_null(dl);
+    wrap_free_watch(dl);
+    pouch_gateway_downlink_acquire(dl);
+
+    zassert_ok(pouch_gateway_downlink_block_cb(data, 0, true, dl));
+    pouch_gateway_downlink_end_cb(0, dl);
+    zassert_equal(stub_blockbuf_alloc_count(), 0, "the empty response took a block");
+    zassert_equal(data_available_calls, 1);
+    assert_ends_empty(dl);
+
+    pouch_gateway_downlink_close(dl);
+    assert_all_released();
+}
+
+ZTEST(downlink, test_empty_final_response_allocates_no_block)
+{
+    end_with_an_empty_final_response((const uint8_t *) "");
+}
+
+ZTEST(downlink, test_empty_final_response_without_payload_allocates_no_block)
+{
+    end_with_an_empty_final_response(NULL);
+}
+
+ZTEST(downlink, test_clean_end_after_non_final_blocks_ends_after_the_data)
+{
+    struct pouch_gateway_downlink_context *dl =
+        pouch_gateway_downlink_open(data_available_cb, NULL);
+    zassert_not_null(dl);
+    wrap_free_watch(dl);
+    pouch_gateway_downlink_acquire(dl);
+
+    zassert_ok(pouch_gateway_downlink_block_cb((const uint8_t *) "ab", 2, false, dl));
+    zassert_ok(pouch_gateway_downlink_block_cb((const uint8_t *) "cd", 2, false, dl));
+
+    uint8_t buf[8];
+    size_t len = sizeof(buf);
+    bool is_last = true;
+    zassert_ok(pouch_gateway_downlink_get_data(dl, buf, &len, &is_last));
+    zassert_equal(len, 4);
+    zassert_mem_equal(buf, "abcd", 4);
+    zassert_false(is_last);
+    data_available_calls = 0;
+
+    pouch_gateway_downlink_end_cb(0, dl);
+    zassert_equal(data_available_calls, 1, "the end did not wake the waiting consumer");
+    assert_ends_empty(dl);
+
+    pouch_gateway_downlink_close(dl);
+    assert_all_released();
+}
+
 ZTEST(downlink, test_close_before_end_keeps_context_until_end)
 {
     struct pouch_gateway_downlink_context *dl =

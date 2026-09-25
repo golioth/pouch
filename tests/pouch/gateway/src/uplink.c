@@ -256,6 +256,8 @@ ZTEST(uplink, test_failed_open_does_not_acquire_downlink)
 
 ZTEST(uplink, test_closed_downlink_lives_until_uplink_ends)
 {
+    dl_armed_calls = 0;
+
     struct pouch_gateway_downlink_context *dl = pouch_gateway_downlink_open(dl_armed_cb, NULL);
     zassert_not_null(dl);
     wrap_free_watch(dl);
@@ -269,6 +271,7 @@ ZTEST(uplink, test_closed_downlink_lives_until_uplink_ends)
     /* An empty uplink forwards nothing and ends the downlink with status 0. */
     pouch_gateway_uplink_close(up);
     zassert_equal(end_cb_calls, 1);
+    zassert_equal(dl_armed_calls, 0, "the end notified a closed downlink");
     assert_all_released();
 }
 
