@@ -5,6 +5,7 @@
  */
 #include <stdlib.h>
 #include <zephyr/fs/fs.h>
+#include <zephyr/init.h>
 #include <pouch/pouch.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/psa_util.h>
@@ -13,21 +14,15 @@
 LOG_MODULE_REGISTER(credentials);
 
 #define CERT_DIR CONFIG_EXAMPLE_CREDENTIALS_DIR
-#define CERT_FILE CERT_DIR "/crt.der"
-#define KEY_FILE CERT_DIR "/key.der"
+#define CERT_FILE CERT_DIR "/" CONFIG_EXAMPLE_POUCH_DEVICE_CRT_FILENAME
+#define KEY_FILE CERT_DIR "/" CONFIG_EXAMPLE_POUCH_DEVICE_KEY_FILENAME
 
 /** Load the raw private key data into PSA */
 static psa_key_id_t import_raw_pk(const uint8_t *private_key, size_t size)
 {
     mbedtls_pk_context pk;
     mbedtls_pk_init(&pk);
-    int err = mbedtls_pk_parse_key(&pk,
-                                   private_key,
-                                   size,
-                                   NULL,
-                                   0,
-                                   mbedtls_psa_get_random,
-                                   MBEDTLS_PSA_RANDOM_STATE);
+    int err = mbedtls_pk_parse_key(&pk, private_key, size, NULL, 0);
     if (err)
     {
         LOG_ERR("Failed to parse key: -0x%x", -err);
@@ -51,7 +46,7 @@ static psa_key_id_t import_raw_pk(const uint8_t *private_key, size_t size)
     return key_id;
 }
 
-static void ensure_credentials_dir(void)
+static int ensure_credentials_dir(void)
 {
     struct fs_dirent dirent;
 
@@ -65,7 +60,12 @@ static void ensure_credentials_dir(void)
     {
         LOG_ERR("Failed to create credentials dir: %d", err);
     }
+
+    return err;
 }
+
+/* Run after filesystem mounts, before SMP provisioning */
+SYS_INIT(ensure_credentials_dir, APPLICATION, 85);
 
 static ssize_t get_file_size(const char *path)
 {
@@ -87,9 +87,6 @@ static ssize_t get_file_size(const char *path)
 
 static ssize_t read_file(const char *path, uint8_t **out)
 {
-    // Ensure that the credentials directory exists, so the user doesn't have to
-    ensure_credentials_dir();
-
     ssize_t size = get_file_size(path);
     if (size <= 0)
     {
