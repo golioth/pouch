@@ -2,6 +2,9 @@
  * Copyright (c) 2026 Golioth, Inc.
  */
 
+/* A board overlay replaces app.overlay, which mounts the credentials file system */
+#include "../app.overlay"
+
 &spi1 {
 	compatible = "nordic,nrf-spis";
 	status = "okay";

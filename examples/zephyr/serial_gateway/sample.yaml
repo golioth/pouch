@@ -1,0 +1,15 @@
+sample:
+  name: Pouch SPI Serial Gateway
+common:
+  build_only: true
+  tags: spi
+  sysbuild: true
+  platform_allow:
+    - frdm_rw612
+  integration_platforms:
+    - frdm_rw612
+tests:
+  pouch.serial_gateway.build: {}
+  pouch.serial_gateway.wifi.build:
+    extra_args:
+      - EXTRA_CONF_FILE=boards/frdm_rw612_wifi.conf

@@ -24,10 +24,15 @@ Zephyr board with an SPI peripheral, PSA, MbedTLS and LittleFS support
 should work.
 
 The SPI peripheral is configured through a board-specific devicetree overlay (see
-`nrf52840dk_nrf52840.overlay` for reference). The overlay declares a
+`boards/nrf52840dk_nrf52840.overlay` for reference). The overlay declares a
 `pouch-serial` child node under the SPI controller that binds to the
 `golioth,pouch-device` compatible, providing the CS, data-ready and
-`spi-max-frequency` properties used by the transport.
+`spi-max-frequency` properties used by the transport. A board overlay replaces
+`app.overlay`, so it must include `app.overlay` to keep the file system that
+holds the credentials.
+
+The frame size (`CONFIG_POUCH_SPI_DEVICE_FRAME_SIZE`) must match the
+gateway's `CONFIG_POUCH_SPI_BROKER_FRAME_SIZE`.
 
 ## Authentication
 
