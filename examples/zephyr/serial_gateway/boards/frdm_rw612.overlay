@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2026 Golioth, Inc.
+ */
+
+/* A board overlay replaces app.overlay, which mounts the credentials file system */
+#include "../app.overlay"
+
 &pinctrl {
 	/* Override the board's pinmux_flexcomm1_spi, which includes BOTH an SS0
 	 * and an SS1 group. The RW61x MCI_IO_MUX pinctrl driver processes every
