@@ -3,14 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 menu "Pouch Serial Transport"
-    visible if POUCH_TRANSPORT_SERIAL
-
-config POUCH_TRANSPORT_SERIAL_BROKER
-    bool
-    depends on POUCH_GATEWAY
-    default y
-    help
-        Enable the broker-based implementation of the Pouch Serial transport.
+    visible if POUCH_TRANSPORT_SERIAL || POUCH_GATEWAY
 
 config POUCH_TRANSPORT_SERIAL_DEVICE
     bool
@@ -55,6 +48,7 @@ menuconfig POUCH_SPI_BROKER
     bool "Pouch SPI broker transport"
     depends on SPI
     depends on POUCH_GATEWAY
+    select POUCH_TRANSPORT_SERIAL_BROKER
     default $(dt_compat_on_bus,$(DT_COMPAT_GOLIOTH_POUCH_BROKER),spi)
     help
       Enable the SPI broker (master) transport adapter for the Pouch serial
