@@ -117,9 +117,11 @@ config POUCH_TRANSPORT_SERIAL
 config POUCH_TRANSPORT_SERIAL_BROKER
     bool "Serial transport"
     help
-      Enable the Pouch Serial transport. This transport can be
-      used in a gateway application that communicates with a
-      node device over a serial connection.
+      Enable the broker side of the Pouch Serial transport. This transport
+      can be used in a gateway application that communicates with a node
+      device over a serial connection. It is independent of the transport
+      the gateway itself uses to reach Golioth, and is selected by the
+      serial transport adapters, such as POUCH_SPI_BROKER.
 
 module = POUCH_TRANSPORT
 module-str = Pouch Transport
