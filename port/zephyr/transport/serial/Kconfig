@@ -38,19 +38,12 @@ if POUCH_SPI_DEVICE
 config POUCH_SPI_DEVICE_FRAME_SIZE
     int "SPI slave frame size"
     default 128
-    range 2 256
+    range 3 256
     help
       Maximum frame size in bytes for SPI transactions. Controls the
       size of the TX and RX buffers. The first byte is reserved for
       a length field, so the maximum payload is one less than this
       value.
-
-config POUCH_SPI_DEVICE_RX_BUFFER_SIZE
-    int "SPI slave RX buffer size"
-    default 256
-    help
-      Size of the RX buffer in bytes for the SPI slave transport adapter.
-      Must be at least as large as POUCH_SPI_DEVICE_FRAME_SIZE.
 
 module = POUCH_SPI_DEVICE
 module-str = Pouch SPI Slave
@@ -73,7 +66,7 @@ if POUCH_SPI_BROKER
 config POUCH_SPI_BROKER_FRAME_SIZE
     int "SPI broker frame size"
     default 128
-    range 2 256
+    range 3 256
     help
       Maximum frame size in bytes for SPI transactions. Controls the
       size of the TX and RX buffers. The first byte is reserved for

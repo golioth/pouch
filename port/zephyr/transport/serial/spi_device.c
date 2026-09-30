@@ -21,7 +21,7 @@ LOG_MODULE_REGISTER(pouch_spi_device, CONFIG_POUCH_SPI_DEVICE_LOG_LEVEL);
 #define DT_DRV_COMPAT golioth_pouch_device
 
 BUILD_ASSERT(DT_NUM_INST_STATUS_OKAY(DT_DRV_COMPAT) == 1,
-             "Exactly one golioth,pouch-device-spi node is required");
+             "Exactly one golioth,pouch-device node is required");
 
 #define HAS_DATA_READY_GPIO DT_INST_NODE_HAS_PROP(0, data_ready_gpios)
 
@@ -31,9 +31,18 @@ static struct spi_dt_spec spi =
 static const struct gpio_dt_spec data_ready_gpio =
     GPIO_DT_SPEC_INST_GET_OR(0, data_ready_gpios, {0});
 
+/* Each transfer allocates room for a full frame plus its length byte in the RX packet buffer. */
+#define RX_ALLOC_LEN (1 + CONFIG_POUCH_SPI_DEVICE_FRAME_SIZE)
+
+/* The packet buffer doesn't rewind when it's empty, so an allocation is only guaranteed to be
+ * contiguous if the buffer can hold two of them. Each packet also carries a 32-bit length field,
+ * and the buffer keeps one word free to tell a full buffer from an empty one.
+ */
+#define RX_PBUF_SIZE \
+    (2 * (ROUND_UP(RX_ALLOC_LEN, sizeof(uint32_t)) + sizeof(uint32_t)) + sizeof(uint32_t))
+
 static uint8_t tx_buf[CONFIG_POUCH_SPI_DEVICE_FRAME_SIZE];
-static uint8_t rx_buf[sizeof(struct spsc_pbuf) + CONFIG_POUCH_SPI_DEVICE_RX_BUFFER_SIZE] __aligned(
-    4);
+static uint8_t rx_buf[sizeof(struct spsc_pbuf) + RX_PBUF_SIZE] __aligned(4);
 static struct k_work process_work;
 static struct spsc_pbuf *rx_pbuf;
 static atomic_t flags;
@@ -85,7 +94,7 @@ static void spi_xfer_complete(const struct device *dev, int result, void *data)
     {
         LOG_ERR("Transfer failed: %d", result);
         atomic_clear_bit(&flags, FLAG_BUSY);
-        setup_transfer();
+        k_work_submit(&process_work);
         return;
     }
 
@@ -95,8 +104,6 @@ static void spi_xfer_complete(const struct device *dev, int result, void *data)
     {
         spsc_pbuf_commit(rx_pbuf, MIN(result, 1 + len));
     }
-
-    k_work_submit(&process_work);
 
     if (atomic_test_bit(&flags, FLAG_TX_IN_PROGRESS))
     {
@@ -115,7 +122,12 @@ static void spi_xfer_complete(const struct device *dev, int result, void *data)
     }
 
     atomic_clear_bit(&flags, FLAG_BUSY);
-    setup_transfer();
+
+    /* This callback runs in ISR context while the SPI driver still holds its context lock, so the
+     * next transfer can't be set up from here. The process work item sets it up after handling the
+     * received frame.
+     */
+    k_work_submit(&process_work);
 }
 
 static void process_rx(void)
@@ -134,9 +146,13 @@ static void process_rx(void)
         const uint8_t *data = &buf[1];
         if (res < 1 + len)
         {
-            // not ready yet, will process again after next RX
-            LOG_WRN("Waiting for %u bytes", len + 1 - res);
-            return;
+            /* Every frame is received in a single transfer, and each transfer gets its own packet,
+             * so the missing bytes will never arrive. This happens if the broker's frame size is
+             * larger than ours.
+             */
+            LOG_ERR("Dropping truncated frame (%d of %zu bytes)", res - 1, len);
+            spsc_pbuf_free(rx_pbuf, res);
+            continue;
         }
 
         LOG_HEXDUMP_DBG(buf, res, "RX");
@@ -205,8 +221,8 @@ static int setup_transfer(void)
     }
 
     char *buf;
-    int res = spsc_pbuf_alloc(rx_pbuf, 1 + CONFIG_POUCH_SPI_DEVICE_FRAME_SIZE, &buf);
-    if (res != 1 + CONFIG_POUCH_SPI_DEVICE_FRAME_SIZE)
+    int res = spsc_pbuf_alloc(rx_pbuf, RX_ALLOC_LEN, &buf);
+    if (res != RX_ALLOC_LEN)
     {
         // This can only happen if there's RX data waiting to be processed.
         // We'll come back to set up the next transfer after processing.
@@ -216,7 +232,7 @@ static int setup_transfer(void)
     }
 
     rx_spi_buf.buf = buf;
-    rx_spi_buf.len = 1 + CONFIG_POUCH_SPI_DEVICE_FRAME_SIZE;
+    rx_spi_buf.len = RX_ALLOC_LEN;
     atomic_set_bit_to(&flags, FLAG_TX_IN_PROGRESS, tx_spi_buf.buf != NULL);
 
     res = spi_transceive_cb(spi.bus,
