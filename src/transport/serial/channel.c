@@ -16,11 +16,29 @@ POUCH_LOG_REGISTER(serial_channel, CONFIG_POUCH_SERIAL_LOG_LEVEL);
 enum ch_flag
 {
     CH_FLAG_OPEN,
+    /** Opened, but no fragment has been sent or received yet. */
     CH_FLAG_OPENING,
+    /** A frame should be produced on the next call to pouch_serial_ch_frame_get(). */
     CH_FLAG_PENDING,
     CH_FLAG_ERROR,
     CH_FLAG_SUSPENDED,
+    /** Sender only: a fragment has been sent, and the remote hasn't ACKed it yet. */
+    CH_FLAG_WAIT_ACK,
+    /** Push sender only: the fragment waiting for an ACK is the last one. */
+    CH_FLAG_LAST_SENT,
 };
+
+/*
+ * The serial protocol is stop-and-wait: every fragment is paired with an ACK from the receiver.
+ * As the broker initiates all exchanges, the pairing depends on the channel direction:
+ *
+ * - Device -> Broker channels are pulled by the broker: the receiver sends an ACK to request each
+ *   fragment, and the sender responds with exactly one fragment per ACK. There's no ACK after the
+ *   last fragment.
+ * - Broker -> Device channels are pushed by the broker: the sender sends a fragment, and waits for
+ *   the receiver to ACK it before sending the next one. The last fragment is ACKed too, and the
+ *   sender doesn't consider the transfer complete until it is.
+ */
 
 static enum pouch_serial_channel_id channel_id(const struct pouch_serial_channel *ch)
 {
@@ -32,11 +50,47 @@ static bool is_receiver(const struct pouch_serial_channel *ch)
     return (ch->endpoint->send == NULL);
 }
 
+static bool is_push(const struct pouch_serial_channel *ch)
+{
+    return POUCH_SERIAL_CH_BROKER_TO_DEVICE(channel_id(ch));
+}
+
 static void signal_ready(struct pouch_serial_channel *ch)
 {
     if (ch->bearer.ready != NULL)
     {
         ch->bearer.ready(&ch->bearer);
+    }
+}
+
+/*
+ * Close the channel. If the transfer failed and notify_remote is set, an error frame is sent to
+ * the remote on the next call to pouch_serial_ch_frame_get().
+ */
+static void close_channel(struct pouch_serial_channel *ch, bool success, bool notify_remote)
+{
+    if (!pouch_atomic_test_and_clear_bit(&ch->flags, CH_FLAG_OPEN))
+    {
+        return;
+    }
+
+    pouch_atomic_clear_bit(&ch->flags, CH_FLAG_WAIT_ACK);
+    pouch_atomic_clear_bit(&ch->flags, CH_FLAG_LAST_SENT);
+
+    if (!success && notify_remote)
+    {
+        pouch_atomic_set_bit(&ch->flags, CH_FLAG_ERROR);
+        pouch_atomic_set_bit(&ch->flags, CH_FLAG_PENDING);
+    }
+
+    if (ch->endpoint->end != NULL)
+    {
+        ch->endpoint->end(&ch->bearer, success);
+    }
+
+    if (ch->closed_cb != NULL)
+    {
+        ch->closed_cb(ch, success);
     }
 }
 
@@ -46,7 +100,14 @@ static int handle_ack(struct pouch_serial_channel *ch, bool err)
     if (err)
     {
         POUCH_LOG_ERR("Received NACK on channel %d", channel_id(ch));
-        pouch_serial_ch_close(ch, false);
+        // The remote has already abandoned the transfer, so there's no need to tell it
+        close_channel(ch, false, false);
+        return 0;
+    }
+
+    if (is_receiver(ch))
+    {
+        POUCH_LOG_DBG("ch %d: ignoring ACK on receiver channel", channel_id(ch));
         return 0;
     }
 
@@ -55,22 +116,38 @@ static int handle_ack(struct pouch_serial_channel *ch, bool err)
         return 0;
     }
 
-    /* Receiver channels don't open via ACK - they open when the first DATA
-     * frame arrives (handle_data).  Just respond with an ACK so the remote
-     * sender knows it may proceed. */
-    if (ch->endpoint->send == NULL)
+    if (!pouch_atomic_test_bit(&ch->flags, CH_FLAG_OPEN))
     {
-        signal_ready(ch);
+        if (is_push(ch))
+        {
+            // Push senders are opened locally, not by the remote.
+            POUCH_LOG_DBG("ch %d: ignoring ACK on closed channel", channel_id(ch));
+            return 0;
+        }
+
+        // The first request from the remote opens the transfer
+        return pouch_serial_ch_open(ch);
+    }
+
+    if (!pouch_atomic_test_and_clear_bit(&ch->flags, CH_FLAG_WAIT_ACK))
+    {
+        // We haven't sent anything since the last ACK, so this one is redundant.
         return 0;
     }
 
-    /* First prompt: open the transfer. */
-    return pouch_serial_ch_open(ch);
+    if (pouch_atomic_test_and_clear_bit(&ch->flags, CH_FLAG_LAST_SENT))
+    {
+        POUCH_LOG_DBG("ch %d: last fragment ACKed, closing", channel_id(ch));
+        close_channel(ch, true, false);
+        return 0;
+    }
+
+    signal_ready(ch);
+    return 0;
 }
 
 /*
- * Handle an incoming Data frame on a Broker->Device channel.
- * The broker is writing data to the device.
+ * Handle an incoming Data frame. Only receiver channels accept Data frames.
  */
 static int handle_data(struct pouch_serial_channel *ch,
                        const struct pouch_serial_header *hdr,
@@ -86,8 +163,16 @@ static int handle_data(struct pouch_serial_channel *ch,
     if (hdr->err)
     {
         POUCH_LOG_WRN("ch %d: error flag set, closing", channel_id(ch));
-        pouch_serial_ch_close(ch, false);
+        // The remote has already abandoned the transfer, so there's no need to tell it
+        close_channel(ch, false, false);
         return 0;
+    }
+
+    if (!is_receiver(ch) || ch->endpoint->recv == NULL)
+    {
+        POUCH_LOG_ERR("ch %d: DATA on sender channel", channel_id(ch));
+        close_channel(ch, false, true);
+        return -EINVAL;
     }
 
     if (hdr->first)
@@ -99,6 +184,13 @@ static int handle_data(struct pouch_serial_channel *ch,
             return -EBUSY;
         }
 
+        if (!is_push(ch) && !pouch_atomic_test_bit(&ch->flags, CH_FLAG_OPEN))
+        {
+            // Pulled transfers are opened locally, and must be requested before they're sent
+            POUCH_LOG_ERR("ch %d: unrequested transfer", channel_id(ch));
+            return -EINVAL;
+        }
+
         POUCH_LOG_DBG("ch %d: opening receiver channel", channel_id(ch));
         int err = pouch_serial_ch_open(ch);
         if (err)
@@ -108,34 +200,36 @@ static int handle_data(struct pouch_serial_channel *ch,
 
         pouch_atomic_clear_bit(&ch->flags, CH_FLAG_OPENING);
     }
-    else if (!pouch_atomic_test_bit(&ch->flags, CH_FLAG_OPEN))
+    else if (!pouch_atomic_test_bit(&ch->flags, CH_FLAG_OPEN)
+             || pouch_atomic_test_bit(&ch->flags, CH_FLAG_OPENING))
     {
-        POUCH_LOG_ERR("ch %d: not open", channel_id(ch));
+        POUCH_LOG_ERR("ch %d: missing FIRST fragment", channel_id(ch));
         return -EINVAL;
     }
 
     if (len > 0)
     {
-        if (ch->endpoint->recv == NULL)
-        {
-            POUCH_LOG_ERR("ch %d: recv on send endpoint", channel_id(ch));
-            pouch_serial_ch_close(ch, false);
-            return -EINVAL;
-        }
-
         int err = ch->endpoint->recv(&ch->bearer, payload, len);
         if (err)
         {
             POUCH_LOG_ERR("ch %d: recv failed: %d", channel_id(ch), err);
-            pouch_serial_ch_close(ch, false);
+            close_channel(ch, false, true);
             return err;
         }
+    }
+
+    /* Pushed fragments are all ACKed, including the last one. Pulled fragments are requested by
+     * the next ACK, so the last one isn't followed by an ACK.
+     */
+    if (is_push(ch) || !hdr->last)
+    {
+        pouch_atomic_set_bit(&ch->flags, CH_FLAG_PENDING);
     }
 
     if (hdr->last)
     {
         POUCH_LOG_DBG("ch %d: last fragment, closing", channel_id(ch));
-        pouch_serial_ch_close(ch, true);
+        close_channel(ch, true, false);
     }
 
     return 0;
@@ -168,10 +262,9 @@ int pouch_serial_ch_recv(struct pouch_serial_channel *ch,
 
 size_t pouch_serial_ch_frame_get(struct pouch_serial_channel *ch, uint8_t *buf, size_t maxlen)
 {
-
     if (maxlen <= POUCH_SERIAL_HEADER_LEN)
     {
-        return -EINVAL;
+        return 0;
     }
 
     if (!pouch_atomic_test_and_clear_bit(&ch->flags, CH_FLAG_PENDING))
@@ -190,28 +283,27 @@ size_t pouch_serial_ch_frame_get(struct pouch_serial_channel *ch, uint8_t *buf, 
         };
 
         *buf = pouch_serial_header_encode(&hdr);
-        pouch_atomic_clear_bit(&ch->flags, CH_FLAG_OPEN);
         return POUCH_SERIAL_HEADER_LEN;
     }
 
-    if (!pouch_atomic_test_bit(&ch->flags, CH_FLAG_OPEN))
-    {
-        return 0;
-    }
-
-    // If this is a receiver channel
+    // Receivers only ever send ACKs, and may owe one after the channel has closed.
     if (is_receiver(ch))
     {
         struct pouch_serial_header hdr = {
             .is_data = false,
-            .err = pouch_atomic_test_and_clear_bit(&ch->flags, CH_FLAG_ERROR),
+            .err = false,
             .channel = channel_id(ch),
         };
         *buf = pouch_serial_header_encode(&hdr);
-        POUCH_LOG_DBG("ch %d: sending ACK (err=%d)", channel_id(ch), hdr.err);
+        POUCH_LOG_DBG("ch %d: sending ACK", channel_id(ch));
         return POUCH_SERIAL_HEADER_LEN;
     }
 
+    if (!pouch_atomic_test_bit(&ch->flags, CH_FLAG_OPEN)
+        || pouch_atomic_test_bit(&ch->flags, CH_FLAG_WAIT_ACK))
+    {
+        return 0;
+    }
 
     size_t len = maxlen - POUCH_SERIAL_HEADER_LEN;
     enum pouch_result result = ch->endpoint->send(&ch->bearer, &buf[POUCH_SERIAL_HEADER_LEN], &len);
@@ -237,14 +329,27 @@ size_t pouch_serial_ch_frame_get(struct pouch_serial_channel *ch, uint8_t *buf, 
 
     *buf = pouch_serial_header_encode(&hdr);
 
-    if (is_last)
+    if (error)
     {
+        // The frame we're returning already carries the error.
+        close_channel(ch, false, false);
+        return POUCH_SERIAL_HEADER_LEN;
+    }
+
+    if (is_last && !is_push(ch))
+    {
+        // Pulled transfers are complete as soon as the last fragment is sent.
         POUCH_LOG_DBG("ch %d: last fragment, closing", channel_id(ch));
-        pouch_serial_ch_close(ch, !error);
+        close_channel(ch, true, false);
     }
     else
     {
-        signal_ready(ch);
+        if (is_last)
+        {
+            pouch_atomic_set_bit(&ch->flags, CH_FLAG_LAST_SENT);
+        }
+
+        pouch_atomic_set_bit(&ch->flags, CH_FLAG_WAIT_ACK);
     }
 
     return POUCH_SERIAL_HEADER_LEN + len;
@@ -253,7 +358,14 @@ size_t pouch_serial_ch_frame_get(struct pouch_serial_channel *ch, uint8_t *buf, 
 void pouch_serial_ch_ready(struct pouch_serial_channel *ch)
 {
     POUCH_LOG_DBG("ch %d: is ready to send", channel_id(ch));
-    if (ch->endpoint->send != NULL || pouch_atomic_test_bit(&ch->flags, CH_FLAG_OPENING))
+
+    /* Senders may send whenever they're not waiting for an ACK. Receivers only send on their own
+     * accord to (re)request the first fragment of a pulled transfer - every other ACK is sent in
+     * response to a fragment.
+     */
+    bool ready = is_receiver(ch) ? pouch_atomic_test_bit(&ch->flags, CH_FLAG_OPENING)
+                                 : !pouch_atomic_test_bit(&ch->flags, CH_FLAG_WAIT_ACK);
+    if (ready)
     {
         pouch_atomic_set_bit(&ch->flags, CH_FLAG_PENDING);
     }
@@ -267,10 +379,15 @@ int pouch_serial_ch_open(struct pouch_serial_channel *ch)
     }
 
     POUCH_LOG_DBG("ch %d: opening", channel_id(ch));
+    pouch_atomic_clear_bit(&ch->flags, CH_FLAG_WAIT_ACK);
+    pouch_atomic_clear_bit(&ch->flags, CH_FLAG_LAST_SENT);
+
     int ret = ch->endpoint->start(&ch->bearer);
     if (ret)
     {
         POUCH_LOG_ERR("Endpoint start() failed for channel %d: %d", channel_id(ch), ret);
+        // The endpoint never started, so the channel never opened. Only notify the remote.
+        pouch_atomic_clear_bit(&ch->flags, CH_FLAG_OPEN);
         pouch_atomic_set_bit(&ch->flags, CH_FLAG_ERROR);
         pouch_atomic_set_bit(&ch->flags, CH_FLAG_PENDING);
         signal_ready(ch);
@@ -286,27 +403,7 @@ int pouch_serial_ch_open(struct pouch_serial_channel *ch)
 
 void pouch_serial_ch_close(struct pouch_serial_channel *ch, bool success)
 {
-    if (!pouch_atomic_test_and_clear_bit(&ch->flags, CH_FLAG_OPEN))
-    {
-        return;
-    }
-
-    if (!success)
-    {
-        // close the channel, but allow an error frame to go through.
-        pouch_atomic_set_bit(&ch->flags, CH_FLAG_ERROR);
-        pouch_atomic_set_bit(&ch->flags, CH_FLAG_PENDING);
-    }
-
-    if (ch->endpoint->end != NULL)
-    {
-        ch->endpoint->end(&ch->bearer, success);
-    }
-
-    if (ch->closed_cb != NULL)
-    {
-        ch->closed_cb(ch, success);
-    }
+    close_channel(ch, success, true);
 }
 
 bool pouch_serial_ch_is_open(struct pouch_serial_channel *ch)

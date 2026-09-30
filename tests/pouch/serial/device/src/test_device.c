@@ -131,7 +131,8 @@ static size_t get_frame(struct pouch_serial_header *hdr,
 }
 
 /**
- * Drain all pending frames from the device into a contiguous buffer.
+ * Drain a transfer from the device into a contiguous buffer, requesting each
+ * fragment after the first with an ACK like the broker does.
  *
  * @param      channel     Only collect frames for this channel (ignore others).
  * @param[out] out         Buffer to accumulate payload data.
@@ -200,7 +201,25 @@ static void drain_sender_frames(uint8_t channel,
             *saw_last = true;
             break;
         }
+
+        /* Request the next fragment */
+        zassert_ok(send_ack(channel, false));
     }
+}
+
+/** Expect an ACK frame (with the given error flag) on the channel. */
+static void expect_ack(uint8_t channel, bool err)
+{
+    uint8_t buf[FRAME_BUF_SIZE];
+    struct pouch_serial_header hdr;
+    const uint8_t *payload;
+    size_t payload_len;
+
+    size_t len = get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf));
+    zassert_true(len > 0, "expected ACK on channel %u", channel);
+    zassert_equal(hdr.channel, channel);
+    zassert_false(hdr.is_data, "expected ACK, got DATA");
+    zassert_equal(hdr.err, err);
 }
 
 /* ---- Stub reset helper --------------------------------------------------- */
@@ -272,6 +291,58 @@ ZTEST(serial_device, test_sender_single_fragment)
     zassert_mem_equal(out, payload, sizeof(payload));
 
     zassert_equal(device_stubs.uplink.start_count, 1);
+    zassert_equal(device_stubs.uplink.end_success_count, 1);
+}
+
+ZTEST(serial_device, test_sender_multi_fragment_waits_for_ack)
+{
+    /* Payload must span multiple frames. Each frame carries at most
+     * FRAME_BUF_SIZE - POUCH_SERIAL_HEADER_LEN payload bytes.
+     */
+    uint8_t payload[FRAME_BUF_SIZE * 2];
+    for (size_t i = 0; i < sizeof(payload); i++)
+    {
+        payload[i] = (uint8_t) i;
+    }
+    stub_sender_set_data(&device_stubs.uplink, payload, sizeof(payload));
+
+    zassert_ok(send_ack(POUCH_SERIAL_CH_UPLINK, false));
+
+    uint8_t buf[FRAME_BUF_SIZE];
+    struct pouch_serial_header hdr;
+    const uint8_t *resp_payload;
+    size_t resp_len;
+
+    size_t len = get_frame(&hdr, &resp_payload, &resp_len, buf, sizeof(buf));
+    zassert_true(len > 0);
+    zassert_true(hdr.first);
+    zassert_false(hdr.last, "expected multi-fragment transfer");
+
+    /* The next fragment is only sent once the broker requests it */
+    zassert_equal(get_frame(&hdr, &resp_payload, &resp_len, buf, sizeof(buf)), 0);
+
+    uint8_t out[STUB_EP_BUF_SIZE];
+    size_t out_len;
+    int frame_count;
+    bool saw_first, saw_last, saw_err;
+
+    zassert_ok(send_ack(POUCH_SERIAL_CH_UPLINK, false));
+    drain_sender_frames(POUCH_SERIAL_CH_UPLINK,
+                        out,
+                        &out_len,
+                        sizeof(out),
+                        &frame_count,
+                        &saw_first,
+                        &saw_last,
+                        &saw_err);
+
+    zassert_false(saw_first, "FIRST flag on a later fragment");
+    zassert_true(saw_last);
+    zassert_false(saw_err);
+    zassert_equal(resp_len + out_len, sizeof(payload));
+    zassert_mem_equal(out, &payload[resp_len], out_len);
+
+    /* Pulled transfers are complete once the last fragment is sent */
     zassert_equal(device_stubs.uplink.end_success_count, 1);
 }
 
@@ -547,16 +618,15 @@ ZTEST(serial_device, test_receiver_multi_fragment)
     static const uint8_t frag2[] = {0x03, 0x04};
     static const uint8_t frag3[] = {0x05};
 
-    /* First fragment */
+    /* Each fragment is ACKed once it has been processed, including the last one */
     zassert_ok(send_data(POUCH_SERIAL_CH_SERVER_CERT, true, false, false, frag1, sizeof(frag1)));
+    expect_ack(POUCH_SERIAL_CH_SERVER_CERT, false);
 
-    /* Middle fragment */
     zassert_ok(send_data(POUCH_SERIAL_CH_SERVER_CERT, false, false, false, frag2, sizeof(frag2)));
+    expect_ack(POUCH_SERIAL_CH_SERVER_CERT, false);
 
-    /* Last fragment */
     zassert_ok(send_data(POUCH_SERIAL_CH_SERVER_CERT, false, true, false, frag3, sizeof(frag3)));
-
-    /* No intermediate ACKs are produced; receiver processes data silently. */
+    expect_ack(POUCH_SERIAL_CH_SERVER_CERT, false);
 
     /* Verify accumulated data */
     uint8_t expected[] = {0x01, 0x02, 0x03, 0x04, 0x05};
@@ -570,7 +640,8 @@ ZTEST(serial_device, test_receiver_empty_transfer)
 {
     zassert_ok(send_data(POUCH_SERIAL_CH_DOWNLINK, true, true, false, NULL, 0));
 
-    /* No ACK is produced for the last (or only) data frame. */
+    /* Pushed transfers are ACKed, even when the only fragment is also the last one. */
+    expect_ack(POUCH_SERIAL_CH_DOWNLINK, false);
     zassert_equal(device_stubs.downlink.rx_len, 0);
     zassert_equal(device_stubs.downlink.start_count, 1);
     zassert_equal(device_stubs.downlink.end_success_count, 1);
@@ -843,18 +914,17 @@ ZTEST(serial_device, test_sender_ack_err_during_transfer)
 
     /*
      * The INFO endpoint has no end() callback (like the real one), so the abort
-     * is observed on the wire instead: the channel closes and emits a final
-     * ERR frame, and nothing follows it.
+     * is observed on the wire instead: the broker abandoned the transfer, so the
+     * channel closes without responding, and the rest of the payload is never sent.
      */
     len = get_frame(&hdr, &resp_payload, &resp_len, buf, sizeof(buf));
-    zassert_true(len > 0, "expected an ERR frame for the aborted transfer");
-    zassert_equal(hdr.channel, POUCH_SERIAL_CH_INFO);
-    zassert_true(hdr.is_data);
-    zassert_true(hdr.err, "expected ERR flag on the aborted transfer");
-    zassert_true(hdr.last, "expected LAST flag on the aborted transfer");
-
-    len = get_frame(&hdr, &resp_payload, &resp_len, buf, sizeof(buf));
     zassert_equal(len, 0, "closed channel should not produce more frames");
+
+    /* The next prompt starts a new transfer from the top */
+    zassert_ok(send_ack(POUCH_SERIAL_CH_INFO, false));
+    len = get_frame(&hdr, &resp_payload, &resp_len, buf, sizeof(buf));
+    zassert_true(len > 0, "expected a new transfer");
+    zassert_true(hdr.first, "expected FIRST flag on the new transfer");
 }
 
 ZTEST(serial_device, test_successive_transfers_same_channel)
