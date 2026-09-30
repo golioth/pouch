@@ -24,7 +24,8 @@ endif()
 if(NOT _pouch_device
    AND NOT _pouch_gateway
    AND NOT _pouch_transport_sar
-   AND NOT _pouch_transport_serial)
+   AND NOT _pouch_transport_serial
+   AND NOT _pouch_transport_serial_broker)
     return()
 endif()
 
@@ -91,22 +92,24 @@ if(NOT CMAKE_BUILD_EARLY_EXPANSION)
     add_dependencies(${_pouch_target} ${_pouch_transport_codegen_target})
 endif()
 
-if(_pouch_transport_serial)
+# The serial broker runs on gateways, independently of the transport the gateway uses itself, so
+# it doesn't depend on the transport choice.
+if(_pouch_transport_serial OR _pouch_transport_serial_broker)
     target_sources(${_pouch_target} PRIVATE
         ${_pouch_transport_root}/serial/channel.c
         ${_pouch_transport_root}/serial/packet.c
         ${_pouch_transport_root}/serial/serial.c
     )
+endif()
 
-    if (_pouch_transport_serial_broker)
-        target_sources(${_pouch_target} PRIVATE
-            ${_pouch_transport_root}/serial/broker.c
-        )
-    endif()
+if(_pouch_transport_serial_broker)
+    target_sources(${_pouch_target} PRIVATE
+        ${_pouch_transport_root}/serial/broker.c
+    )
+endif()
 
-    if (_pouch_transport_serial_device)
-        target_sources(${_pouch_target} PRIVATE
-            serial/device.c
-        )
-    endif()
+if(_pouch_transport_serial AND _pouch_transport_serial_device)
+    target_sources(${_pouch_target} PRIVATE
+        ${_pouch_transport_root}/serial/device.c
+    )
 endif()

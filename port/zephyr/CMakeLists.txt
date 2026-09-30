@@ -82,5 +82,7 @@ zephyr_library_sources_ifdef(CONFIG_POUCH_SPI_DEVICE ${CMAKE_CURRENT_LIST_DIR}/t
 if(CONFIG_POUCH_GATEWAY)
     zephyr_include_directories(${CMAKE_CURRENT_LIST_DIR}/../../include)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../src/gateway gateway)
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/transport/gatt/broker gatt_broker)
+    if(CONFIG_POUCH_GATEWAY_GATT)
+        add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/transport/gatt/broker gatt_broker)
+    endif()
 endif()
