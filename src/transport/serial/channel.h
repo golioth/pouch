@@ -19,10 +19,16 @@ typedef void (*pouch_serial_ch_closed_cb_t)(struct pouch_serial_channel *ch, boo
 enum ch_flag
 {
     CH_FLAG_OPEN,
+    /** Opened, but no fragment has been sent or received yet. */
     CH_FLAG_OPENING,
+    /** A frame should be produced on the next call to pouch_serial_ch_frame_get(). */
     CH_FLAG_PENDING,
     CH_FLAG_ERROR,
     CH_FLAG_SUSPENDED,
+    /** Sender only: a fragment has been sent, and the remote hasn't ACKed it yet. */
+    CH_FLAG_WAIT_ACK,
+    /** Push sender only: the fragment waiting for an ACK is the last one. */
+    CH_FLAG_LAST_SENT,
     CH_FLAG_COUNT,
 };
 

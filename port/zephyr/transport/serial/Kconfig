@@ -79,6 +79,21 @@ config POUCH_SPI_BROKER_THREAD_STACK_SIZE
     help
       Stack size in bytes for the shared SPI broker work queue thread.
 
+config POUCH_SPI_BROKER_RETRY_DELAY_MIN_MS
+    int "Initial delay before restarting a failed exchange (ms)"
+    default 1000
+    help
+      Time in milliseconds to wait before restarting the exchange after it
+      fails. The delay doubles with each consecutive failure, up to
+      POUCH_SPI_BROKER_RETRY_DELAY_MAX_MS, and is reset by a successful
+      exchange.
+
+config POUCH_SPI_BROKER_RETRY_DELAY_MAX_MS
+    int "Maximum delay before restarting a failed exchange (ms)"
+    default 60000
+    help
+      Upper bound for the delay before restarting a failed exchange.
+
 config POUCH_SPI_BROKER_INTERFRAME_DELAY
     int "Delay between each frame in milliseconds"
     default 5

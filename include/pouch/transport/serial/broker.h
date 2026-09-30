@@ -58,6 +58,13 @@ struct pouch_serial_broker_adapter
     /**
      * Called when the exchange sequence completes or fails.
      *
+     * After a successful exchange, the broker stays ready for the next sync,
+     * which starts when the device calls for it through
+     * @ref pouch_serial_broker_notify. After a failure, every open transfer
+     * has been abandoned, and the broker stays idle until the adapter calls
+     * @ref pouch_serial_broker_start again. Adapters should back off before
+     * restarting, as the failure may persist.
+     *
      * @param broker  Broker instance.
      * @param success true if the full exchange completed successfully.
      */
@@ -83,7 +90,8 @@ struct pouch_serial_broker *pouch_serial_broker_create(
  *   Uplink drain -> Downlink delivery
  *
  * The adapter's @c end callback is invoked when the sequence completes or
- * fails. Only one exchange may be in progress at a time.
+ * fails. Only one exchange may be in progress at a time: starting the broker
+ * while an exchange is in progress abandons it.
  *
  * @param broker  Broker instance.
  */
@@ -96,9 +104,10 @@ void pouch_serial_broker_start(struct pouch_serial_broker *broker);
  * device. The first byte of @p frame is the encoded header; the remaining
  * bytes are the payload.
  *
- * On a protocol error the broker restarts the exchange from the top before
- * returning, so the adapter does not need to drive recovery itself. The error
- * code is still returned, for logging and diagnostics.
+ * As the protocol is stop-and-wait, a frame that can't be processed aborts the
+ * exchange, and the adapter's @c end callback is invoked with @c success set to
+ * false before this returns. The error code is still returned, for logging and
+ * diagnostics.
  *
  * @param broker  Broker instance.
  * @param frame   Frame bytes, starting with the 1-byte header.

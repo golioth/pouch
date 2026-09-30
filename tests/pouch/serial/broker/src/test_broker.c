@@ -105,6 +105,43 @@ static int send_data(uint8_t channel,
     return send_frame(&hdr, payload, payload_len);
 }
 
+/*
+ * Frames fetched from the broker while looking for a frame on another channel. The broker
+ * interleaves frames from concurrently open channels, so helpers that only care about one channel
+ * set the other frames aside here. get_frame() returns stashed frames before fetching new ones.
+ */
+#define STASH_SIZE 8
+
+static struct
+{
+    uint8_t buf[FRAME_BUF_SIZE];
+    size_t len;
+} stash[STASH_SIZE];
+static size_t stash_count;
+
+static void stash_push(const uint8_t *buf, size_t len)
+{
+    zassert_true(stash_count < STASH_SIZE, "frame stash overflow");
+    zassert_true(len <= FRAME_BUF_SIZE);
+    memcpy(stash[stash_count].buf, buf, len);
+    stash[stash_count].len = len;
+    stash_count++;
+}
+
+static size_t stash_pop(uint8_t *buf, size_t bufsize)
+{
+    if (stash_count == 0)
+    {
+        return 0;
+    }
+
+    size_t len = MIN(stash[0].len, bufsize);
+    memcpy(buf, stash[0].buf, len);
+    stash_count--;
+    memmove(&stash[0], &stash[1], stash_count * sizeof(stash[0]));
+    return len;
+}
+
 /**
  * Get a frame from the broker and decode its header.
  *
@@ -116,7 +153,12 @@ static size_t get_frame(struct pouch_serial_header *hdr,
                         uint8_t *buf,
                         size_t bufsize)
 {
-    size_t len = pouch_serial_broker_frame_get(test_broker, buf, bufsize);
+    size_t len = stash_pop(buf, bufsize);
+    if (len == 0)
+    {
+        len = pouch_serial_broker_frame_get(test_broker, buf, bufsize);
+    }
+
     if (len == 0)
     {
         return 0;
@@ -141,12 +183,65 @@ static size_t get_frame(struct pouch_serial_header *hdr,
 }
 
 /**
- * Drain a broker sender channel: ACK it open, then collect all DATA frames.
+ * Get the next frame on a specific channel, stashing frames for other channels.
+ *
+ * @return Total frame length, or 0 if no frame was available on the channel.
+ */
+static size_t get_frame_on(uint8_t channel,
+                           struct pouch_serial_header *hdr,
+                           const uint8_t **payload,
+                           size_t *payload_len,
+                           uint8_t *buf,
+                           size_t bufsize)
+{
+    /* Check the stash first, without disturbing the order of the other frames */
+    for (size_t i = 0; i < stash_count; i++)
+    {
+        struct pouch_serial_header stashed;
+        zassert_ok(pouch_serial_header_decode(stash[i].buf[0], &stashed));
+        if (stashed.channel == channel)
+        {
+            size_t len = MIN(stash[i].len, bufsize);
+            memcpy(buf, stash[i].buf, len);
+            stash_count--;
+            memmove(&stash[i], &stash[i + 1], (stash_count - i) * sizeof(stash[0]));
+
+            zassert_ok(pouch_serial_header_decode(buf[0], hdr));
+            *payload = (len > POUCH_SERIAL_HEADER_LEN) ? &buf[POUCH_SERIAL_HEADER_LEN] : NULL;
+            *payload_len = len - POUCH_SERIAL_HEADER_LEN;
+            return len;
+        }
+    }
+
+    for (int i = 0; i < MAX_FRAMES; i++)
+    {
+        size_t len = pouch_serial_broker_frame_get(test_broker, buf, bufsize);
+        if (len == 0)
+        {
+            return 0;
+        }
+
+        zassert_ok(pouch_serial_header_decode(buf[0], hdr));
+        if (hdr->channel == channel)
+        {
+            *payload = (len > POUCH_SERIAL_HEADER_LEN) ? &buf[POUCH_SERIAL_HEADER_LEN] : NULL;
+            *payload_len = len - POUCH_SERIAL_HEADER_LEN;
+            return len;
+        }
+
+        stash_push(buf, len);
+    }
+
+    return 0;
+}
+
+/**
+ * Drain a broker sender channel, ACKing each DATA frame like a real device would.
  *
  * Broker sender channels are opened by the broker itself (next() -> open_channel()),
- * so they emit DATA frames with FIRST set straight away - there is no prompt ACK.
- * The ACK sent here mirrors what a real device does; pouch_serial_ch_open() is
- * idempotent, so it is a no-op on an already-open channel.
+ * so they emit a DATA frame with FIRST set straight away. The broker then waits for
+ * an ACK before sending the next fragment, and closes the channel once the last
+ * fragment is ACKed. Error frames abandon the transfer, and aren't ACKed.
  */
 static void drain_sender_channel(uint8_t channel,
                                  uint8_t *out,
@@ -168,22 +263,14 @@ static void drain_sender_channel(uint8_t channel,
     *saw_last = false;
     *saw_err = false;
 
-    /* Send ACK to open the sender channel */
-    zassert_ok(send_ack(channel, false));
-
     for (int i = 0; i < MAX_FRAMES; i++)
     {
-        size_t len = get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf));
+        size_t len = get_frame_on(channel, &hdr, &payload, &payload_len, buf, sizeof(buf));
         if (len == 0)
         {
             break;
         }
 
-        zassert_equal(hdr.channel,
-                      channel,
-                      "unexpected channel %u (expected %u)",
-                      hdr.channel,
-                      channel);
         zassert_true(hdr.is_data, "expected DATA frame, got ACK");
 
         if (hdr.first)
@@ -203,6 +290,14 @@ static void drain_sender_channel(uint8_t channel,
         }
 
         (*frame_count)++;
+
+        if (hdr.err)
+        {
+            *saw_last = hdr.last;
+            break;
+        }
+
+        zassert_ok(send_ack(channel, false));
 
         if (hdr.last)
         {
@@ -224,9 +319,8 @@ static void complete_receiver_channel(uint8_t channel, const void *data, size_t 
     size_t payload_len;
 
     /* Get the ACK prompt from the broker */
-    size_t len = get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf));
+    size_t len = get_frame_on(channel, &hdr, &payload, &payload_len, buf, sizeof(buf));
     zassert_true(len > 0, "expected ACK prompt for channel %u", channel);
-    zassert_equal(hdr.channel, channel);
     zassert_false(hdr.is_data, "expected ACK prompt, got DATA");
     zassert_false(hdr.err);
 
@@ -285,6 +379,12 @@ static void advance_to_sync(bool skip_server_cert, bool skip_device_cert)
     /* Send first DATA fragment (opens the channel, captures bearer) */
     zassert_ok(send_data(POUCH_SERIAL_CH_INFO, true, false, false, NULL, 0));
 
+    /* The broker requests the next fragment */
+    len = get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf));
+    zassert_true(len > 0, "expected INFO ACK");
+    zassert_equal(hdr.channel, POUCH_SERIAL_CH_INFO);
+    zassert_false(hdr.is_data);
+
     /* Now set provisioning flags BEFORE closing INFO */
     struct pouch_gateway_node_info *node = broker_stubs.info.bearer->ctx;
     zassert_not_null(node);
@@ -298,27 +398,10 @@ static void advance_to_sync(bool skip_server_cert, bool skip_device_cert)
      * The broker opens this sender channel itself, so ACK it and drain DATA frames. */
     if (!skip_server_cert)
     {
-        /* Mark as provisioned before opening (ch_close triggers next()) */
+        /* Mark as provisioned before the last fragment is ACKed (ch_close triggers next()) */
         node->server_cert_provisioned = true;
 
-        /* Send ACK to open the sender channel */
-        zassert_ok(send_ack(POUCH_SERIAL_CH_SERVER_CERT, false));
-
-        /* Drain all DATA frames */
-        for (int i = 0; i < MAX_FRAMES; i++)
-        {
-            len = get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf));
-            if (len == 0)
-            {
-                break;
-            }
-            zassert_equal(hdr.channel, POUCH_SERIAL_CH_SERVER_CERT);
-            zassert_true(hdr.is_data);
-            if (hdr.last)
-            {
-                break;
-            }
-        }
+        complete_sender_channel(POUCH_SERIAL_CH_SERVER_CERT);
     }
 
     /* 3. DEVICE_CERT (if not provisioned): broker prompts, we send data.
@@ -362,12 +445,10 @@ static void complete_sync(void)
 
         if (hdr.channel == POUCH_SERIAL_CH_DOWNLINK)
         {
-            if (!hdr.is_data)
-            {
-                /* Prompt ACK: open the sender channel */
-                send_ack(POUCH_SERIAL_CH_DOWNLINK, false);
-            }
-            else if (hdr.last)
+            zassert_true(hdr.is_data, "expected DATA on DOWNLINK");
+            /* ACK each fragment: the broker waits for it before sending the next */
+            send_ack(POUCH_SERIAL_CH_DOWNLINK, false);
+            if (hdr.last)
             {
                 downlink_done = true;
             }
@@ -410,6 +491,7 @@ static void reset_stubs(void)
 static void reset_all(void)
 {
     reset_stubs();
+    stash_count = 0;
     ready_count = 0;
     end_count = 0;
     end_success = false;
@@ -682,13 +764,10 @@ ZTEST(serial_broker, test_sender_ack_err_aborts)
     const uint8_t *resp_payload;
     size_t resp_len;
 
-    /* Open the DOWNLINK sender channel with an ACK */
-    zassert_ok(send_ack(POUCH_SERIAL_CH_DOWNLINK, false));
-
-    /* Get the first DATA frame from DOWNLINK */
-    size_t len = get_frame(&hdr, &resp_payload, &resp_len, buf, sizeof(buf));
+    /* The broker opens DOWNLINK itself, and sends the first DATA frame right away */
+    size_t len =
+        get_frame_on(POUCH_SERIAL_CH_DOWNLINK, &hdr, &resp_payload, &resp_len, buf, sizeof(buf));
     zassert_true(len > 0);
-    zassert_equal(hdr.channel, POUCH_SERIAL_CH_DOWNLINK);
     zassert_true(hdr.first);
     zassert_false(hdr.last, "expected multi-fragment transfer");
 
@@ -712,24 +791,73 @@ ZTEST(serial_broker, test_sender_ack_err_during_multi_fragment)
     const uint8_t *resp_payload;
     size_t resp_len;
 
-    /* Open the DOWNLINK sender channel with an ACK */
-    zassert_ok(send_ack(POUCH_SERIAL_CH_DOWNLINK, false));
-
     /* Get first DATA frame */
-    size_t len = get_frame(&hdr, &resp_payload, &resp_len, buf, sizeof(buf));
+    size_t len =
+        get_frame_on(POUCH_SERIAL_CH_DOWNLINK, &hdr, &resp_payload, &resp_len, buf, sizeof(buf));
     zassert_true(len > 0);
     zassert_true(hdr.first);
     zassert_false(hdr.last, "expected multi-fragment");
 
-    /* Get second DATA frame (no intermediate ACK needed) */
-    len = get_frame(&hdr, &resp_payload, &resp_len, buf, sizeof(buf));
+    /* The broker waits for the fragment to be ACKed before sending the next one */
+    len = get_frame_on(POUCH_SERIAL_CH_DOWNLINK, &hdr, &resp_payload, &resp_len, buf, sizeof(buf));
+    zassert_equal(len, 0, "expected the broker to wait for an ACK");
+
+    zassert_ok(send_ack(POUCH_SERIAL_CH_DOWNLINK, false));
+
+    /* Get second DATA frame */
+    len = get_frame_on(POUCH_SERIAL_CH_DOWNLINK, &hdr, &resp_payload, &resp_len, buf, sizeof(buf));
     zassert_true(len > 0);
+    zassert_false(hdr.first);
 
     /* Now send ACK+ERR to abort mid-transfer */
     zassert_ok(send_ack(POUCH_SERIAL_CH_DOWNLINK, true));
 
     zassert_equal(broker_stubs.downlink.end_fail_count, 1);
     zassert_equal(broker_stubs.downlink.end_success_count, 0);
+}
+
+ZTEST(serial_broker, test_sender_completes_on_last_ack)
+{
+    advance_to_sync(true, true);
+
+    uint8_t buf[FRAME_BUF_SIZE];
+    struct pouch_serial_header hdr;
+    const uint8_t *payload;
+    size_t payload_len;
+
+    /* No data loaded: the only DOWNLINK fragment is also the last one */
+    size_t len =
+        get_frame_on(POUCH_SERIAL_CH_DOWNLINK, &hdr, &payload, &payload_len, buf, sizeof(buf));
+    zassert_true(len > 0);
+    zassert_true(hdr.first);
+    zassert_true(hdr.last);
+
+    /* The transfer isn't complete until the device has ACKed the last fragment */
+    zassert_equal(broker_stubs.downlink.end_success_count, 0);
+
+    zassert_ok(send_ack(POUCH_SERIAL_CH_DOWNLINK, false));
+    zassert_equal(broker_stubs.downlink.end_success_count, 1);
+    zassert_equal(broker_stubs.downlink.end_fail_count, 0);
+}
+
+ZTEST(serial_broker, test_sender_nack_on_last_fails_transfer)
+{
+    advance_to_sync(true, true);
+
+    uint8_t buf[FRAME_BUF_SIZE];
+    struct pouch_serial_header hdr;
+    const uint8_t *payload;
+    size_t payload_len;
+
+    size_t len =
+        get_frame_on(POUCH_SERIAL_CH_DOWNLINK, &hdr, &payload, &payload_len, buf, sizeof(buf));
+    zassert_true(len > 0);
+    zassert_true(hdr.last);
+
+    /* The device failed to process the last fragment */
+    zassert_ok(send_ack(POUCH_SERIAL_CH_DOWNLINK, true));
+    zassert_equal(broker_stubs.downlink.end_success_count, 0);
+    zassert_equal(broker_stubs.downlink.end_fail_count, 1);
 }
 
 ZTEST(serial_broker, test_sender_start_error)
@@ -743,14 +871,11 @@ ZTEST(serial_broker, test_sender_start_error)
     const uint8_t *payload;
     size_t payload_len;
 
-    /* The channel was opened by the broker, so start already failed: the ACK is
-     * a no-op and the error DATA frame is queued up regardless. */
-    zassert_ok(send_ack(POUCH_SERIAL_CH_DOWNLINK, false));
-
-    /* Broker should produce an error DATA frame for DOWNLINK */
-    size_t len = get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf));
+    /* The channel was opened by the broker, so start already failed, and the
+     * error DATA frame is queued up. */
+    size_t len =
+        get_frame_on(POUCH_SERIAL_CH_DOWNLINK, &hdr, &payload, &payload_len, buf, sizeof(buf));
     zassert_true(len > 0, "expected error frame");
-    zassert_equal(hdr.channel, POUCH_SERIAL_CH_DOWNLINK);
     zassert_true(hdr.is_data);
     zassert_true(hdr.err);
     zassert_true(hdr.last);
@@ -770,16 +895,17 @@ ZTEST(serial_broker, test_sender_send_error)
     const uint8_t *payload;
     size_t payload_len;
 
-    /* Send ACK to open the channel */
-    zassert_ok(send_ack(POUCH_SERIAL_CH_DOWNLINK, false));
-
     /* Broker should produce an error DATA frame */
-    size_t len = get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf));
+    size_t len =
+        get_frame_on(POUCH_SERIAL_CH_DOWNLINK, &hdr, &payload, &payload_len, buf, sizeof(buf));
     zassert_true(len > 0, "expected error frame");
-    zassert_equal(hdr.channel, POUCH_SERIAL_CH_DOWNLINK);
     zassert_true(hdr.is_data);
     zassert_true(hdr.err);
     zassert_true(hdr.last);
+
+    /* The error frame already carries the error, so it isn't repeated */
+    len = get_frame_on(POUCH_SERIAL_CH_DOWNLINK, &hdr, &payload, &payload_len, buf, sizeof(buf));
+    zassert_equal(len, 0, "expected a single error frame");
 }
 
 ZTEST(serial_broker, test_sender_server_cert_with_data)
@@ -876,11 +1002,26 @@ ZTEST(serial_broker, test_receiver_multi_fragment)
     /* First fragment */
     zassert_ok(send_data(POUCH_SERIAL_CH_UPLINK, true, false, false, frag1, sizeof(frag1)));
 
+    /* The broker requests each fragment with an ACK */
+    len = get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf));
+    zassert_true(len > 0, "expected ACK for the first fragment");
+    zassert_equal(hdr.channel, POUCH_SERIAL_CH_UPLINK);
+    zassert_false(hdr.is_data);
+    zassert_false(hdr.err);
+
     /* Middle fragment */
     zassert_ok(send_data(POUCH_SERIAL_CH_UPLINK, false, false, false, frag2, sizeof(frag2)));
 
+    len = get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf));
+    zassert_true(len > 0, "expected ACK for the middle fragment");
+    zassert_equal(hdr.channel, POUCH_SERIAL_CH_UPLINK);
+    zassert_false(hdr.is_data);
+
     /* Last fragment */
     zassert_ok(send_data(POUCH_SERIAL_CH_UPLINK, false, true, false, frag3, sizeof(frag3)));
+
+    /* Pulled transfers don't ACK the last fragment */
+    zassert_equal(get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf)), 0);
 
     uint8_t expected[] = {0x01, 0x02, 0x03, 0x04, 0x05};
     zassert_equal(broker_stubs.uplink.rx_len, sizeof(expected));
@@ -983,9 +1124,11 @@ ZTEST(serial_broker, test_receiver_duplicate_first_flag)
     int err = send_data(POUCH_SERIAL_CH_UPLINK, true, false, false, (uint8_t[]){0x02}, 1);
     zassert_not_equal(err, 0, "expected error for duplicate FIRST");
 
-    /* The in-flight transfer is rejected, not aborted */
-    zassert_equal(broker_stubs.uplink.end_fail_count, 0);
+    /* The exchange can't continue, as the device's view of the transfer no longer matches ours */
     zassert_equal(broker_stubs.uplink.start_count, 1);
+    zassert_equal(broker_stubs.uplink.end_fail_count, 1);
+    zassert_equal(end_count, 1);
+    zassert_false(end_success);
 }
 
 ZTEST(serial_broker, test_receiver_start_error)
@@ -1081,6 +1224,12 @@ ZTEST(serial_broker, test_receiver_device_cert_with_data)
     /* Send first (non-last) INFO fragment to open the channel and capture bearer */
     zassert_ok(send_data(POUCH_SERIAL_CH_INFO, true, false, false, NULL, 0));
 
+    /* The broker requests the next fragment */
+    len = get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf));
+    zassert_true(len > 0);
+    zassert_equal(hdr.channel, POUCH_SERIAL_CH_INFO);
+    zassert_false(hdr.is_data);
+
     /* Set provisioning flags BEFORE closing INFO */
     struct pouch_gateway_node_info *node = broker_stubs.info.bearer->ctx;
     node->server_cert_provisioned = true;
@@ -1165,22 +1314,18 @@ ZTEST(serial_broker, test_concurrent_uplink_and_downlink)
 
         if (hdr.channel == POUCH_SERIAL_CH_DOWNLINK)
         {
-            if (!hdr.is_data)
+            zassert_true(hdr.is_data);
+            if (payload_len > 0)
             {
-                /* Prompt ACK: open the sender channel */
-                send_ack(POUCH_SERIAL_CH_DOWNLINK, false);
+                memcpy(&dl_out[dl_len], payload, payload_len);
+                dl_len += payload_len;
             }
-            else
+
+            /* ACK each fragment: the broker waits for it before sending the next */
+            send_ack(POUCH_SERIAL_CH_DOWNLINK, false);
+            if (hdr.last)
             {
-                if (payload_len > 0)
-                {
-                    memcpy(&dl_out[dl_len], payload, payload_len);
-                    dl_len += payload_len;
-                }
-                if (hdr.last)
-                {
-                    dl_done = true;
-                }
+                dl_done = true;
             }
         }
         else if (hdr.channel == POUCH_SERIAL_CH_UPLINK)
@@ -1251,26 +1396,29 @@ ZTEST(serial_broker, test_info_error_ends_exchange)
     const uint8_t *payload;
     size_t payload_len;
 
-    /* Get INFO prompt */
+    /* The broker opened INFO on start, which failed: the exchange is aborted */
+    zassert_equal(broker_stubs.info.start_count, 1);
+    zassert_equal(end_count, 1);
+    zassert_false(end_success);
+
+    /* The device is told to abandon the transfer, instead of being prompted */
     size_t len = get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf));
-    zassert_true(len > 0);
-    zassert_equal(hdr.channel, POUCH_SERIAL_CH_INFO);
-
-    send_data(POUCH_SERIAL_CH_INFO, true, true, false, NULL, 0);
-
-    /* Broker should produce a NACK (ACK+ERR) for the channel */
-    len = get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf));
     zassert_true(len > 0, "expected NACK frame");
     zassert_equal(hdr.channel, POUCH_SERIAL_CH_INFO);
     zassert_false(hdr.is_data);
     zassert_true(hdr.err, "expected ERR on NACK");
 
-    /*
-     * Receiver start errors don't close the channel (OPEN was never fully
-     * set), so channel_closed doesn't fire and adapter->end is NOT called.
-     */
-    zassert_equal(end_count, 0);
-    zassert_equal(broker_stubs.info.start_count, 2);
+    /* The broker doesn't restart on its own: that's up to the adapter */
+    zassert_equal(get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf)), 0);
+    zassert_not_equal(send_data(POUCH_SERIAL_CH_INFO, true, true, false, NULL, 0), 0);
+    zassert_equal(broker_stubs.info.start_count, 1, "unrequested INFO must not be accepted");
+    zassert_equal(end_count, 1);
+
+    /* Restarting runs the exchange from the top */
+    broker_stubs.info.start_err = 0;
+    pouch_serial_broker_start(test_broker);
+    complete_receiver_channel(POUCH_SERIAL_CH_INFO, NULL, 0);
+    zassert_equal(broker_stubs.info.end_success_count, 1);
 }
 
 ZTEST(serial_broker, test_downlink_error_ends_exchange)
@@ -1284,23 +1432,96 @@ ZTEST(serial_broker, test_downlink_error_ends_exchange)
     const uint8_t *payload;
     size_t payload_len;
 
-    /* DOWNLINK is a sender channel: send ACK to open it (triggers start error) */
-    zassert_ok(send_ack(POUCH_SERIAL_CH_DOWNLINK, false));
-
-    /* Broker should produce an error DATA frame */
-    size_t len = get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf));
+    /* The broker opened DOWNLINK itself, and start failed: it sends an error DATA frame */
+    size_t len =
+        get_frame_on(POUCH_SERIAL_CH_DOWNLINK, &hdr, &payload, &payload_len, buf, sizeof(buf));
     zassert_true(len > 0, "expected error frame");
-    zassert_equal(hdr.channel, POUCH_SERIAL_CH_DOWNLINK);
     zassert_true(hdr.is_data);
     zassert_true(hdr.err);
     zassert_true(hdr.last);
 
-    /*
-     * Sender start errors don't close the channel (the endpoint never started),
-     * so channel_closed doesn't fire and adapter->end is NOT called.
-     */
-    zassert_equal(end_count, 0);
+    /* The exchange was aborted before UPLINK was opened */
+    zassert_equal(end_count, 1);
+    zassert_false(end_success);
     zassert_equal(broker_stubs.downlink.start_count, 1);
+    zassert_equal(broker_stubs.downlink.end_fail_count, 0);  // never started
+    zassert_equal(broker_stubs.uplink.start_count, 0);
+}
+
+ZTEST(serial_broker, test_failure_closes_other_channels)
+{
+    broker_stubs.uplink.recv_err = -EIO;
+
+    advance_to_sync(true, true);
+
+    /* Both DOWNLINK and UPLINK are open. Fail UPLINK. */
+    zassert_not_equal(send_data(POUCH_SERIAL_CH_UPLINK, true, false, false, (uint8_t[]){0x01}, 1),
+                      0);
+
+    zassert_equal(end_count, 1);
+    zassert_false(end_success);
+    zassert_equal(broker_stubs.uplink.end_fail_count, 1);
+
+    /* DOWNLINK was aborted along with it, and the device is told to abandon it */
+    zassert_equal(broker_stubs.downlink.end_fail_count, 1);
+
+    uint8_t buf[FRAME_BUF_SIZE];
+    struct pouch_serial_header hdr;
+    const uint8_t *payload;
+    size_t payload_len;
+    bool saw_downlink_err = false;
+
+    for (int i = 0; i < MAX_FRAMES; i++)
+    {
+        if (get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf)) == 0)
+        {
+            break;
+        }
+
+        if (hdr.channel == POUCH_SERIAL_CH_DOWNLINK && hdr.is_data && hdr.first && !hdr.err)
+        {
+            /* The first fragment may already have been queued before the abort */
+            continue;
+        }
+
+        zassert_true(hdr.err, "unexpected frame on channel %u after abort", hdr.channel);
+        saw_downlink_err |= (hdr.channel == POUCH_SERIAL_CH_DOWNLINK);
+    }
+
+    zassert_true(saw_downlink_err, "expected DOWNLINK error frame");
+
+    /* A restart reopens DOWNLINK from scratch, instead of reusing the aborted transfer */
+    broker_stubs.uplink.recv_err = 0;
+    advance_to_sync(true, true);
+    zassert_equal(broker_stubs.downlink.start_count, 2);
+}
+
+ZTEST(serial_broker, test_notify_during_sync_starts_another)
+{
+    advance_to_sync(true, true);
+
+    /* Finish UPLINK first, so no channel is active while DOWNLINK is still running */
+    complete_receiver_channel(POUCH_SERIAL_CH_UPLINK, NULL, 0);
+
+    /* The device asks for another sync */
+    pouch_serial_broker_notify(test_broker);
+
+    complete_sender_channel(POUCH_SERIAL_CH_DOWNLINK);
+    zassert_equal(end_count, 1);
+    zassert_true(end_success);
+
+    /* The notification wasn't lost: a new sync starts right away */
+    uint8_t buf[FRAME_BUF_SIZE];
+    struct pouch_serial_header hdr;
+    const uint8_t *payload;
+    size_t payload_len;
+
+    size_t len =
+        get_frame_on(POUCH_SERIAL_CH_UPLINK, &hdr, &payload, &payload_len, buf, sizeof(buf));
+    zassert_true(len > 0, "expected a new UPLINK prompt");
+    zassert_false(hdr.is_data);
+    zassert_equal(broker_stubs.uplink.start_count, 2);
+    zassert_equal(broker_stubs.downlink.start_count, 2);
 }
 
 ZTEST(serial_broker, test_uplink_with_data)

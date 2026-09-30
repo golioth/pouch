@@ -30,6 +30,7 @@ struct spi_broker_ctx
     struct k_work_delayable work;
     struct k_work_delayable start_work;
     uint32_t poll_interval_ms;
+    uint32_t retry_delay_ms;
     bool pending;
     bool sending;
     bool has_data_ready_pin;
@@ -44,10 +45,11 @@ static struct k_work_q spi_broker_work_q;
 
 static void schedule_exchange(struct spi_broker_ctx *ctx)
 {
-    // Give the slave a bit of time to set its buffers
-    k_work_schedule_for_queue(&spi_broker_work_q,
-                              &ctx->work,
-                              K_MSEC(CONFIG_POUCH_SPI_BROKER_INTERFRAME_DELAY));
+    // Give the slave a bit of time to set its buffers. Reschedule, so a pending poll doesn't
+    // hold back the exchange.
+    k_work_reschedule_for_queue(&spi_broker_work_q,
+                                &ctx->work,
+                                K_MSEC(CONFIG_POUCH_SPI_BROKER_INTERFRAME_DELAY));
 }
 
 static void schedule_poll(struct spi_broker_ctx *ctx)
@@ -75,14 +77,21 @@ static void adapter_ready(const struct pouch_serial_broker *broker)
 
 static void adapter_end(const struct pouch_serial_broker *broker, bool success)
 {
+    const struct pouch_serial_broker_adapter *adapter = pouch_serial_broker_adapter_get(broker);
+    struct spi_broker_ctx *ctx = CONTAINER_OF(adapter, struct spi_broker_ctx, adapter);
+
     if (success)
     {
         LOG_DBG("Exchange completed");
+        ctx->retry_delay_ms = CONFIG_POUCH_SPI_BROKER_RETRY_DELAY_MIN_MS;
+        return;
     }
-    else
-    {
-        LOG_WRN("Exchange failed");
-    }
+
+    // The broker stays idle after a failure until it's restarted. Back off, so a persistent
+    // failure doesn't keep the bus and the cloud connection busy.
+    LOG_WRN("Exchange failed, restarting in %u ms", ctx->retry_delay_ms);
+    k_work_reschedule_for_queue(&spi_broker_work_q, &ctx->start_work, K_MSEC(ctx->retry_delay_ms));
+    ctx->retry_delay_ms = MIN(2 * ctx->retry_delay_ms, CONFIG_POUCH_SPI_BROKER_RETRY_DELAY_MAX_MS);
 }
 
 static void data_ready_isr(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
@@ -230,7 +239,8 @@ static void process_rx(struct spi_broker_ctx *ctx, bool *has_more)
             LOG_ERR("Failed to deliver frame: %d", err);
         }
 
-        // If we received a frame, the slave might have more queued.
+        // The frame may need a response, such as an ACK, and the slave might have more queued.
+        ctx->pending = true;
         i += len;
     }
 
@@ -294,6 +304,7 @@ static void start_work_handler(struct k_work *work)
             },                                                                                 \
         SPI_BROKER_DATA_READY_GPIO(inst).has_data_ready_pin = SPI_BROKER_HAS_DATA_READY(inst), \
         .poll_interval_ms = DT_INST_PROP_OR(inst, poll_interval_ms, 0),                        \
+        .retry_delay_ms = CONFIG_POUCH_SPI_BROKER_RETRY_DELAY_MIN_MS,                          \
     };
 
 #define SPI_BROKER_DEFINE(inst) ON_SPI_BUS(inst, DEFINE_INSTANCE(inst));
@@ -396,7 +407,7 @@ static void broker_start(struct spi_broker_ctx *ctx)
     }
 
     // Drive the broker from the work queue only, so it's never accessed from two threads at once
-    k_work_submit_to_queue(&spi_broker_work_q, &ctx->start_work);
+    k_work_reschedule_for_queue(&spi_broker_work_q, &ctx->start_work, K_NO_WAIT);
 }
 
 #define SPI_BROKER_START(inst) ON_SPI_BUS(inst, broker_start(&spi_broker_ctx_##inst));
