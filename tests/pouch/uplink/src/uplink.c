@@ -427,9 +427,9 @@ ZTEST(uplink, test_stream_basic)
     size_t block_len = sys_get_be16(block);
     zassert_equal(block_len, len - 2, "Unexpected block length %d", block_len);
 
-    // 0x81 is the first stream ID for a closed stream:
+    // Single-block stream: first + last data flags (0xc0) with a stream ID in 0x01..0x1f:
     uint8_t stream_id = block[2];
-    zassert_between_inclusive(stream_id, 0x81, 0xff, "Unexpected stream ID %x", stream_id);
+    zassert_between_inclusive(stream_id, 0xc1, 0xdf, "Unexpected stream ID %x", stream_id);
     zassert_equal(sys_get_be16(&block[3]),
                   POUCH_CONTENT_TYPE_OCTET_STREAM,
                   "Unexpected content type");
@@ -477,10 +477,10 @@ ZTEST(uplink, test_stream_multiblock)
                               "Unexpected block length %d",
                               first_block.block.data_len);
 
-    // 0x01 is the first stream ID for an open stream:
+    // Stream IDs for open streams are in 0x01..0x1f:
     zassert_between_inclusive(first_block.block.id,
                               0x01,
-                              0x7f,
+                              0x1f,
                               "Unexpected stream ID %#x",
                               first_block.block.id);
     zassert_true(first_block.block.first, "Expected first data");
@@ -503,10 +503,10 @@ ZTEST(uplink, test_stream_multiblock)
                               "Unexpected block length %d",
                               second_block.data_len);
 
-    // 0x01 is the first stream ID for an open stream:
+    // Stream IDs for open streams are in 0x01..0x1f:
     zassert_between_inclusive(second_block.id,
                               0x01,
-                              0x7f,
+                              0x1f,
                               "Unexpected stream ID %#x",
                               second_block.id);
     zassert_equal(second_block.id, first_block.block.id, "Unexpected stream ID");
@@ -687,6 +687,11 @@ ZTEST(uplink, test_stream_max_count)
     struct pouch_stream *stream =
         pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM, K_NO_WAIT);
     zassert_is_null(stream, "Expected to fail to open stream");
+
+    // Closing a stream frees up a slot (and its ID) for a new stream:
+    zassert_ok(pouch_stream_close(streams[0], POUCH_NO_WAIT));
+    streams[0] = pouch_uplink_stream_open("test/path", POUCH_CONTENT_TYPE_OCTET_STREAM, K_NO_WAIT);
+    zassert_not_null(streams[0], "Failed to reopen stream");
 
     for (int i = 0; i < POUCH_STREAMS_MAX; i++)
     {
