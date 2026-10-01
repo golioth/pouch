@@ -38,6 +38,7 @@ static struct
     atomic_t sent_packets;
     atomic_t flags;
     unsigned int close_calls;
+    unsigned int end_calls_at_close;
     bool close_success;
 } test_bearer;
 
@@ -85,6 +86,7 @@ static void bearer_close(struct pouch_bearer *bearer, bool success)
     zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE));
     atomic_set_bit(&test_bearer.flags, BEARER_CLOSED);
     test_bearer.close_calls++;
+    test_bearer.end_calls_at_close = test_endpoint.end_calls;
     test_bearer.close_success = success;
 
     if (atomic_test_bit(&test_bearer.flags, BEARER_READY_IN_CLOSE))
@@ -745,6 +747,42 @@ ZTEST(transport_sar_sender, test_delayed_ready_after_last_preserves_success)
 
     pouch_sender_ready(&sender);
     pouch_sender_close(&sender);
+    zassert_equal(test_endpoint.end_calls, 1);
+    zassert_equal(test_bearer.close_calls, 1);
+}
+
+ZTEST(transport_sar_sender, test_endpoint_error_ends_transfer)
+{
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_DATA_REQ);
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+    zassert_ok(pouch_sender_open(&sender, &bearer));
+
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_FAILED);
+
+    struct pouch_sar_rx_pkt ack = {
+        .code = POUCH_RECEIVER_CODE_ACK,
+        .seq = POUCH_SAR_SEQ_MAX,
+        .window = 4,
+    };
+    uint8_t buf[POUCH_SAR_RX_PKT_LEN];
+    pouch_sar_rx_pkt_encode(&ack, buf);
+    zassert_ok(pouch_sender_recv(&sender, buf, sizeof(buf)));
+
+    zassert_equal(atomic_get(&test_endpoint.send_calls), 1);
+    zassert_equal(test_endpoint.end_calls, 1, "endpoint not ended after its error");
+    zassert_false(test_endpoint.end_success);
+    zassert_equal(test_bearer.close_calls, 1);
+    zassert_false(test_bearer.close_success);
+    zassert_equal(test_bearer.end_calls_at_close, 1, "bearer closed before the endpoint ended");
+    zassert_is_null(sender.bearer);
+    zassert_is_null(sender.buf);
+
+    pouch_sender_ready(&sender);
+    pouch_sender_close(&sender);
+    zassert_equal(pouch_sender_recv(&sender, buf, sizeof(buf)), -EBUSY);
+    zassert_equal(atomic_get(&test_endpoint.send_calls), 1);
     zassert_equal(test_endpoint.end_calls, 1);
     zassert_equal(test_bearer.close_calls, 1);
 }
