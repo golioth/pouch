@@ -88,7 +88,7 @@ static void push_fragments(struct pouch_sender *sender)
         if (res == POUCH_ERROR)
         {
             POUCH_LOG_ERR("Error from endpoint, aborting");
-            pouch_bearer_close(sender->bearer, false);
+            end(sender, false);
             return;
         }
         if (res == POUCH_MORE_DATA && pkt.len == 0)
