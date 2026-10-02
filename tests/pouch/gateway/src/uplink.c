@@ -23,6 +23,10 @@
 #include "gateway/downlink.h"
 #include <pouch/gateway/uplink.h>
 
+#include "leak_check.h"
+#include "stub_blockbuf.h"
+#include "wrap.h"
+
 /*--------------------------------------------------
  * Stub cloud transport
  *------------------------------------------------*/
@@ -38,6 +42,10 @@ static struct
     size_t payload_len;
     pouch_gateway_cloud_block2_cb_t resp_cb;
     void *resp_arg;
+    /* Delivered as a single Block2 response block when not NULL, flagged last unless partial. */
+    const uint8_t *response;
+    size_t response_len;
+    bool response_partial;
 } stub;
 
 static int stub_forward(pouch_gateway_cloud_upload_chunk_cb_t chunk_cb,
@@ -76,6 +84,15 @@ static int stub_forward(pouch_gateway_cloud_upload_chunk_cb_t chunk_cb,
         }
     }
 
+    if (stub.response != NULL)
+    {
+        int err = resp_cb(stub.response, stub.response_len, !stub.response_partial, resp_arg);
+        if (err)
+        {
+            return err;
+        }
+    }
+
     return stub.forward_rc;
 }
 
@@ -107,6 +124,7 @@ static void uplink_setup(void *fixture)
     memset(&stub, 0, sizeof(stub));
     end_cb_calls = 0;
     end_cb_result = -1;
+    stub_blockbuf_reset_counters();
     pouch_gateway_cloud_transport_register(&stub_transport);
 }
 
@@ -194,6 +212,10 @@ ZTEST(uplink, test_forwards_to_downlink_via_resp_cb)
 
     struct pouch_gateway_downlink_context *dl = pouch_gateway_downlink_open(dl_armed_cb, NULL);
     zassert_not_null(dl);
+    wrap_free_watch(dl);
+
+    stub.response = (const uint8_t *) "RESP";
+    stub.response_len = 4;
 
     struct pouch_gateway_uplink *up = pouch_gateway_uplink_open(dl, on_end, NULL);
     zassert_not_null(up);
@@ -207,12 +229,6 @@ ZTEST(uplink, test_forwards_to_downlink_via_resp_cb)
     zassert_not_null(stub.resp_cb);
     zassert_equal_ptr(stub.resp_arg, dl);
 
-    /* Push a synthetic response block through the wire to mimic a
-     * cloud Block2 response.  This must complete the downlink.
-     */
-    int err = stub.resp_cb((const uint8_t *) "RESP", 4, true, stub.resp_arg);
-    zassert_ok(err);
-
     /* Drain the downlink and verify "RESP". */
     uint8_t out[8] = {0};
     size_t out_len = sizeof(out);
@@ -223,6 +239,78 @@ ZTEST(uplink, test_forwards_to_downlink_via_resp_cb)
     zassert_true(is_last);
 
     pouch_gateway_downlink_close(dl);
+    assert_all_released();
+}
+
+ZTEST(uplink, test_forward_error_after_part_of_the_response_truncates_the_downlink)
+{
+    struct pouch_gateway_downlink_context *dl = pouch_gateway_downlink_open(dl_armed_cb, NULL);
+    zassert_not_null(dl);
+    wrap_free_watch(dl);
+
+    stub.response = (const uint8_t *) "RE";
+    stub.response_len = 2;
+    stub.response_partial = true;
+    stub.forward_rc = -ETIMEDOUT;
+
+    struct pouch_gateway_uplink *up = pouch_gateway_uplink_open(dl, on_end, NULL);
+    zassert_not_null(up);
+    zassert_ok(pouch_gateway_uplink_write(up, (const uint8_t *) "p", 1));
+    pouch_gateway_uplink_close(up);
+    zassert_equal(end_cb_result, POUCH_GATEWAY_UPLINK_ERROR_CLOUD);
+
+    uint8_t out[8];
+    size_t out_len = 2;
+    bool is_last = true;
+    zassert_ok(pouch_gateway_downlink_get_data(dl, out, &out_len, &is_last));
+    zassert_equal(out_len, 2);
+    zassert_mem_equal(out, "RE", 2);
+    zassert_false(is_last);
+
+    out_len = sizeof(out);
+    zassert_equal(pouch_gateway_downlink_get_data(dl, out, &out_len, &is_last),
+                  -EIO,
+                  "the truncation was not reported");
+    zassert_equal(out_len, 0);
+    zassert_false(is_last);
+    zassert_true(pouch_gateway_downlink_is_complete(dl));
+
+    pouch_gateway_downlink_close(dl);
+    assert_all_released();
+}
+
+ZTEST(uplink, test_failed_open_does_not_acquire_downlink)
+{
+    struct pouch_gateway_downlink_context *dl = pouch_gateway_downlink_open(dl_armed_cb, NULL);
+    zassert_not_null(dl);
+    wrap_free_watch(dl);
+
+    stub_blockbuf_fail_alloc_from(1);
+    zassert_is_null(pouch_gateway_uplink_open(dl, on_end, NULL));
+
+    pouch_gateway_downlink_close(dl);
+    assert_all_released();
+}
+
+ZTEST(uplink, test_closed_downlink_lives_until_uplink_ends)
+{
+    dl_armed_calls = 0;
+
+    struct pouch_gateway_downlink_context *dl = pouch_gateway_downlink_open(dl_armed_cb, NULL);
+    zassert_not_null(dl);
+    wrap_free_watch(dl);
+
+    struct pouch_gateway_uplink *up = pouch_gateway_uplink_open(dl, on_end, NULL);
+    zassert_not_null(up);
+
+    pouch_gateway_downlink_close(dl);
+    zassert_equal(wrap_free_count(), 0, "freed while the uplink holds a reference");
+
+    /* An empty uplink forwards nothing and ends the downlink with status 0. */
+    pouch_gateway_uplink_close(up);
+    zassert_equal(end_cb_calls, 1);
+    zassert_equal(dl_armed_calls, 0, "the end notified a closed downlink");
+    assert_all_released();
 }
 
 ZTEST(uplink, test_streaming_across_many_writes)
