@@ -18,7 +18,11 @@ target_include_directories(app PRIVATE
 # The serial transport log macro needs CONFIG_POUCH_SERIAL_LOG_LEVEL, which is
 # normally provided by Kconfig when CONFIG_POUCH is enabled. Since this test
 # builds serial sources in isolation, define it directly.
-target_compile_definitions(app PRIVATE CONFIG_POUCH_SERIAL_LOG_LEVEL=3)
+target_compile_definitions(app PRIVATE
+    CONFIG_POUCH_SERIAL_LOG_LEVEL=3
+    CONFIG_POUCH_SERIAL_FRAME_MAX_LEN=127
+    CONFIG_POUCH_SERIAL_BROKER_MAX_RETRIES=5
+)
 
 # Serial transport sources (device side only, no broker)
 target_sources(app PRIVATE

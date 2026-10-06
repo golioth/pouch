@@ -29,10 +29,12 @@ struct spi_broker_ctx
     struct gpio_callback gpio_cb;
     struct k_work_delayable work;
     struct k_work_delayable start_work;
+    struct k_work_delayable retry_work;
     uint32_t poll_interval_ms;
     uint32_t retry_delay_ms;
     bool pending;
     bool sending;
+    bool progress;  // The device has sent a valid frame since the retry timer was last armed
     bool has_data_ready_pin;
     uint8_t tx_buf[CONFIG_POUCH_SPI_BROKER_FRAME_SIZE];
     uint8_t rx_buf[CONFIG_POUCH_SPI_BROKER_FRAME_SIZE];
@@ -60,6 +62,33 @@ static void schedule_poll(struct spi_broker_ctx *ctx)
         pouch_serial_broker_notify(ctx->broker);
         k_work_schedule_for_queue(&spi_broker_work_q, &ctx->work, K_MSEC(ctx->poll_interval_ms));
     }
+}
+
+/*
+ * Arm the retry timer while the broker waits for the device to respond, and restart it whenever
+ * the device makes progress.
+ */
+static void update_retry_timer(struct spi_broker_ctx *ctx)
+{
+    if (!pouch_serial_broker_is_waiting(ctx->broker))
+    {
+        k_work_cancel_delayable(&ctx->retry_work);
+    }
+    else if (ctx->progress)
+    {
+        k_work_reschedule_for_queue(&spi_broker_work_q,
+                                    &ctx->retry_work,
+                                    K_MSEC(CONFIG_POUCH_SPI_BROKER_RETRY_TIMEOUT_MS));
+    }
+    else
+    {
+        // Keeps the deadline if the timer is already running
+        k_work_schedule_for_queue(&spi_broker_work_q,
+                                  &ctx->retry_work,
+                                  K_MSEC(CONFIG_POUCH_SPI_BROKER_RETRY_TIMEOUT_MS));
+    }
+
+    ctx->progress = false;
 }
 
 static void adapter_ready(const struct pouch_serial_broker *broker)
@@ -238,6 +267,10 @@ static void process_rx(struct spi_broker_ctx *ctx, bool *has_more)
         {
             LOG_ERR("Failed to deliver frame: %d", err);
         }
+        else
+        {
+            ctx->progress = true;
+        }
 
         // The frame may need a response, such as an ACK, and the slave might have more queued.
         ctx->pending = true;
@@ -273,6 +306,7 @@ static void exchange_work_handler(struct k_work *work)
         schedule_poll(ctx);
     }
 
+    update_retry_timer(ctx);
     ctx->sending = false;
 }
 
@@ -283,6 +317,15 @@ static void start_work_handler(struct k_work *work)
 
     pouch_serial_broker_start(ctx->broker);
     schedule_poll(ctx);
+}
+
+static void retry_work_handler(struct k_work *work)
+{
+    struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+    struct spi_broker_ctx *ctx = CONTAINER_OF(dwork, struct spi_broker_ctx, retry_work);
+
+    // The broker queues the retries, and signals the adapter to send them
+    pouch_serial_broker_timeout(ctx->broker);
 }
 
 // Wrapper ensuring that the fn only gets invoked if the instance is on a SPI bus
@@ -355,6 +398,7 @@ static int instance_init(struct spi_broker_ctx *ctx)
 
     k_work_init_delayable(&ctx->work, exchange_work_handler);
     k_work_init_delayable(&ctx->start_work, start_work_handler);
+    k_work_init_delayable(&ctx->retry_work, retry_work_handler);
 
     ctx->broker = pouch_serial_broker_create(&ctx->adapter);
     if (ctx->broker == NULL)

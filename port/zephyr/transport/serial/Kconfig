@@ -14,6 +14,25 @@ config POUCH_TRANSPORT_SERIAL_DEVICE
         runs on the node device and communicates with a gateway running the
         broker implementation.
 
+config POUCH_SERIAL_FRAME_MAX_LEN
+    int "Maximum serial frame length"
+    default 127
+    range 2 255
+    help
+      Maximum length of a Pouch Serial frame, including its header. Every
+      channel keeps the last frame it sent until it's ACKed, so it can send
+      it again, which takes this much memory per channel. Frames are limited
+      to the smaller of this and the frame size of the transport adapter.
+
+config POUCH_SERIAL_BROKER_MAX_RETRIES
+    int "Maximum number of retries"
+    depends on POUCH_TRANSPORT_SERIAL_BROKER
+    default 5
+    help
+      Number of times the broker sends a frame again, or asks the device to
+      send its last frame again, before it gives up on the exchange. The
+      count is reset whenever the device sends a valid frame.
+
 menuconfig POUCH_SPI_DEVICE
     bool "Pouch SPI device transport"
     depends on SPI
@@ -87,6 +106,16 @@ config POUCH_SPI_BROKER_RETRY_DELAY_MAX_MS
     default 60000
     help
       Upper bound for the delay before restarting a failed exchange.
+
+config POUCH_SPI_BROKER_RETRY_TIMEOUT_MS
+    int "Time to wait for a response before retrying (ms)"
+    default 2000
+    help
+      Time in milliseconds to wait for the device to respond to a frame
+      before sending it again, or asking the device to send its last frame
+      again. The device may take a while to process some frames, such as
+      the last fragment of a certificate, but a retry that arrives in the
+      meantime is harmless.
 
 config POUCH_SPI_BROKER_INTERFRAME_DELAY
     int "Delay between each frame in milliseconds"
