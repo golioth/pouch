@@ -15,7 +15,7 @@
 #define HDR_CH_MASK 0x0f
 
 /* Reserved bits in an ACK frame must be zero. */
-#define HDR_ACK_RESERVED_MASK (HDR_FIRST | HDR_LAST)
+#define HDR_ACK_RESERVED_MASK (HDR_FIRST)
 
 uint8_t pouch_serial_header_encode(const struct pouch_serial_header *hdr)
 {
@@ -32,6 +32,11 @@ uint8_t pouch_serial_header_encode(const struct pouch_serial_header *hdr)
         {
             byte |= HDR_LAST;
         }
+    }
+    else if (hdr->err && hdr->last)
+    {
+        // Abort
+        byte |= HDR_LAST;
     }
 
     if (hdr->err)
@@ -62,10 +67,10 @@ int pouch_serial_header_decode(uint8_t byte, struct pouch_serial_header *hdr)
     else
     {
         hdr->first = false;
-        hdr->last = false;
+        hdr->last = !!(byte & HDR_LAST);
 
-        /* Reserved bits must be zero in ACK frames. */
-        if (byte & HDR_ACK_RESERVED_MASK)
+        /* Reserved bits must be zero in ACK frames, and LAST is only valid with ERR (abort). */
+        if ((byte & HDR_ACK_RESERVED_MASK) || (hdr->last && !hdr->err))
         {
             return -EINVAL;
         }
