@@ -41,6 +41,8 @@ struct pouch_serial_broker
     struct pouch_gateway_node_info node;
     pouch_atomic_t flags;
     uint8_t active_channel;
+    /** Number of retries since the device last sent a valid frame. */
+    unsigned int retries;
 };
 
 static void signal_adapter_ready(struct pouch_serial_broker *broker)
@@ -271,6 +273,31 @@ struct pouch_serial_broker *pouch_serial_broker_create(
     return broker;
 }
 
+/*
+ * Retry every channel that's waiting for a response, and abort the exchange if the device keeps
+ * failing to respond. Waiting for the first fragment of a pulled transfer doesn't count, as the
+ * device might not have any data yet.
+ */
+static void retry(struct pouch_serial_broker *broker)
+{
+    bool counted = false;
+    for (enum pouch_serial_channel_id i = 0; i < POUCH_SERIAL_CHANNEL_COUNT; i++)
+    {
+        struct pouch_serial_channel *ch = &broker->serial.channels[i];
+        bool awaiting_first = pouch_serial_ch_is_awaiting_first(ch);
+        if (pouch_serial_ch_retry(ch) && !awaiting_first)
+        {
+            counted = true;
+        }
+    }
+
+    if (counted && ++broker->retries > CONFIG_POUCH_SERIAL_BROKER_MAX_RETRIES)
+    {
+        POUCH_LOG_ERR("No response after %u retries", CONFIG_POUCH_SERIAL_BROKER_MAX_RETRIES);
+        abort_exchange(broker);
+    }
+}
+
 void pouch_serial_broker_start(struct pouch_serial_broker *broker)
 {
     POUCH_LOG_DBG("Starting broker %p", broker);
@@ -278,6 +305,7 @@ void pouch_serial_broker_start(struct pouch_serial_broker *broker)
     // Restarting an exchange in progress abandons it
     close_all_channels(broker);
     pouch_atomic_clear(&broker->flags);
+    broker->retries = 0;
     pouch_atomic_set_bit(&broker->flags, FLAG_RUNNING);
 
     next(broker);
@@ -294,6 +322,14 @@ int pouch_serial_broker_recv(struct pouch_serial_broker *broker, const void *fra
 
     POUCH_LOG_DBG("pouch_serial_broker_recv: len=%zu", len);
     int err = pouch_serial_recv(&broker->serial, frame, len);
+    if (err == -EBADMSG)
+    {
+        // The frame was broken on the way, so ask for it again
+        POUCH_LOG_WRN("Received a malformed frame, retrying");
+        retry(broker);
+        return err;
+    }
+
     if (err)
     {
         /* Transfers are stop-and-wait, so a frame that can't be processed leaves the exchange
@@ -304,7 +340,37 @@ int pouch_serial_broker_recv(struct pouch_serial_broker *broker, const void *fra
         return err;
     }
 
+    broker->retries = 0;
     return 0;
+}
+
+void pouch_serial_broker_timeout(struct pouch_serial_broker *broker)
+{
+    if (broker == NULL || !pouch_atomic_test_bit(&broker->flags, FLAG_RUNNING))
+    {
+        return;
+    }
+
+    POUCH_LOG_WRN("No response from the device, retrying");
+    retry(broker);
+}
+
+bool pouch_serial_broker_is_waiting(struct pouch_serial_broker *broker)
+{
+    if (broker == NULL)
+    {
+        return false;
+    }
+
+    for (enum pouch_serial_channel_id i = 0; i < POUCH_SERIAL_CHANNEL_COUNT; i++)
+    {
+        if (pouch_serial_ch_is_waiting(&broker->serial.channels[i]))
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 size_t pouch_serial_broker_frame_get(struct pouch_serial_broker *broker,
@@ -328,19 +394,16 @@ void pouch_serial_broker_notify(struct pouch_serial_broker *broker)
         return;
     }
 
-    uint8_t active = broker->active_channel;
-    if (active == NO_CHANNEL)
+    /* We want to be able to call this without invoking pouch behavior, so that this function can
+     * be called from an ISR context. If we're idling, we'll just set a flag indicating that the
+     * state machine should be nudged next time a frame is requested. During an exchange, there's
+     * nothing to do: the device holds on to our requests until it has data, and lost frames are
+     * recovered by pouch_serial_broker_timeout().
+     */
+    if (broker->active_channel == NO_CHANNEL)
     {
-        /* We want to be able to call this without invoking pouch behavior, so that this function
-         * can be called from an ISR context. If we're idling, we'll just set a flag indicating that
-         * the state machine should be nudged next time a frame is requested.
-         */
         pouch_atomic_set_bit(&broker->flags, FLAG_NOTIFIED);
-        return;
     }
-
-    // Re-request the first fragment, in case the device ignored the previous request
-    pouch_serial_ch_ready(&broker->serial.channels[active]);
 }
 
 const struct pouch_serial_broker_adapter *pouch_serial_broker_adapter_get(
