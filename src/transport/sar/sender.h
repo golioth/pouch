@@ -25,7 +25,10 @@ struct pouch_sender
      * bits. base <= next <= pulled <= base + CONFIG_POUCH_TRANSPORT_SAR_TX_WINDOW.
      */
 
-    /** First fragment the receiver hasn't ACKed. */
+    /**
+     * First fragment the receiver hasn't ACKed. Once the FIN has been sent, it's the fragment
+     * after the last one.
+     */
     uint32_t base;
     /** Next fragment to send. */
     uint32_t next;
