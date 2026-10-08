@@ -170,6 +170,30 @@ static bool full_tx_window(const void *global_state)
     return CONFIG_POUCH_TRANSPORT_SAR_TX_WINDOW == POUCH_SAR_WINDOW_MAX;
 }
 
+/* Run a transfer with a single fragment, until the sender sends FIN */
+static void transfer_until_fin(void)
+{
+    open_sender(5);
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_CLOSED);
+
+    zassert_ok(send_ack(POUCH_SAR_SEQ_MAX, 4));
+    zassert_equal(atomic_get(&test_bearer.sent_packets), 1);
+    zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_SENT_LAST_PACKET));
+
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+    zassert_ok(send_ack(0, 4));
+    zassert_equal(atomic_get(&test_bearer.sent_packets), 2);
+    zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_SENT_FIN));
+    zassert_true(test_endpoint.end_success);
+    zassert_true(test_bearer.close_success);
+
+    // The transfer has ended, and must not end again:
+    atomic_clear_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_clear_bit(&test_endpoint.flags, ENDPOINT_EXPECT_DATA_REQ);
+    atomic_clear_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+}
+
 ZTEST_SUITE(transport_sar_sender, full_tx_window, NULL, reset, NULL, NULL);
 ZTEST_SUITE(transport_sar_sender_tx_window, NULL, NULL, reset, NULL, NULL);
 
@@ -983,4 +1007,74 @@ ZTEST(transport_sar_sender, test_recv_after_close)
     // Verify no crash or use-after-free occurred
     zassert_equal(sender.bearer, NULL);
     zassert_equal(sender.buf, NULL);
+}
+
+ZTEST(transport_sar_sender, test_lost_fin)
+{
+    transfer_until_fin();
+
+    // The receiver ACKs the last fragment again, because it didn't get the FIN:
+    zassert_ok(send_ack(0, 4));
+    zassert_equal(atomic_get(&test_bearer.sent_packets), 3);
+    zassert_true(test_bearer.log[2].flags & POUCH_SAR_TX_PKT_FLAG_FIN);
+    // The decoded FIN carries the IDLE flag if it reports success:
+    zassert_true(test_bearer.log[1].flags & POUCH_SAR_TX_PKT_FLAG_IDLE);
+    zassert_true(test_bearer.log[2].flags & POUCH_SAR_TX_PKT_FLAG_IDLE);
+
+    zassert_ok(send_ack(0, 4));
+    zassert_equal(atomic_get(&test_bearer.sent_packets), 4);
+    zassert_true(test_bearer.log[3].flags & POUCH_SAR_TX_PKT_FLAG_IDLE);
+
+    // Anything else is ignored:
+    zassert_ok(send_ack(POUCH_SAR_SEQ_MAX, 4));
+    zassert_ok(send_ack(1, 4));
+    pouch_sender_ready(&sender);
+    zassert_equal(atomic_get(&test_bearer.sent_packets), 4);
+}
+
+ZTEST(transport_sar_sender, test_close_after_fin)
+{
+    transfer_until_fin();
+
+    // Closing doesn't end the transfer again:
+    pouch_sender_close(&sender);
+    zassert_equal(sender.bearer, NULL);
+
+    zassert_equal(send_ack(0, 4), -EBUSY);
+    zassert_equal(atomic_get(&test_bearer.sent_packets), 2);
+
+    pouch_sender_close(&sender);
+}
+
+static void close_sender(void)
+{
+    pouch_sender_close(&sender);
+}
+
+ZTEST(transport_sar_sender, test_close_from_end_callback)
+{
+    // The transport closes the sender as soon as the transfer ends:
+    test_endpoint.on_end = close_sender;
+    transfer_until_fin();
+
+    zassert_equal(sender.bearer, NULL);
+    zassert_equal(send_ack(0, 4), -EBUSY);
+    zassert_equal(atomic_get(&test_bearer.sent_packets), 2);
+}
+
+ZTEST(transport_sar_sender, test_reopen_after_fin)
+{
+    transfer_until_fin();
+
+    // A new transfer starts from the beginning:
+    atomic_clear_bit(&test_endpoint.flags, ENDPOINT_STARTED);
+    atomic_clear_bit(&test_endpoint.flags, ENDPOINT_ENDED);
+    atomic_clear_bit(&test_endpoint.flags, ENDPOINT_CLOSED);
+    open_sender(10 * (bearer.maxlen - 2));
+
+    zassert_ok(send_ack(POUCH_SAR_SEQ_MAX, 2));
+    zassert_equal(atomic_get(&test_bearer.sent_packets), 4);
+    zassert_equal(test_bearer.log[2].seq, 0);
+    zassert_true(test_bearer.log[2].flags & POUCH_SAR_TX_PKT_FLAG_FIRST);
+    zassert_equal(test_bearer.log[3].seq, 1);
 }

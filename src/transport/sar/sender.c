@@ -23,6 +23,7 @@ enum state
     STATE_READY,
     STATE_ACTIVE,
     STATE_FIN,
+    STATE_FIN_SENT,
 };
 
 static size_t slot_size(const struct pouch_bearer *bearer)
@@ -92,34 +93,49 @@ static void end(struct pouch_sender *sender, bool success)
     sender->bearer = NULL;
 }
 
-static void send_fin(struct pouch_sender *p)
+static void send_fin(struct pouch_sender *sender)
 {
     struct pouch_sar_tx_pkt pkt = {
         .flags = POUCH_SAR_TX_PKT_FLAG_FIN,
     };
-    if (p->state == STATE_IDLE)
-    {
-        // This isn't the first time we're sending the FIN
-        pkt.flags |= POUCH_SAR_TX_PKT_FLAG_IDLE;
-    }
-
-    size_t len = p->bearer->maxlen;
-    int err = pouch_sar_tx_pkt_encode(&pkt, p->buf, &len);
+    uint8_t buf[POUCH_SAR_TX_PKT_HEADER_LEN];
+    size_t len = sizeof(buf);
+    int err = pouch_sar_tx_pkt_encode(&pkt, buf, &len);
     if (err)
     {
         POUCH_LOG_ERR("Encode failed (%d)", err);
         return;
     }
 
-
-    err = pouch_bearer_send(p->bearer, p->buf, len);
+    err = pouch_bearer_send(sender->bearer, buf, len);
     if (err)
     {
         POUCH_LOG_ERR("TX failed (%d)", err);
-        return;
+    }
+}
+
+/*
+ * End the transfer once the receiver has ACKed the last fragment. If the FIN gets lost, the
+ * receiver keeps ACKing the last fragment, so hold on to the bearer to send the FIN again, until
+ * the sender is closed.
+ */
+static void finish(struct pouch_sender *sender)
+{
+    struct pouch_bearer *bearer = sender->bearer;
+
+    send_fin(sender);
+
+    free(sender->buf);
+    sender->buf = NULL;
+    // The sender may get closed from the callbacks, which puts it in the idle state.
+    sender->state = STATE_FIN_SENT;
+
+    if (sender->endpoint->end)
+    {
+        sender->endpoint->end(bearer, true);
     }
 
-    p->state = STATE_IDLE;
+    pouch_bearer_close(bearer, true);
 }
 
 /*
@@ -270,6 +286,19 @@ int pouch_sender_recv(struct pouch_sender *sender, const uint8_t *buf, size_t le
         return err;
     }
 
+    if (sender->state == STATE_FIN_SENT)
+    {
+        // The transfer is over. The receiver ACKing the last fragment again means that it didn't
+        // get the FIN.
+        if (ack.code == POUCH_RECEIVER_CODE_ACK && ack.seq == SEQ(sender->base - 1))
+        {
+            POUCH_LOG_DBG("Repeating FIN");
+            send_fin(sender);
+        }
+
+        return 0;
+    }
+
     if (ack.code != POUCH_RECEIVER_CODE_ACK)
     {
         POUCH_LOG_ERR("Received NACK");
@@ -321,8 +350,7 @@ int pouch_sender_recv(struct pouch_sender *sender, const uint8_t *buf, size_t le
 
         if (base == sender->pulled && last_pulled(sender))
         {
-            send_fin(sender);
-            end(sender, true);
+            finish(sender);
             return 0;
         }
     }
@@ -349,7 +377,7 @@ int pouch_sender_recv(struct pouch_sender *sender, const uint8_t *buf, size_t le
 
 void pouch_sender_ready(struct pouch_sender *sender)
 {
-    if (sender->state == STATE_IDLE)
+    if (sender->state == STATE_IDLE || sender->state == STATE_FIN_SENT)
     {
         return;
     }
@@ -369,6 +397,12 @@ void pouch_sender_close(struct pouch_sender *sender)
             break;
         case STATE_FIN:
             end(sender, true);
+            break;
+        case STATE_FIN_SENT:
+            // The transfer has already ended
+            reset(sender);
+            sender->bearer = NULL;
+            sender->state = STATE_IDLE;
             break;
         case STATE_IDLE:
             POUCH_LOG_DBG("Closed while idle");
