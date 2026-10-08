@@ -1,9 +1,15 @@
+common:
+  platform_allow:
+    - native_sim
+    - native_sim/native/64
+  integration_platforms:
+    - native_sim
+    - native_sim/native/64
+  tags: test_framework
 tests:
-  pouch.transport:
-    platform_allow:
-      - native_sim
-      - native_sim/native/64
-    integration_platforms:
-      - native_sim
-      - native_sim/native/64
-    tags: test_framework
+  pouch.transport: {}
+  pouch.transport.tx_window:
+    extra_configs:
+      - CONFIG_POUCH_TRANSPORT_SAR_TX_WINDOW=2
+      # The sender suite needs the full TX window, and doesn't run:
+      - CONFIG_ZTEST_VERIFY_RUN_ALL=n

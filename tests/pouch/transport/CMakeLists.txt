@@ -8,6 +8,7 @@ project(transport_test)
 target_sources(app PRIVATE
   src/sender.c
   src/receiver.c
+  src/exchange.c
 )
 target_include_directories(app PRIVATE
     ${ZEPHYR_POUCH_MODULE_DIR}/src

@@ -5,9 +5,33 @@
 # Note: This file must be sourced by each port transport Kconfig file.
 # This is approach is brittle and should be improved in future work.
 
-config POUCH_TRANSPORT_SAR
+menuconfig POUCH_TRANSPORT_SAR
   bool "Enable SAR core transport support" if ZTEST
   help
     Enable shared Segmentation and Reassembly (SAR) sender/receiver
     packetization support used by transport backends and transport unit
     tests.
+
+if POUCH_TRANSPORT_SAR
+
+config POUCH_TRANSPORT_SAR_TX_WINDOW
+  int "SAR sender window"
+  default 3
+  range 1 127
+  help
+    Number of fragments the SAR sender holds on to until the receiver
+    ACKs them, so they can be sent again if they're lost. The sender
+    never has more fragments in flight than this, even if the receiver
+    advertises a larger window. Each fragment takes up a buffer of the
+    bearer's maximum packet length.
+
+config POUCH_TRANSPORT_SAR_MAX_RETRIES
+  int "SAR sender retries"
+  default 5
+  range 0 255
+  help
+    Number of times the SAR sender goes back and sends unACKed
+    fragments again without the receiver making any progress, before
+    it abandons the transfer.
+
+endif
