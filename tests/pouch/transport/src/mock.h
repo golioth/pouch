@@ -41,6 +41,7 @@ static struct
     atomic_t recv_calls;
     atomic_t flags;
     int open_retval;
+    bool end_success;
 } test_endpoint;
 
 static int start(struct pouch_bearer *bearer)
@@ -88,6 +89,7 @@ static void end(struct pouch_bearer *bearer, bool success)
     zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_STARTED));
     zassert_false(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
 
+    test_endpoint.end_success = success;
     atomic_set_bit(&test_endpoint.flags, ENDPOINT_ENDED);
 }
 

@@ -18,6 +18,8 @@ struct pouch_receiver
     uint8_t ack;
     uint8_t window;
     uint8_t state;
+    /** The last fragment received in order has been ACKed again since a gap was detected. */
+    bool gap_acked;
 
     pouch_work_delayable_t work;
 };

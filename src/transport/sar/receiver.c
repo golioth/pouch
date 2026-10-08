@@ -96,6 +96,7 @@ int pouch_receiver_open(struct pouch_receiver *recv, struct pouch_bearer *bearer
     recv->bearer = bearer;
     recv->window = window;
     recv->seq = POUCH_SAR_SEQ_MAX;
+    recv->gap_acked = false;
     recv->state = STATE_READY;
     pouch_work_delayable_init(&recv->work, send_ack);
 
@@ -161,6 +162,28 @@ int pouch_receiver_recv(struct pouch_receiver *recv, const uint8_t *buf, size_t 
         return 0;
     }
 
+    // Only the next segment in order is processed. Anything else, including a resent FIRST or
+    // LAST segment, is ignored.
+    if (pkt.seq != ((recv->seq + 1) & POUCH_SAR_SEQ_MASK))
+    {
+        POUCH_LOG_WRN("OoO RX: %x (last: %x)", pkt.seq, recv->seq);
+
+        // A segment after a gap means that the segments before it were lost. ACK the last
+        // segment received in order again, so the sender goes back to the first one we're
+        // missing. Do it once per gap: the sender goes back on every repeated ACK, and the rest
+        // of the segments it already sent will arrive after the gap too. Segments we've already
+        // received are left to the periodic ACK.
+        uint8_t distance = (pkt.seq - recv->seq) & POUCH_SAR_SEQ_MASK;
+        bool ahead = distance != 0 && distance <= POUCH_SAR_WINDOW_MAX;
+        if (ahead && !recv->gap_acked)
+        {
+            recv->gap_acked = true;
+            pouch_work_reschedule(&recv->work, POUCH_NO_WAIT);  // ack last received packet instead
+        }
+
+        return 0;
+    }
+
     if (pkt.flags & POUCH_SAR_TX_PKT_FLAG_FIRST)
     {
         if (recv->state == STATE_ACTIVE)
@@ -198,14 +221,6 @@ int pouch_receiver_recv(struct pouch_receiver *recv, const uint8_t *buf, size_t 
         recv->state = STATE_ENDED;
     }
 
-    if (pkt.seq != ((recv->seq + 1) & POUCH_SAR_SEQ_MASK))
-    {
-        POUCH_LOG_WRN("OoO RX: %x (last: %x)", pkt.seq, recv->seq);
-        // out of order packet - should be ignored
-        pouch_work_reschedule(&recv->work, POUCH_NO_WAIT);  // ack last received packet instead
-        return 0;
-    }
-
     if (pkt.len > 0)
     {
         err = recv->endpoint->recv(recv->bearer, pkt.data, pkt.len);
@@ -219,6 +234,7 @@ int pouch_receiver_recv(struct pouch_receiver *recv, const uint8_t *buf, size_t 
     }
 
     recv->seq = pkt.seq;
+    recv->gap_acked = false;
 
     // send ack right away:
     pouch_work_reschedule(&recv->work, POUCH_NO_WAIT);

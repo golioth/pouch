@@ -208,7 +208,7 @@ ZTEST(transport_sar_receiver, test_invalid_packet_not_first)
     zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
 }
 
-ZTEST(transport_sar_receiver, test_invalid_duplicate_first_packet)
+ZTEST(transport_sar_receiver, test_duplicate_first_packet)
 {
     atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
     atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_SEND);
@@ -217,16 +217,79 @@ ZTEST(transport_sar_receiver, test_invalid_duplicate_first_packet)
 
     zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(1)));
 
-    uint8_t buf[2] = {POUCH_SAR_TX_PKT_FLAG_FIRST};
-    zassert_ok(pouch_receiver_recv(&receiver, buf, sizeof(buf)));
+    uint8_t data = 0xaa;
+    uint8_t buf[3];
+    size_t len = sizeof(buf);
+    struct pouch_sar_tx_pkt pkt = {
+        .flags = POUCH_SAR_TX_PKT_FLAG_FIRST,
+        .data = &data,
+        .len = sizeof(data),
+    };
+    zassert_ok(pouch_sar_tx_pkt_encode(&pkt, buf, &len));
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_RECV);
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(1)));
+    zassert_equal(test_bearer.ack_seq, 0);
 
-    // FIRST again
-    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
-    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
-    zassert_not_ok(pouch_receiver_recv(&receiver, buf, sizeof(buf)));
+    // FIRST again, as if the sender went back. It's ignored, and left to the periodic ACK:
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+    zassert_equal(k_sem_take(&test_bearer.sem, K_MSEC(1)), -EAGAIN);
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(CONFIG_POUCH_TRANSPORT_ACK_TIMEOUT_MS + 100)));
+    zassert_equal(test_bearer.ack_seq, 0);
 
-    zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_CLOSED));
-    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
+    zassert_equal(test_endpoint.recv_calls, 1);
+    zassert_false(atomic_test_bit(&test_bearer.flags, BEARER_CLOSED));
+    zassert_false(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
+}
+
+ZTEST(transport_sar_receiver, test_out_of_order_packet)
+{
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_SEND);
+
+    zassert_ok(pouch_receiver_open(&receiver, &bearer, 4));
+
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(1)));
+
+    uint8_t data = 0xaa;
+    uint8_t buf[3];
+    size_t len = sizeof(buf);
+    struct pouch_sar_tx_pkt pkt = {
+        .flags = POUCH_SAR_TX_PKT_FLAG_FIRST,
+        .data = &data,
+        .len = sizeof(data),
+    };
+    zassert_ok(pouch_sar_tx_pkt_encode(&pkt, buf, &len));
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_RECV);
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(1)));
+    zassert_equal(test_bearer.ack_seq, 0);
+
+    // seq 1 was lost, and seq 2 arrives. It's ignored, and seq 0 is ACKed again right away:
+    pkt.flags = 0;
+    pkt.seq = 2;
+    zassert_ok(pouch_sar_tx_pkt_encode(&pkt, buf, &len));
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(1)));
+    zassert_equal(test_bearer.ack_seq, 0);
+    zassert_equal(test_endpoint.recv_calls, 1);
+
+    // The rest of the fragments after the gap are ignored too, but the gap has already been ACKed:
+    pkt.seq = 3;
+    zassert_ok(pouch_sar_tx_pkt_encode(&pkt, buf, &len));
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+    zassert_equal(k_sem_take(&test_bearer.sem, K_MSEC(1)), -EAGAIN);
+    zassert_equal(test_endpoint.recv_calls, 1);
+
+    // The sender goes back to seq 1:
+    pkt.seq = 1;
+    zassert_ok(pouch_sar_tx_pkt_encode(&pkt, buf, &len));
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(1)));
+    zassert_equal(test_bearer.ack_seq, 1);
+    zassert_equal(test_endpoint.recv_calls, 2);
+
+    zassert_false(atomic_test_bit(&test_bearer.flags, BEARER_CLOSED));
 }
 
 ZTEST(transport_sar_receiver, test_rx_single_packet_transfer)
@@ -364,6 +427,60 @@ ZTEST(transport_sar_receiver, test_rx_fail_duplicate_last)
     zassert_equal(test_endpoint.recv_calls, 2);
     zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_CLOSED));
     zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
+}
+
+ZTEST(transport_sar_receiver, test_rx_duplicate_last)
+{
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_START);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_SEND);
+
+    zassert_ok(pouch_receiver_open(&receiver, &bearer, 4));
+
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(1)));
+
+    uint8_t data = 0xaa;
+    uint8_t buf[3];
+    size_t len = sizeof(buf);
+    struct pouch_sar_tx_pkt pkt = {
+        .flags = POUCH_SAR_TX_PKT_FLAG_FIRST,
+        .data = &data,
+        .len = sizeof(data),
+    };
+    zassert_ok(pouch_sar_tx_pkt_encode(&pkt, buf, &len));
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_RECV);
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    pkt.flags = POUCH_SAR_TX_PKT_FLAG_LAST;
+    pkt.seq++;
+    zassert_ok(pouch_sar_tx_pkt_encode(&pkt, buf, &len));
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(1)));
+    zassert_equal(test_bearer.ack_seq, 1);
+
+    // The same LAST fragment again, as if the sender went back. It's ignored, and left to the
+    // periodic ACK:
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+    zassert_equal(k_sem_take(&test_bearer.sem, K_MSEC(1)), -EAGAIN);
+    zassert_ok(k_sem_take(&test_bearer.sem, K_MSEC(CONFIG_POUCH_TRANSPORT_ACK_TIMEOUT_MS + 100)));
+    zassert_equal(test_bearer.ack_seq, 1);
+    zassert_equal(test_endpoint.recv_calls, 2);
+    zassert_false(atomic_test_bit(&test_bearer.flags, BEARER_CLOSED));
+
+    // The transfer still finishes:
+    struct pouch_sar_tx_pkt fin = {
+        .flags = POUCH_SAR_TX_PKT_FLAG_FIN,
+    };
+    len = sizeof(buf);
+    zassert_ok(pouch_sar_tx_pkt_encode(&fin, buf, &len));
+
+    atomic_set_bit(&test_endpoint.flags, ENDPOINT_EXPECT_END);
+    atomic_set_bit(&test_bearer.flags, BEARER_EXPECT_CLOSE);
+    zassert_ok(pouch_receiver_recv(&receiver, buf, len));
+
+    zassert_equal(test_endpoint.recv_calls, 2);
+    zassert_true(atomic_test_bit(&test_bearer.flags, BEARER_CLOSED));
+    zassert_true(atomic_test_bit(&test_endpoint.flags, ENDPOINT_ENDED));
+    zassert_true(test_endpoint.end_success);
 }
 
 ZTEST(transport_sar_receiver, test_invalid_fin_too_long)
