@@ -44,6 +44,8 @@ static struct
     bool end_success;
     /** Next byte the endpoint sends, so each fragment's data is different. */
     uint8_t next_byte;
+    /** Called at the end of the transfer, if set. */
+    void (*on_end)(void);
 } test_endpoint;
 
 static int start(struct pouch_bearer *bearer)
@@ -93,6 +95,11 @@ static void end(struct pouch_bearer *bearer, bool success)
 
     test_endpoint.end_success = success;
     atomic_set_bit(&test_endpoint.flags, ENDPOINT_ENDED);
+
+    if (test_endpoint.on_end != NULL)
+    {
+        test_endpoint.on_end();
+    }
 }
 
 static int recv(struct pouch_bearer *bearer, const void *buf, size_t len)

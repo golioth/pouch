@@ -396,3 +396,34 @@ ZTEST(transport_sar_exchange, test_long_transfer_with_loss)
         transfer(LONG_TRANSFER);
     }
 }
+
+ZTEST(transport_sar_exchange, test_lost_fin)
+{
+    ARRAY_FOR_EACH(modes, m)
+    {
+        test.mode = modes[m];
+        for (int i = 1; i <= 3; i++)
+        {
+            test.drop_fins = i;
+            transfer(SHORT_TRANSFER);
+            transfer(0);
+        }
+    }
+}
+
+ZTEST(transport_sar_exchange, test_lost_last_fragment_ack_and_fin)
+{
+    ARRAY_FOR_EACH(modes, m)
+    {
+        test.mode = modes[m];
+        transfer(SHORT_TRANSFER);
+        int fragments = test.fragments;
+        int acks = test.acks;
+
+        // The last fragment, the last ACKs, and the FIN:
+        test.drop_fragments = BIT64(fragments - 1);
+        test.drop_acks = BIT64(acks - 1) | BIT64(acks);
+        test.drop_fins = 1;
+        transfer(SHORT_TRANSFER);
+    }
+}
