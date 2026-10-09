@@ -24,6 +24,8 @@
 static int ready_count;
 static int end_count;
 static bool end_success;
+static bool end_drains_frames;
+static int end_downlink_err_frames;
 static struct pouch_serial_broker *test_broker;
 
 static void adapter_ready(const struct pouch_serial_broker *broker)
@@ -37,6 +39,23 @@ static void adapter_end(const struct pouch_serial_broker *broker, bool success)
     (void) broker;
     end_count++;
     end_success = success;
+
+    for (int i = 0; end_drains_frames && i < MAX_FRAMES; i++)
+    {
+        uint8_t buf[FRAME_BUF_SIZE];
+        struct pouch_serial_header hdr;
+
+        if (pouch_serial_broker_frame_get(test_broker, buf, sizeof(buf)) == 0)
+        {
+            break;
+        }
+
+        zassert_ok(pouch_serial_header_decode(buf[0], &hdr));
+        if (hdr.channel == POUCH_SERIAL_CH_DOWNLINK && hdr.is_data && hdr.err && hdr.last)
+        {
+            end_downlink_err_frames++;
+        }
+    }
 }
 
 static const struct pouch_serial_broker_adapter test_adapter = {
@@ -436,6 +455,8 @@ static void reset_all(void)
     ready_count = 0;
     end_count = 0;
     end_success = false;
+    end_drains_frames = false;
+    end_downlink_err_frames = 0;
 }
 
 /* ---- Test fixture -------------------------------------------------------- */
@@ -863,6 +884,99 @@ ZTEST(serial_broker, test_sender_server_cert_with_data)
     zassert_mem_equal(out, cert, sizeof(cert));
 }
 
+static void assert_downlink_stays_quiet(void)
+{
+    uint8_t buf[FRAME_BUF_SIZE];
+    struct pouch_serial_header hdr;
+    const uint8_t *payload;
+    size_t payload_len;
+
+    for (int i = 0; i < MAX_FRAMES; i++)
+    {
+        if (get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf)) == 0)
+        {
+            break;
+        }
+
+        zassert_not_equal(hdr.channel,
+                          POUCH_SERIAL_CH_DOWNLINK,
+                          "closed DOWNLINK channel prompted the device again");
+    }
+}
+
+ZTEST(serial_broker, test_sender_ready_in_last_frame_does_not_reprompt)
+{
+    static const uint8_t payload[] = {0x10, 0x20, 0x30};
+    stub_sender_set_data(&broker_stubs.downlink, payload, sizeof(payload));
+    broker_stubs.downlink.ready_in_send = true;
+
+    advance_to_sync(true, true);
+    complete_sender_channel(POUCH_SERIAL_CH_DOWNLINK);
+    zassert_equal(broker_stubs.downlink.end_success_count, 1);
+
+    assert_downlink_stays_quiet();
+}
+
+ZTEST(serial_broker, test_sender_ready_in_end_does_not_reprompt)
+{
+    static const uint8_t payload[] = {0x10, 0x20, 0x30};
+    stub_sender_set_data(&broker_stubs.downlink, payload, sizeof(payload));
+    broker_stubs.downlink.ready_in_end = true;
+
+    advance_to_sync(true, true);
+    complete_sender_channel(POUCH_SERIAL_CH_DOWNLINK);
+    zassert_equal(broker_stubs.downlink.end_success_count, 1);
+
+    assert_downlink_stays_quiet();
+}
+
+ZTEST(serial_broker, test_sender_ready_after_close_does_not_reprompt)
+{
+    static const uint8_t payload[] = {0x10, 0x20, 0x30};
+    stub_sender_set_data(&broker_stubs.downlink, payload, sizeof(payload));
+
+    advance_to_sync(true, true);
+    complete_sender_channel(POUCH_SERIAL_CH_DOWNLINK);
+    zassert_equal(broker_stubs.downlink.end_success_count, 1);
+
+    pouch_bearer_ready(broker_stubs.downlink.bearer);
+
+    assert_downlink_stays_quiet();
+}
+
+ZTEST(serial_broker, test_sender_ack_err_frame_available_in_end)
+{
+    uint8_t payload[FRAME_BUF_SIZE * 2];
+    memset(payload, 0xAB, sizeof(payload));
+    stub_sender_set_data(&broker_stubs.downlink, payload, sizeof(payload));
+
+    advance_to_sync(true, true);
+
+    uint8_t buf[FRAME_BUF_SIZE];
+    struct pouch_serial_header hdr;
+    const uint8_t *resp_payload;
+    size_t resp_len;
+
+    size_t len = get_frame(&hdr, &resp_payload, &resp_len, buf, sizeof(buf));
+    zassert_true(len > 0, "expected DOWNLINK prompt");
+    zassert_equal(hdr.channel, POUCH_SERIAL_CH_DOWNLINK);
+    zassert_false(hdr.is_data);
+
+    zassert_ok(send_ack(POUCH_SERIAL_CH_DOWNLINK, false));
+
+    len = get_frame(&hdr, &resp_payload, &resp_len, buf, sizeof(buf));
+    zassert_true(len > 0);
+    zassert_equal(hdr.channel, POUCH_SERIAL_CH_DOWNLINK);
+    zassert_false(hdr.last, "expected multi-fragment transfer");
+
+    end_drains_frames = true;
+    zassert_ok(send_ack(POUCH_SERIAL_CH_DOWNLINK, true));
+
+    zassert_equal(end_count, 1);
+    zassert_false(end_success);
+    zassert_equal(end_downlink_err_frames, 1, "adapter end found no DOWNLINK ERR|LAST frame");
+}
+
 /* ==========================================================================
  * Receiver channel tests (INFO=0, DEVICE_CERT=2, UPLINK=4)
  *
@@ -1258,6 +1372,31 @@ ZTEST(serial_broker, test_notify_triggers_uplink)
 
     len = get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf));
     zassert_true(len > 0, "expected UPLINK prompt after notify");
+    zassert_equal(hdr.channel, POUCH_SERIAL_CH_UPLINK);
+    zassert_false(hdr.is_data);
+}
+
+ZTEST(serial_broker, test_notify_during_uplink_survives_close)
+{
+    static const uint8_t ul_data[] = {0x01, 0x02};
+
+    advance_to_sync(true, true);
+    complete_sender_channel(POUCH_SERIAL_CH_DOWNLINK);
+
+    uint8_t buf[FRAME_BUF_SIZE];
+    struct pouch_serial_header hdr;
+    const uint8_t *payload;
+    size_t payload_len;
+
+    /* Consume the UPLINK prompt, then notify while the transfer is open */
+    zassert_true(get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf)) > 0);
+    zassert_equal(hdr.channel, POUCH_SERIAL_CH_UPLINK);
+    zassert_ok(send_data(POUCH_SERIAL_CH_UPLINK, true, false, false, ul_data, sizeof(ul_data)));
+    pouch_serial_broker_notify(test_broker);
+    zassert_ok(send_data(POUCH_SERIAL_CH_UPLINK, false, true, false, ul_data, sizeof(ul_data)));
+
+    size_t len = get_frame(&hdr, &payload, &payload_len, buf, sizeof(buf));
+    zassert_true(len > 0, "notify prompt was dropped when UPLINK closed");
     zassert_equal(hdr.channel, POUCH_SERIAL_CH_UPLINK);
     zassert_false(hdr.is_data);
 }

@@ -51,7 +51,7 @@ static void end(struct pouch_bearer *bearer, bool success)
 {
     struct pouch_gateway_node_info *node = bearer->ctx;
 
-    pouch_gateway_downlink_abort(node->downlink_ctx);
+    pouch_gateway_downlink_close(node->downlink_ctx);
     node->downlink_ctx = NULL;
 }
 
