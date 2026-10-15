@@ -13,6 +13,7 @@
 
 #include <pouch/transport/serial/broker.h>
 
+#include <stdlib.h>
 #include <string.h>
 
 LOG_MODULE_REGISTER(pouch_spi_broker, CONFIG_POUCH_SPI_BROKER_LOG_LEVEL);
@@ -27,6 +28,7 @@ struct spi_broker_ctx
     struct gpio_dt_spec data_ready_gpio;
     struct gpio_callback gpio_cb;
     struct k_work_delayable work;
+    struct k_work_delayable start_work;
     uint32_t poll_interval_ms;
     bool pending;
     bool sending;
@@ -264,6 +266,15 @@ static void exchange_work_handler(struct k_work *work)
     ctx->sending = false;
 }
 
+static void start_work_handler(struct k_work *work)
+{
+    struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+    struct spi_broker_ctx *ctx = CONTAINER_OF(dwork, struct spi_broker_ctx, start_work);
+
+    pouch_serial_broker_start(ctx->broker);
+    schedule_poll(ctx);
+}
+
 // Wrapper ensuring that the fn only gets invoked if the instance is on a SPI bus
 #define ON_SPI_BUS(inst, fn) IF_ENABLED(DT_INST_ON_BUS(inst, spi), (fn))
 
@@ -289,6 +300,40 @@ static void exchange_work_handler(struct k_work *work)
 
 DT_INST_FOREACH_STATUS_OKAY(SPI_BROKER_DEFINE)
 
+static int data_ready_init(struct spi_broker_ctx *ctx)
+{
+    if (!gpio_is_ready_dt(&ctx->data_ready_gpio))
+    {
+        LOG_ERR("Data-ready GPIO not ready (%p)", ctx);
+        return -ENODEV;
+    }
+
+    int err = gpio_pin_configure_dt(&ctx->data_ready_gpio, GPIO_INPUT);
+    if (err != 0)
+    {
+        LOG_ERR("Failed to configure data-ready GPIO (%p): %d", ctx, err);
+        return err;
+    }
+
+    gpio_init_callback(&ctx->gpio_cb, data_ready_isr, BIT(ctx->data_ready_gpio.pin));
+    err = gpio_add_callback(ctx->data_ready_gpio.port, &ctx->gpio_cb);
+    if (err != 0)
+    {
+        LOG_ERR("Failed to add data-ready callback (%p): %d", ctx, err);
+        return err;
+    }
+
+    err = gpio_pin_interrupt_configure_dt(&ctx->data_ready_gpio, GPIO_INT_EDGE_TO_ACTIVE);
+    if (err != 0)
+    {
+        LOG_ERR("Failed to configure data-ready interrupt (%p): %d", ctx, err);
+        gpio_remove_callback(ctx->data_ready_gpio.port, &ctx->gpio_cb);
+        return err;
+    }
+
+    return 0;
+}
+
 static int instance_init(struct spi_broker_ctx *ctx)
 {
     if (!spi_is_ready_dt(&ctx->spi))
@@ -297,41 +342,26 @@ static int instance_init(struct spi_broker_ctx *ctx)
         return -ENODEV;
     }
 
-    if (ctx->has_data_ready_pin)
-    {
-        if (!gpio_is_ready_dt(&ctx->data_ready_gpio))
-        {
-            LOG_ERR("Data-ready GPIO not ready (%p)", ctx);
-            return -ENODEV;
-        }
-        int err = gpio_pin_configure_dt(&ctx->data_ready_gpio, GPIO_INPUT);
-        if (err != 0)
-        {
-            LOG_ERR("Failed to configure data-ready GPIO (%p): %d", ctx, err);
-            return err;
-        }
-        err = gpio_pin_interrupt_configure_dt(&ctx->data_ready_gpio, GPIO_INT_EDGE_TO_ACTIVE);
-        if (err != 0)
-        {
-            LOG_ERR("Failed to configure data-ready interrupt (%p): %d", ctx, err);
-            return err;
-        }
-        gpio_init_callback(&ctx->gpio_cb, data_ready_isr, BIT(ctx->data_ready_gpio.pin));
-        err = gpio_add_callback(ctx->data_ready_gpio.port, &ctx->gpio_cb);
-        if (err != 0)
-        {
-            LOG_ERR("Failed to add data-ready callback (%p): %d", ctx, err);
-            return err;
-        }
-    }
-
     k_work_init_delayable(&ctx->work, exchange_work_handler);
+    k_work_init_delayable(&ctx->start_work, start_work_handler);
 
     ctx->broker = pouch_serial_broker_create(&ctx->adapter);
     if (ctx->broker == NULL)
     {
         LOG_ERR("Failed to create broker (%p)", ctx);
         return -ENOMEM;
+    }
+
+    // Arm the data-ready interrupt last, as it may fire right away
+    if (ctx->has_data_ready_pin)
+    {
+        int err = data_ready_init(ctx);
+        if (err)
+        {
+            free(ctx->broker);
+            ctx->broker = NULL;
+            return err;
+        }
     }
 
     LOG_DBG("Initialized SPI broker (%p)", ctx);
@@ -359,11 +389,17 @@ SYS_INIT(spi_broker_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
 
 static void broker_start(struct spi_broker_ctx *ctx)
 {
-    pouch_serial_broker_start(ctx->broker);
-    schedule_poll(ctx);
+    if (ctx->broker == NULL)
+    {
+        // Initialization failed, and has already been logged
+        return;
+    }
+
+    // Drive the broker from the work queue only, so it's never accessed from two threads at once
+    k_work_submit_to_queue(&spi_broker_work_q, &ctx->start_work);
 }
 
-#define SPI_BROKER_START(inst) ON_SPI_BUS(inst, broker_start(&spi_broker_ctx_##inst))
+#define SPI_BROKER_START(inst) ON_SPI_BUS(inst, broker_start(&spi_broker_ctx_##inst));
 
 void pouch_spi_broker_start(void)
 {
