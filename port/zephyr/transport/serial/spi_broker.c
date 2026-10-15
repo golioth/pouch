@@ -33,6 +33,7 @@ struct spi_broker_ctx
     bool has_data_ready_pin;
     uint8_t tx_buf[CONFIG_POUCH_SPI_BROKER_FRAME_SIZE];
     uint8_t rx_buf[CONFIG_POUCH_SPI_BROKER_FRAME_SIZE];
+    size_t tx_len;  // Length of the frame in tx_buf, kept until it has been clocked out
     size_t rx_bytes;
 };
 
@@ -129,16 +130,22 @@ static void prepare_tx(struct spi_broker_ctx *ctx, struct spi_buf *buf)
 {
     buf->buf = ctx->tx_buf;
 
-    size_t len =
-        pouch_serial_broker_frame_get(ctx->broker, &ctx->tx_buf[1], sizeof(ctx->tx_buf) - 1);
-    if (len == 0)
+    // A frame left over from a failed transfer is sent again before fetching a new one
+    if (ctx->tx_len == 0)
     {
-        buf->len = 0;
-        return;
+        size_t len =
+            pouch_serial_broker_frame_get(ctx->broker, &ctx->tx_buf[1], sizeof(ctx->tx_buf) - 1);
+        if (len == 0)
+        {
+            buf->len = 0;
+            return;
+        }
+
+        ctx->tx_buf[0] = (uint8_t) len;
+        ctx->tx_len = 1 + len;  // include length byte
     }
 
-    ctx->tx_buf[0] = (uint8_t) len;
-    buf->len = 1 + len;   // include header byte
+    buf->len = ctx->tx_len;
     ctx->pending = true;  // always check for a response from the slave after sending
 }
 
@@ -176,8 +183,11 @@ static void trx(struct spi_broker_ctx *ctx)
     if (err)
     {
         LOG_ERR("SPI transceive failed: %d", err);
+        ctx->pending = true;  // retry the frame in tx_buf
         return;
     }
+
+    ctx->tx_len = 0;
 
     // in master mode, spi_transceive_dt returns 0, so we have to keep track of the number of bytes
     // received ourselves
