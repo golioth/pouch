@@ -2,6 +2,7 @@ common:
   build_only: true
   platform_allow:
     - nrf52840dk/nrf52840
+    - nrf54lm20dk/nrf54lm20a/cpuapp
 tests:
   pouch.encryption.chacha:
     extra_configs:
