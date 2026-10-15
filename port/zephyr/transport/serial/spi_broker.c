@@ -275,7 +275,7 @@ static void exchange_work_handler(struct k_work *work)
         .poll_interval_ms = DT_INST_PROP_OR(inst, poll_interval_ms, 0),                        \
     };
 
-#define SPI_BROKER_DEFINE(inst) ON_SPI_BUS(inst, DEFINE_INSTANCE(inst))
+#define SPI_BROKER_DEFINE(inst) ON_SPI_BUS(inst, DEFINE_INSTANCE(inst));
 
 DT_INST_FOREACH_STATUS_OKAY(SPI_BROKER_DEFINE)
 
@@ -328,7 +328,7 @@ static int instance_init(struct spi_broker_ctx *ctx)
     return 0;
 }
 
-#define SPI_BROKER_INIT_INSTANCE(inst) ON_SPI_BUS(inst, instance_init(&spi_broker_ctx_##inst))
+#define SPI_BROKER_INIT_INSTANCE(inst) ON_SPI_BUS(inst, instance_init(&spi_broker_ctx_##inst));
 
 static int spi_broker_init(void)
 {
