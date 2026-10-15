@@ -12,8 +12,9 @@ west build -b <board>
 ```
 
 The `<board>` should be the Zephyr board ID of your board. The example is
-primarily developed and tested on the `nrf52840dk/nrf52840` board, but any Zephyr
-board with BLE, PSA, MbedTLS and LittleFS support should work.
+primarily developed and tested on the `nrf52840dk/nrf52840` and
+`nrf54lm20dk/nrf54lm20a/cpuapp` boards, but any Zephyr board with BLE, PSA,
+MbedTLS and LittleFS support should work.
 
 ## Authentication
 
