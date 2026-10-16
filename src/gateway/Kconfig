@@ -14,8 +14,9 @@ config POUCH_GATEWAY_NUM_BLOCKS
     help
       Maximum number of in-flight downlink blocks queued between the
       cloud transport (producer) and the broker side (consumer).
-      Each entry is a pointer; the backing buffers come from the
-      pouch_buf pool sized by CONFIG_POUCH_BLOCK_COUNT.
+      Each entry holds a block pointer and whether that block ends
+      the stream; the backing buffers come from the pouch_buf pool
+      sized by CONFIG_POUCH_BLOCK_COUNT.
 
 config POUCH_GATEWAY_DEVICE_CERT_MAX_LEN
     int "Device certificate maximum length"

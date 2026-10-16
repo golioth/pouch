@@ -252,6 +252,12 @@ void pouch_serial_ch_close(struct pouch_serial_channel *ch, bool success)
         ch->endpoint->end(&ch->bearer, success);
     }
 
+    /* A clean sender close drops endpoint readiness; a failed one needs the flag for ERR|LAST. */
+    if (success && ch->endpoint->send != NULL)
+    {
+        pouch_atomic_clear_bit(&ch->flags, CH_FLAG_PENDING);
+    }
+
     if (ch->closed_cb)
     {
         ch->closed_cb(ch, success);

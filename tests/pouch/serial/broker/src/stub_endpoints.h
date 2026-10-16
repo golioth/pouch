@@ -29,6 +29,12 @@ struct stub_sender
     /** If true, send() returns POUCH_ERROR. */
     bool send_err;
 
+    /** If true, the DOWNLINK stub signals readiness from send(). */
+    bool ready_in_send;
+
+    /** If true, the DOWNLINK stub signals readiness from end(). */
+    bool ready_in_end;
+
     /** Bearer pointer captured during start(). */
     struct pouch_bearer *bearer;
 };

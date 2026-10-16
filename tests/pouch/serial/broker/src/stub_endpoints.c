@@ -29,6 +29,8 @@ void stub_sender_reset(struct stub_sender *s)
     s->end_fail_count = 0;
     s->start_err = 0;
     s->send_err = false;
+    s->ready_in_send = false;
+    s->ready_in_end = false;
     s->bearer = NULL;
 }
 
@@ -220,13 +222,19 @@ static int b_downlink_start(struct pouch_bearer *bearer)
 
 static enum pouch_result b_downlink_send(struct pouch_bearer *bearer, void *dst, size_t *dst_len)
 {
-    (void) bearer;
+    if (broker_stubs.downlink.ready_in_send)
+    {
+        pouch_bearer_ready(bearer);
+    }
     return sender_fill(&broker_stubs.downlink, dst, dst_len);
 }
 
 static void b_downlink_end(struct pouch_bearer *bearer, bool success)
 {
-    (void) bearer;
+    if (broker_stubs.downlink.ready_in_end)
+    {
+        pouch_bearer_ready(bearer);
+    }
     if (success)
     {
         broker_stubs.downlink.end_success_count++;

@@ -36,7 +36,11 @@ static void bearer_ready(struct pouch_bearer *bearer)
     struct pouch_serial_channel *ch = channel_from_bearer(bearer);
     struct pouch_serial *transport = transport_from_channel(ch);
 
-    pouch_serial_ch_ready(ch);
+    if (pouch_serial_ch_is_open(ch))
+    {
+        pouch_serial_ch_ready(ch);
+    }
+
     if (transport->ready)
     {
         transport->ready(transport);

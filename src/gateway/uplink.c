@@ -290,6 +290,11 @@ struct pouch_gateway_uplink *pouch_gateway_uplink_open(
     uplink->end_cb = end_cb;
     uplink->end_cb_arg = end_cb_arg;
 
+    if (downlink != NULL)
+    {
+        pouch_gateway_downlink_acquire(downlink);
+    }
+
     return uplink;
 }
 

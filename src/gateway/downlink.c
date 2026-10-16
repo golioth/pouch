@@ -22,8 +22,15 @@ enum
     DOWNLINK_FLAG_COMPLETE,
     DOWNLINK_FLAG_TRANSPORT_ABORTED,
     DOWNLINK_FLAG_TRANSPORT_WAITING,
-    DOWNLINK_FLAG_COAP_ERROR,
+    DOWNLINK_FLAG_ENDED,
+    DOWNLINK_FLAG_TRUNCATED,
     DOWNLINK_FLAG_COUNT,
+};
+
+struct downlink_block
+{
+    struct pouch_buf *block;
+    bool is_last;
 };
 
 struct pouch_gateway_downlink_context
@@ -32,29 +39,50 @@ struct pouch_gateway_downlink_context
     void *cb_arg;
 
     pouch_msgq_t block_queue;
-    uint8_t block_queue_buf[CONFIG_POUCH_GATEWAY_NUM_BLOCKS * sizeof(struct pouch_buf *)];
+    uint8_t block_queue_buf[CONFIG_POUCH_GATEWAY_NUM_BLOCKS * sizeof(struct downlink_block)];
 
     /* Currently being drained.  Owned by the consumer thread. */
-    struct pouch_buf *current_block;
-    /* Offset into current_block for the next byte to read. */
+    struct downlink_block current;
+    /* Offset into current.block for the next byte to read. */
     size_t offset;
-    /* The block that was flagged as last by the producer.  Compared
-     * against current_block on consumption to determine end-of-stream.
-     * Single-writer (producer), single-reader (consumer); the
-     * happens-before across the msgq put/get makes this safe.
-     */
-    struct pouch_buf *last_block;
+
+    /* Producer-owned: a chunk was queued. */
+    bool received;
+    /* Producer-owned: block_cb() refused data. */
+    bool dropped;
 
     POUCH_ATOMIC_DEFINE(flags, DOWNLINK_FLAG_COUNT);
+    pouch_atomic_t refs;
 };
 
-static void flush_block_queue(struct pouch_gateway_downlink_context *downlink)
+static void release(struct pouch_gateway_downlink_context *downlink)
 {
-    struct pouch_buf *block;
-
-    while (pouch_msgq_get(&downlink->block_queue, &block, POUCH_NO_WAIT) == 0)
+    if (pouch_atomic_dec(&downlink->refs) != 1)
     {
-        blockbuf_free(block);
+        return;
+    }
+
+    struct downlink_block item;
+
+    while (pouch_msgq_get(&downlink->block_queue, &item, POUCH_NO_WAIT) == 0)
+    {
+        blockbuf_free(item.block);
+    }
+
+    if (NULL != downlink->current.block)
+    {
+        blockbuf_free(downlink->current.block);
+    }
+
+    free(downlink);
+}
+
+static void notify_waiting(struct pouch_gateway_downlink_context *downlink)
+{
+    if (!pouch_atomic_test_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED)
+        && pouch_atomic_test_and_clear_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING))
+    {
+        downlink->data_available_cb(downlink->cb_arg);
     }
 }
 
@@ -62,20 +90,26 @@ int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_las
 {
     struct pouch_gateway_downlink_context *downlink = arg;
 
-    if (pouch_atomic_test_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED))
-    {
-        return -ECANCELED;
-    }
-
     pouch_timepoint_t deadline =
         pouch_timepoint_get(POUCH_SECONDS(CONFIG_POUCH_GATEWAY_DOWNLINK_BLOCK_TIMEOUT));
 
     /* A block-pool element holds at most MAX_PLAINTEXT_BLOCK_SIZE payload
      * bytes and buf_write() is unchecked, so split the payload across as
-     * many blocks as needed to stay within that capacity.
+     * many blocks as needed to stay within that capacity. An empty payload
+     * queues nothing; end_cb() ends the stream.
      */
-    do
+    while (len)
     {
+        if (pouch_atomic_test_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED))
+        {
+            return -ECANCELED;
+        }
+
+        if (downlink->dropped)
+        {
+            return -ENOMEM;
+        }
+
         size_t take = MIN(len, (size_t) MAX_PLAINTEXT_BLOCK_SIZE);
         bool last_chunk = is_last && (take == len);
 
@@ -83,43 +117,28 @@ int pouch_gateway_downlink_block_cb(const uint8_t *data, size_t len, bool is_las
         if (block == NULL)
         {
             POUCH_LOG_ERR("Failed to allocate block");
+            downlink->dropped = true;
             return -ENOMEM;
         }
 
         buf_write(block, data, take);
 
-        /* Record the last block's pointer BEFORE submitting so the
-         * consumer sees it as soon as it dequeues this buffer.
-         */
-        if (last_chunk)
-        {
-            downlink->last_block = block;
-        }
-
-        int err = pouch_msgq_put(&downlink->block_queue, &block, pouch_timepoint_timeout(deadline));
+        struct downlink_block item = {.block = block, .is_last = last_chunk};
+        int err = pouch_msgq_put(&downlink->block_queue, &item, pouch_timepoint_timeout(deadline));
         if (err)
         {
             POUCH_LOG_ERR("Failed to enqueue block: %d", err);
-            if (last_chunk)
-            {
-                downlink->last_block = NULL;
-            }
             blockbuf_free(block);
-            // TODO: We're potentially leaving a partial payload in the pouch here,
-            // without notifying the receiver about the error.
-            // Tracked in golioth/firmware-issue-tracker#1061
+            downlink->dropped = true;
             return -ENOMEM;
         }
 
-        if (NULL == downlink->current_block
-            && pouch_atomic_test_and_clear_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING))
-        {
-            downlink->data_available_cb(downlink->cb_arg);
-        }
+        downlink->received = true;
+        notify_waiting(downlink);
 
         data += take;
         len -= take;
-    } while (len);
+    }
 
     return 0;
 }
@@ -131,31 +150,14 @@ void pouch_gateway_downlink_end_cb(int status, void *arg)
     if (0 != status)
     {
         POUCH_LOG_ERR("Downlink ending due to error %d", status);
-
-        if (pouch_atomic_test_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED))
-        {
-            pouch_gateway_downlink_close(downlink);
-        }
-        else
-        {
-            pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_COAP_ERROR);
-
-            if (NULL == downlink->current_block
-                && pouch_atomic_test_and_clear_bit(downlink->flags,
-                                                   DOWNLINK_FLAG_TRANSPORT_WAITING))
-            {
-                downlink->data_available_cb(downlink->cb_arg);
-            }
-        }
-        return;
     }
 
-    if (downlink->last_block == NULL)
-    {
-        // We never received the last block (or likely any data at all).
-        // Pass an empty dummy last block down to let the normal end-of-downlink mechanism run:
-        pouch_gateway_downlink_block_cb(NULL, 0, true, downlink);
-    }
+    bool truncated = downlink->dropped || (0 != status && downlink->received);
+
+    pouch_atomic_set_bit(downlink->flags,
+                         truncated ? DOWNLINK_FLAG_TRUNCATED : DOWNLINK_FLAG_ENDED);
+    notify_waiting(downlink);
+    release(downlink);
 }
 
 struct pouch_gateway_downlink_context *pouch_gateway_downlink_open(
@@ -173,18 +175,21 @@ struct pouch_gateway_downlink_context *pouch_gateway_downlink_open(
 
     downlink->data_available_cb = data_available_cb;
     downlink->cb_arg = cb_arg;
-    downlink->current_block = NULL;
-    downlink->last_block = NULL;
+    downlink->current.block = NULL;
     downlink->offset = 0;
+    downlink->received = false;
+    downlink->dropped = false;
     pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_COMPLETE);
     pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED);
-    pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_COAP_ERROR);
+    pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_ENDED);
+    pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_TRUNCATED);
     pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING);
+    pouch_atomic_set(&downlink->refs, 1);
 
     pouch_msgq_init(&downlink->block_queue,
                     downlink->block_queue_buf,
                     sizeof(downlink->block_queue_buf),
-                    sizeof(struct pouch_buf *));
+                    sizeof(struct downlink_block));
 
     return downlink;
 }
@@ -206,28 +211,40 @@ int pouch_gateway_downlink_get_data(struct pouch_gateway_downlink_context *downl
 
     while (*dst_len)
     {
-        if (NULL == downlink->current_block)
+        if (NULL == downlink->current.block)
         {
-            if (pouch_msgq_get(&downlink->block_queue, &downlink->current_block, POUCH_NO_WAIT)
-                != 0)
+            if (pouch_msgq_get(&downlink->block_queue, &downlink->current, POUCH_NO_WAIT) != 0)
             {
+                pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING);
+                long flags = pouch_atomic_get_value(downlink->flags);
+
+                if (pouch_msgq_get(&downlink->block_queue, &downlink->current, POUCH_NO_WAIT) == 0)
+                {
+                    pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING);
+                    continue;
+                }
+
+                if (flags & BIT(DOWNLINK_FLAG_TRUNCATED))
+                {
+                    pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_COMPLETE);
+                    pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING);
+                    *dst_len = 0;
+                    return -EIO;
+                }
+
                 *dst_len = total_bytes_copied;
-                if (pouch_atomic_test_bit(downlink->flags, DOWNLINK_FLAG_COAP_ERROR))
+                if (flags & BIT(DOWNLINK_FLAG_ENDED))
                 {
                     *is_last = true;
                     pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_COMPLETE);
-                    return 0;
-                }
-                if (0 == total_bytes_copied)
-                {
-                    pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING);
+                    pouch_atomic_clear_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_WAITING);
                 }
                 return 0;
             }
         }
 
         struct pouch_bufview v;
-        pouch_bufview_init(&v, downlink->current_block);
+        pouch_bufview_init(&v, downlink->current.block);
         v.offset = downlink->offset;
 
         size_t bytes_to_copy = MIN(*dst_len, pouch_bufview_available(&v));
@@ -238,18 +255,13 @@ int pouch_gateway_downlink_get_data(struct pouch_gateway_downlink_context *downl
         dst = (void *) ((intptr_t) dst + bytes_to_copy);
         total_bytes_copied += bytes_to_copy;
 
-        if (buf_size_get(downlink->current_block) == downlink->offset)
+        if (buf_size_get(downlink->current.block) == downlink->offset)
         {
-            bool drained_last = (downlink->current_block == downlink->last_block);
+            bool drained_last = downlink->current.is_last;
 
-            blockbuf_free(downlink->current_block);
+            blockbuf_free(downlink->current.block);
+            downlink->current.block = NULL;
             downlink->offset = 0;
-
-            if (pouch_msgq_get(&downlink->block_queue, &downlink->current_block, POUCH_NO_WAIT)
-                != 0)
-            {
-                downlink->current_block = NULL;
-            }
 
             if (drained_last)
             {
@@ -271,24 +283,16 @@ bool pouch_gateway_downlink_is_complete(const struct pouch_gateway_downlink_cont
 
 void pouch_gateway_downlink_close(struct pouch_gateway_downlink_context *downlink)
 {
-    flush_block_queue(downlink);
-
-    if (NULL != downlink->current_block)
+    if (!pouch_gateway_downlink_is_complete(downlink))
     {
-        blockbuf_free(downlink->current_block);
+        POUCH_LOG_INF("Aborting downlink");
     }
-
-    free(downlink);
-}
-
-void pouch_gateway_downlink_abort(struct pouch_gateway_downlink_context *downlink)
-{
-    POUCH_LOG_INF("Aborting downlink");
 
     pouch_atomic_set_bit(downlink->flags, DOWNLINK_FLAG_TRANSPORT_ABORTED);
+    release(downlink);
+}
 
-    if (pouch_gateway_downlink_is_complete(downlink))
-    {
-        pouch_gateway_downlink_close(downlink);
-    }
+void pouch_gateway_downlink_acquire(struct pouch_gateway_downlink_context *downlink)
+{
+    pouch_atomic_inc(&downlink->refs);
 }
