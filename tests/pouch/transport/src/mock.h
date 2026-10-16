@@ -42,6 +42,8 @@ static struct
     atomic_t flags;
     int open_retval;
     bool end_success;
+    /** Next byte the endpoint sends, so each fragment's data is different. */
+    uint8_t next_byte;
 } test_endpoint;
 
 static int start(struct pouch_bearer *bearer)
@@ -76,7 +78,7 @@ static enum pouch_result send(struct pouch_bearer *bearer, void *buf, size_t *le
     uint8_t *b = buf;
     for (int i = 0; i < *len; i++)
     {
-        b[i] = i;
+        b[i] = test_endpoint.next_byte++;
     }
 
     return atomic_test_bit(&test_endpoint.flags, ENDPOINT_CLOSED) ? POUCH_NO_MORE_DATA
