@@ -23,6 +23,7 @@
 #include <zephyr/ztest.h>
 
 #include <pouch/transport/serial/broker.h>
+#include <pouch/transport/serial/common.h>
 #include <pouch/transport/serial/device.h>
 
 #define MAX_FRAME_SIZE 64
@@ -48,11 +49,6 @@ static const struct pouch_serial_broker_adapter adapter = {
     .ready = broker_ready,
     .end = broker_end,
 };
-
-static void device_ready(void)
-{
-    pouch_serial_broker_notify(test_broker);
-}
 
 /*
  * Pump frames between broker and device until both sides are idle.
@@ -137,8 +133,7 @@ static void run_exchange(void)
     broker_done = false;
     broker_success = false;
 
-    int err = pouch_serial_broker_start(test_broker);
-    zassert_ok(err, "broker_start failed: %d", err);
+    pouch_serial_broker_start(test_broker);
 
     pump(MAX_PUMP_ITER);
 
@@ -151,7 +146,7 @@ static void *suite_setup(void)
     test_broker = pouch_serial_broker_create(&adapter);
     zassert_not_null(test_broker, "broker_create returned NULL");
 
-    pouch_serial_device_init(device_ready);
+    pouch_serial_device_init(NULL);
 
     return NULL;
 }
@@ -165,7 +160,8 @@ static void before(void *f)
     zassert_not_null(test_broker, "broker_create returned NULL");
 
     stubs_reset();
-    pouch_serial_device_init(device_ready);
+    pouch_serial_device_init(NULL);
+    pouch_serial_device_sync();  // unsuspend device
 
     broker_done = false;
     broker_success = false;
@@ -405,8 +401,7 @@ ZTEST(serial_exchange, test_recv_error)
     load_default_payloads();
     broker_stubs.uplink.recv_err = -EIO;
 
-    int err = pouch_serial_broker_start(test_broker);
-    zassert_ok(err, "broker_start failed: %d", err);
+    pouch_serial_broker_start(test_broker);
 
     pump_until_done(MAX_PUMP_ITER);
 
@@ -429,8 +424,7 @@ ZTEST(serial_exchange, test_send_error)
     load_default_payloads();
     broker_stubs.downlink.send_err_after = 0;
 
-    int err = pouch_serial_broker_start(test_broker);
-    zassert_ok(err, "broker_start failed: %d", err);
+    pouch_serial_broker_start(test_broker);
 
     pump_until_done(MAX_PUMP_ITER);
 
@@ -461,8 +455,7 @@ ZTEST(serial_exchange, test_remote_send_error)
     stub_sender_set_data(&device_stubs.uplink, uplink_large, sizeof(uplink_large));
     device_stubs.uplink.send_err_after = 1;
 
-    int err = pouch_serial_broker_start(test_broker);
-    zassert_ok(err, "broker_start failed: %d", err);
+    pouch_serial_broker_start(test_broker);
 
     pump_until_done(MAX_PUMP_ITER);
 
@@ -477,4 +470,267 @@ ZTEST(serial_exchange, test_remote_send_error)
     zassert_equal(broker_stubs.uplink.start_count, 1);
     zassert_equal(broker_stubs.uplink.end_fail_count, 1);
     zassert_equal(broker_stubs.uplink.end_success_count, 0);
+}
+
+/* ==========================================================================
+ * Lost and broken frames
+ *
+ * A fault is injected into one frame on the way between the broker and the
+ * device. When both sides go quiet while the broker is waiting for a response,
+ * the pump calls pouch_serial_broker_timeout(), like the adapter's timer would.
+ * ========================================================================== */
+
+/*
+ * Faults are limited to the ones the receiver can detect. There's no checksum, so a frame that's
+ * still well formed, but has the wrong payload, is delivered as-is.
+ */
+enum fault_type
+{
+    FAULT_DROP,
+    /* Append garbage to an ACK, like a frame running into the next one on the wire */
+    FAULT_TRAILING_GARBAGE,
+    /* Break the header, so the frame is no longer valid */
+    FAULT_BAD_HEADER,
+};
+
+static struct
+{
+    bool from_broker;
+    /* Only frames matching the filter are counted */
+    bool (*filter)(const uint8_t *frame, size_t len);
+    int index;
+    enum fault_type type;
+    int count;
+    bool injected;
+} fault;
+
+static int timeouts;
+
+static bool is_data_frame(const uint8_t *frame, size_t len)
+{
+    return (frame[0] & 0x80) != 0;
+}
+
+static bool is_downlink_ack(const uint8_t *frame, size_t len)
+{
+    return frame[0] == POUCH_SERIAL_CH_DOWNLINK;
+}
+
+/* Apply the fault to a frame. Returns false if the frame is lost. */
+static bool apply_fault(bool from_broker, uint8_t *frame, size_t *len, size_t bufsize)
+{
+    if (fault.injected || fault.from_broker != from_broker || !fault.filter(frame, *len)
+        || fault.count++ != fault.index)
+    {
+        return true;
+    }
+
+    fault.injected = true;
+    switch (fault.type)
+    {
+        case FAULT_DROP:
+            return false;
+        case FAULT_TRAILING_GARBAGE:
+            zassert_true(*len + 2 <= bufsize);
+            frame[(*len)++] = 0x00;
+            frame[(*len)++] = 0x00;
+            return true;
+        case FAULT_BAD_HEADER:
+            /* An ACK with the reserved FIRST bit set */
+            frame[0] = 0x20;
+            return true;
+    }
+
+    return true;
+}
+
+static void pump_with_faults(int max_iter)
+{
+    uint8_t buf[MAX_FRAME_SIZE + 2];
+    int iter;
+
+    for (iter = 0; iter < max_iter && !broker_done; iter++)
+    {
+        size_t len = pouch_serial_broker_frame_get(test_broker, buf, MAX_FRAME_SIZE);
+        if (len > 0)
+        {
+            if (apply_fault(true, buf, &len, sizeof(buf)))
+            {
+                (void) pouch_serial_device_recv(buf, len);
+            }
+            continue;
+        }
+
+        len = pouch_serial_device_frame_get(buf, MAX_FRAME_SIZE);
+        if (len > 0)
+        {
+            if (apply_fault(false, buf, &len, sizeof(buf)))
+            {
+                (void) pouch_serial_broker_recv(test_broker, buf, len);
+            }
+            continue;
+        }
+
+        if (!pouch_serial_broker_is_waiting(test_broker))
+        {
+            break;
+        }
+
+        timeouts++;
+        pouch_serial_broker_timeout(test_broker);
+    }
+
+    zassert_true(iter < max_iter, "exchange did not converge within %d iterations", max_iter);
+}
+
+static void reset_exchange(void)
+{
+    before(NULL);
+    memset(&fault, 0, sizeof(fault));
+    timeouts = 0;
+}
+
+static void load_large_payloads(uint8_t bufs[5][LARGE_PAYLOAD_SIZE])
+{
+    for (int i = 0; i < 5; i++)
+    {
+        fill_pattern(bufs[i], LARGE_PAYLOAD_SIZE, 0x10 * (i + 1));
+    }
+
+    load_payloads(bufs[0],
+                  LARGE_PAYLOAD_SIZE,
+                  bufs[1],
+                  LARGE_PAYLOAD_SIZE,
+                  bufs[2],
+                  LARGE_PAYLOAD_SIZE,
+                  bufs[3],
+                  LARGE_PAYLOAD_SIZE,
+                  bufs[4],
+                  LARGE_PAYLOAD_SIZE);
+}
+
+static void expect_large_payloads(uint8_t bufs[5][LARGE_PAYLOAD_SIZE])
+{
+    zassert_equal(broker_stubs.info.rx_len, LARGE_PAYLOAD_SIZE);
+    zassert_mem_equal(broker_stubs.info.rx_buf, bufs[0], LARGE_PAYLOAD_SIZE);
+    zassert_equal(device_stubs.server_cert.rx_len, LARGE_PAYLOAD_SIZE);
+    zassert_mem_equal(device_stubs.server_cert.rx_buf, bufs[1], LARGE_PAYLOAD_SIZE);
+    zassert_equal(broker_stubs.device_cert.rx_len, LARGE_PAYLOAD_SIZE);
+    zassert_mem_equal(broker_stubs.device_cert.rx_buf, bufs[2], LARGE_PAYLOAD_SIZE);
+    zassert_equal(device_stubs.downlink.rx_len, LARGE_PAYLOAD_SIZE);
+    zassert_mem_equal(device_stubs.downlink.rx_buf, bufs[3], LARGE_PAYLOAD_SIZE);
+    zassert_equal(broker_stubs.uplink.rx_len, LARGE_PAYLOAD_SIZE);
+    zassert_mem_equal(broker_stubs.uplink.rx_buf, bufs[4], LARGE_PAYLOAD_SIZE);
+}
+
+/*
+ * Run an exchange with a fault on every data frame in one direction in turn, and check that every
+ * transfer completes intact.
+ */
+static void sweep_data_frames(bool from_broker, enum fault_type type)
+{
+    static uint8_t bufs[5][LARGE_PAYLOAD_SIZE];
+
+    for (int i = 0;; i++)
+    {
+        reset_exchange();
+        fault.from_broker = from_broker;
+        fault.filter = is_data_frame;
+        fault.index = i;
+        fault.type = type;
+
+        load_large_payloads(bufs);
+        pouch_serial_broker_start(test_broker);
+        pump_with_faults(MAX_PUMP_ITER);
+
+        if (!fault.injected)
+        {
+            // Every data frame has been tried
+            zassert_true(i > 4, "expected a multi-fragment exchange");
+            break;
+        }
+
+        zassert_true(broker_done, "exchange did not complete with a fault on data frame %d", i);
+        zassert_true(broker_success, "exchange failed with a fault on data frame %d", i);
+        zassert_true(timeouts > 0 || !from_broker, "expected a timeout on frame %d", i);
+        expect_large_payloads(bufs);
+    }
+}
+
+ZTEST(serial_exchange, test_lost_broker_data_frames)
+{
+    sweep_data_frames(true, FAULT_DROP);
+}
+
+ZTEST(serial_exchange, test_lost_device_data_frames)
+{
+    sweep_data_frames(false, FAULT_DROP);
+}
+
+ZTEST(serial_exchange, test_broken_device_data_frames)
+{
+    /* The broker notices the broken frame, and asks for it again right away */
+    sweep_data_frames(false, FAULT_BAD_HEADER);
+}
+
+ZTEST(serial_exchange, test_broken_broker_data_frames)
+{
+    /* The device ignores the broken frame, and the broker sends it again after a timeout */
+    sweep_data_frames(true, FAULT_BAD_HEADER);
+}
+
+/* Load a downlink that takes two fragments, so the device's second DOWNLINK ACK is for the last */
+static void load_two_fragment_downlink(uint8_t *downlink, size_t len)
+{
+    zassert_true(len > MAX_FRAME_SIZE && len < 2 * (MAX_FRAME_SIZE - 1));
+    fill_pattern(downlink, len, 0x40);
+    load_default_payloads();
+    stub_sender_set_data(&broker_stubs.downlink, downlink, len);
+    fault.filter = is_downlink_ack;
+    fault.index = 1;
+}
+
+/*
+ * A single-fragment transfer sent again after its ACK was lost is delivered twice: it starts with
+ * FIRST, so without sequence numbers, the device can't tell it from the next transfer.
+ */
+ZTEST(serial_exchange, test_lost_ack_to_last_fragment)
+{
+    uint8_t downlink[100];
+    reset_exchange();
+    load_two_fragment_downlink(downlink, sizeof(downlink));
+    fault.type = FAULT_DROP;
+
+    pouch_serial_broker_start(test_broker);
+    pump_with_faults(MAX_PUMP_ITER);
+
+    zassert_true(fault.injected);
+    zassert_true(broker_done);
+    zassert_true(broker_success);
+    zassert_true(timeouts > 0);
+
+    /* The broker sent the last fragment again, and the device ACKed it without delivering it twice
+     */
+    zassert_equal(device_stubs.downlink.start_count, 1);
+    zassert_equal(device_stubs.downlink.rx_len, sizeof(downlink));
+    zassert_mem_equal(device_stubs.downlink.rx_buf, downlink, sizeof(downlink));
+}
+
+ZTEST(serial_exchange, test_broken_ack_to_last_fragment)
+{
+    /* Like the ACK that got split up on the SPI bus */
+    uint8_t downlink[100];
+    reset_exchange();
+    load_two_fragment_downlink(downlink, sizeof(downlink));
+    fault.type = FAULT_TRAILING_GARBAGE;
+
+    pouch_serial_broker_start(test_broker);
+    pump_with_faults(MAX_PUMP_ITER);
+
+    zassert_true(fault.injected);
+    zassert_true(broker_done);
+    zassert_true(broker_success);
+    zassert_equal(device_stubs.downlink.start_count, 1);
+    zassert_equal(device_stubs.downlink.rx_len, sizeof(downlink));
+    zassert_mem_equal(device_stubs.downlink.rx_buf, downlink, sizeof(downlink));
 }

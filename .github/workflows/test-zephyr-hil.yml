@@ -88,6 +88,7 @@ jobs:
             --overflow-as-errors                \
             --platform ${{ inputs.west_board }} \
             -T pouch/examples/zephyr/           \
+            --filter runnable                   \
             --prep-artifacts-for-testing        \
             --keep-artifacts zephyr.hex
 
@@ -125,6 +126,7 @@ jobs:
             --overflow-as-errors                \
             --platform ${{ inputs.west_board }} \
             -T pouch/examples/zephyr/           \
+            --filter runnable                   \
             --build-only
 
           # Create archive of update files, preserving path

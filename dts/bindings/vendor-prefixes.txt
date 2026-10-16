@@ -1,0 +1,2 @@
+# Custom vendor prefixes introduced in this repository
+golioth	Golioth Inc.
