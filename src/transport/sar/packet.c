@@ -37,11 +37,6 @@ int pouch_sar_tx_pkt_decode(const void *buf, size_t buf_len, struct pouch_sar_tx
             return -EINVAL;
         }
 
-        if (buf_len != POUCH_SAR_TX_PKT_HEADER_LEN)
-        {
-            return -EINVAL;
-        }
-
         pkt->seq = 0;
         pkt->len = 0;
         pkt->data = NULL;
