@@ -25,6 +25,7 @@ enum flags
     FLAG_SYNC,
     FLAG_UPLINK_DONE,
     FLAG_DOWNLINK_DONE,
+    FLAG_COUNT,
 };
 
 struct pouch_serial_broker
@@ -32,7 +33,7 @@ struct pouch_serial_broker
     struct pouch_serial serial;
     const struct pouch_serial_broker_adapter *adapter;
     struct pouch_gateway_node_info node;
-    pouch_atomic_t flags;
+    POUCH_ATOMIC_DEFINE(flags, FLAG_COUNT);
 };
 
 static void signal_adapter_ready(struct pouch_serial_broker *broker)
@@ -50,7 +51,7 @@ static void channel_ready(struct pouch_serial_broker *broker, enum pouch_serial_
 
 static void next(struct pouch_serial_broker *broker)
 {
-    if (!pouch_atomic_test_and_set_bit(&broker->flags, FLAG_INFO_READ))
+    if (!pouch_atomic_test_and_set_bit(broker->flags, FLAG_INFO_READ))
     {
         channel_ready(broker, POUCH_SERIAL_CH_INFO);
         signal_adapter_ready(broker);
@@ -71,7 +72,7 @@ static void next(struct pouch_serial_broker *broker)
         return;
     }
 
-    if (!pouch_atomic_test_and_set_bit(&broker->flags, FLAG_SYNC))
+    if (!pouch_atomic_test_and_set_bit(broker->flags, FLAG_SYNC))
     {
         channel_ready(broker, POUCH_SERIAL_CH_UPLINK);
         channel_ready(broker, POUCH_SERIAL_CH_DOWNLINK);
@@ -79,8 +80,8 @@ static void next(struct pouch_serial_broker *broker)
         return;
     }
 
-    if (pouch_atomic_test_bit(&broker->flags, FLAG_DOWNLINK_DONE)
-        && pouch_atomic_test_bit(&broker->flags, FLAG_UPLINK_DONE))
+    if (pouch_atomic_test_bit(broker->flags, FLAG_DOWNLINK_DONE)
+        && pouch_atomic_test_bit(broker->flags, FLAG_UPLINK_DONE))
     {
         if (broker->adapter->end)
         {
@@ -100,7 +101,7 @@ static void channel_closed(struct pouch_serial *s, enum pouch_serial_channel_id 
     struct pouch_serial_broker *broker = CONTAINER_OF(s, struct pouch_serial_broker, serial);
     if (!success)
     {
-        pouch_atomic_clear(&broker->flags);
+        pouch_atomic_clear(broker->flags);
         if (broker->adapter->end)
         {
             broker->adapter->end(broker, false);
@@ -112,11 +113,11 @@ static void channel_closed(struct pouch_serial *s, enum pouch_serial_channel_id 
 
     if (ch == POUCH_SERIAL_CH_UPLINK)
     {
-        pouch_atomic_set_bit(&broker->flags, FLAG_UPLINK_DONE);
+        pouch_atomic_set_bit(broker->flags, FLAG_UPLINK_DONE);
     }
     else if (ch == POUCH_SERIAL_CH_DOWNLINK)
     {
-        pouch_atomic_set_bit(&broker->flags, FLAG_DOWNLINK_DONE);
+        pouch_atomic_set_bit(broker->flags, FLAG_DOWNLINK_DONE);
     }
 
     next(broker);
@@ -163,10 +164,10 @@ int pouch_serial_broker_start(struct pouch_serial_broker *broker)
     }
 
     POUCH_LOG_DBG("Starting broker %p", broker);
-    pouch_atomic_clear_bit(&broker->flags, FLAG_INFO_READ);
-    pouch_atomic_clear_bit(&broker->flags, FLAG_SYNC);
-    pouch_atomic_clear_bit(&broker->flags, FLAG_DOWNLINK_DONE);
-    pouch_atomic_clear_bit(&broker->flags, FLAG_UPLINK_DONE);
+    pouch_atomic_clear_bit(broker->flags, FLAG_INFO_READ);
+    pouch_atomic_clear_bit(broker->flags, FLAG_SYNC);
+    pouch_atomic_clear_bit(broker->flags, FLAG_DOWNLINK_DONE);
+    pouch_atomic_clear_bit(broker->flags, FLAG_UPLINK_DONE);
 
     next(broker);
     return 0;
