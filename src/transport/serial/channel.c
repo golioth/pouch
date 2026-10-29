@@ -13,14 +13,6 @@
 
 POUCH_LOG_REGISTER(serial_channel, CONFIG_POUCH_SERIAL_LOG_LEVEL);
 
-enum ch_flag
-{
-    CH_FLAG_OPEN,
-    CH_FLAG_FIRST_FRAGMENT,
-    CH_FLAG_PENDING,
-    CH_FLAG_ERROR,
-};
-
 static enum pouch_serial_channel_id channel_id(const struct pouch_serial_channel *ch)
 {
     return ch->id;
@@ -44,16 +36,16 @@ static int handle_ack(struct pouch_serial_channel *ch, bool err)
     }
 
     /* First prompt: open the transfer. */
-    if (!pouch_atomic_test_and_set_bit(&ch->flags, CH_FLAG_OPEN))
+    if (!pouch_atomic_test_and_set_bit(ch->flags, CH_FLAG_OPEN))
     {
         int ret = ch->endpoint->start(&ch->bearer);
         if (ret)
         {
-            pouch_atomic_set_bit(&ch->flags, CH_FLAG_ERROR);
+            pouch_atomic_set_bit(ch->flags, CH_FLAG_ERROR);
             pouch_serial_ch_close(ch, false);
         }
 
-        pouch_atomic_set_bit(&ch->flags, CH_FLAG_FIRST_FRAGMENT);
+        pouch_atomic_set_bit(ch->flags, CH_FLAG_FIRST_FRAGMENT);
         pouch_serial_ch_ready(ch);
     }
 
@@ -75,7 +67,7 @@ static int handle_data(struct pouch_serial_channel *ch,
         return 0;
     }
 
-    if (!pouch_atomic_test_and_set_bit(&ch->flags, CH_FLAG_OPEN))
+    if (!pouch_atomic_test_and_set_bit(ch->flags, CH_FLAG_OPEN))
     {
         if (!hdr->first)
         {
@@ -86,13 +78,13 @@ static int handle_data(struct pouch_serial_channel *ch,
         int err = ch->endpoint->start(&ch->bearer);
         if (err)
         {
-            pouch_atomic_clear_bit(&ch->flags, CH_FLAG_OPEN);
-            pouch_atomic_set_bit(&ch->flags, CH_FLAG_ERROR);
+            pouch_atomic_clear_bit(ch->flags, CH_FLAG_OPEN);
+            pouch_atomic_set_bit(ch->flags, CH_FLAG_ERROR);
             pouch_serial_ch_ready(ch);  // nack
             return err;
         }
 
-        pouch_atomic_set_bit(&ch->flags, CH_FLAG_FIRST_FRAGMENT);
+        pouch_atomic_set_bit(ch->flags, CH_FLAG_FIRST_FRAGMENT);
     }
     else if (hdr->first)
     {
@@ -147,7 +139,7 @@ size_t pouch_serial_ch_frame_get(struct pouch_serial_channel *ch, uint8_t *buf, 
         return -EINVAL;
     }
 
-    if (!pouch_atomic_test_and_clear_bit(&ch->flags, CH_FLAG_PENDING))
+    if (!pouch_atomic_test_and_clear_bit(ch->flags, CH_FLAG_PENDING))
     {
         return 0;
     }
@@ -157,7 +149,7 @@ size_t pouch_serial_ch_frame_get(struct pouch_serial_channel *ch, uint8_t *buf, 
     {
         struct pouch_serial_header hdr = {
             .is_data = false,
-            .err = pouch_atomic_test_and_clear_bit(&ch->flags, CH_FLAG_ERROR),
+            .err = pouch_atomic_test_and_clear_bit(ch->flags, CH_FLAG_ERROR),
             .channel = channel_id(ch),
         };
         *buf = pouch_serial_header_encode(&hdr);
@@ -165,22 +157,22 @@ size_t pouch_serial_ch_frame_get(struct pouch_serial_channel *ch, uint8_t *buf, 
         return POUCH_SERIAL_HEADER_LEN;
     }
 
-    if (pouch_atomic_test_and_clear_bit(&ch->flags, CH_FLAG_ERROR))
+    if (pouch_atomic_test_and_clear_bit(ch->flags, CH_FLAG_ERROR))
     {
         struct pouch_serial_header hdr = {
             .channel = channel_id(ch),
             .is_data = true,
             .err = true,
-            .first = pouch_atomic_test_and_clear_bit(&ch->flags, CH_FLAG_FIRST_FRAGMENT),
+            .first = pouch_atomic_test_and_clear_bit(ch->flags, CH_FLAG_FIRST_FRAGMENT),
             .last = true,
         };
 
         *buf = pouch_serial_header_encode(&hdr);
-        pouch_atomic_clear_bit(&ch->flags, CH_FLAG_OPEN);
+        pouch_atomic_clear_bit(ch->flags, CH_FLAG_OPEN);
         return POUCH_SERIAL_HEADER_LEN;
     }
 
-    if (!pouch_atomic_test_bit(&ch->flags, CH_FLAG_OPEN))
+    if (!pouch_atomic_test_bit(ch->flags, CH_FLAG_OPEN))
     {
         /* Sender is not yet open - produce an ACK prompt to request the
          * remote side to open the channel (by ACK-ing back). */
@@ -212,7 +204,7 @@ size_t pouch_serial_ch_frame_get(struct pouch_serial_channel *ch, uint8_t *buf, 
         .channel = channel_id(ch),
         .is_data = true,
         .err = error,
-        .first = pouch_atomic_test_and_clear_bit(&ch->flags, CH_FLAG_FIRST_FRAGMENT),
+        .first = pouch_atomic_test_and_clear_bit(ch->flags, CH_FLAG_FIRST_FRAGMENT),
         .last = is_last,
     };
 
@@ -232,19 +224,19 @@ size_t pouch_serial_ch_frame_get(struct pouch_serial_channel *ch, uint8_t *buf, 
 
 void pouch_serial_ch_ready(struct pouch_serial_channel *ch)
 {
-    pouch_atomic_set_bit(&ch->flags, CH_FLAG_PENDING);
+    pouch_atomic_set_bit(ch->flags, CH_FLAG_PENDING);
 }
 
 void pouch_serial_ch_close(struct pouch_serial_channel *ch, bool success)
 {
-    if (!pouch_atomic_test_and_clear_bit(&ch->flags, CH_FLAG_OPEN))
+    if (!pouch_atomic_test_and_clear_bit(ch->flags, CH_FLAG_OPEN))
     {
         return;
     }
 
     if (!success)
     {
-        pouch_atomic_set_bit(&ch->flags, CH_FLAG_ERROR);
+        pouch_atomic_set_bit(ch->flags, CH_FLAG_ERROR);
     }
 
     if (ch->endpoint->end)
@@ -265,10 +257,10 @@ void pouch_serial_ch_close(struct pouch_serial_channel *ch, bool success)
 
 bool pouch_serial_ch_is_open(struct pouch_serial_channel *ch)
 {
-    return pouch_atomic_test_bit(&ch->flags, CH_FLAG_OPEN);
+    return pouch_atomic_test_bit(ch->flags, CH_FLAG_OPEN);
 }
 
 bool pouch_serial_ch_has_error(struct pouch_serial_channel *ch)
 {
-    return pouch_atomic_test_bit(&ch->flags, CH_FLAG_ERROR);
+    return pouch_atomic_test_bit(ch->flags, CH_FLAG_ERROR);
 }

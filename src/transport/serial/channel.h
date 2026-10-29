@@ -16,12 +16,21 @@ struct pouch_endpoint;
 
 typedef void (*pouch_serial_ch_closed_cb_t)(struct pouch_serial_channel *ch, bool success);
 
+enum ch_flag
+{
+    CH_FLAG_OPEN,
+    CH_FLAG_FIRST_FRAGMENT,
+    CH_FLAG_PENDING,
+    CH_FLAG_ERROR,
+    CH_FLAG_COUNT,
+};
+
 struct pouch_serial_channel
 {
     struct pouch_bearer bearer;
     const struct pouch_endpoint *endpoint;
     pouch_serial_ch_closed_cb_t closed_cb;
-    pouch_atomic_t flags;
+    POUCH_ATOMIC_DEFINE(flags, CH_FLAG_COUNT);
     uint8_t id;
 };
 
