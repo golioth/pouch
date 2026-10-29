@@ -35,14 +35,18 @@ struct get_server_cert_context
     size_t pos;
 };
 
-#define IN_USE_FLAG 0
-#define SERVER_CERT_DOWNLOADED_BIT 1
-#define POUCH_CERT_UPLOADED_BIT 2
-#define DOWNLINK_IN_PROGRESS 3
+enum sync_flag
+{
+    IN_USE_FLAG,
+    SERVER_CERT_DOWNLOADED_BIT,
+    POUCH_CERT_UPLOADED_BIT,
+    DOWNLINK_IN_PROGRESS,
+    SYNC_FLAG_COUNT,
+};
 
 static struct sync_context
 {
-    pouch_atomic_t flags;
+    POUCH_ATOMIC_DEFINE(flags, SYNC_FLAG_COUNT);
     struct mtls_credentials *mtls_creds;
     struct get_server_cert_context server_cert;
 
@@ -57,7 +61,7 @@ static struct sync_context
 
 static void sync_context_init(struct sync_context *sync, struct mtls_credentials *mtls_creds)
 {
-    pouch_atomic_clear(&sync->flags);
+    pouch_atomic_clear(sync->flags);
     sync->mtls_creds = mtls_creds;
     sync->client = NULL;
 }
@@ -114,7 +118,7 @@ static esp_err_t pouch_server_cert_response_callback(esp_http_client_event_t *ev
 
 static int fetch_server_cert(struct sync_context *sync)
 {
-    if (true == pouch_atomic_test_bit(&sync->flags, SERVER_CERT_DOWNLOADED_BIT))
+    if (true == pouch_atomic_test_bit(sync->flags, SERVER_CERT_DOWNLOADED_BIT))
     {
         return 0;
     }
@@ -165,7 +169,7 @@ static int fetch_server_cert(struct sync_context *sync)
         return err;
     }
 
-    pouch_atomic_set_bit(&sync->flags, SERVER_CERT_DOWNLOADED_BIT);
+    pouch_atomic_set_bit(sync->flags, SERVER_CERT_DOWNLOADED_BIT);
     return 0;
 }
 
@@ -181,7 +185,7 @@ esp_err_t pouch_device_cert_response_callback(esp_http_client_event_t *evt)
 
 static int upload_pouch_cert(struct sync_context *sync)
 {
-    if (true == pouch_atomic_test_bit(&sync->flags, POUCH_CERT_UPLOADED_BIT))
+    if (true == pouch_atomic_test_bit(sync->flags, POUCH_CERT_UPLOADED_BIT))
     {
         return 0;
     }
@@ -221,7 +225,7 @@ static int upload_pouch_cert(struct sync_context *sync)
         return -EIO;
     }
 
-    pouch_atomic_set_bit(&sync->flags, POUCH_CERT_UPLOADED_BIT);
+    pouch_atomic_set_bit(sync->flags, POUCH_CERT_UPLOADED_BIT);
     return 0;
 }
 
@@ -233,7 +237,7 @@ esp_err_t pouch_uplink_response_callback(esp_http_client_event_t *evt)
     switch (evt->event_id)
     {
         case HTTP_EVENT_ON_DATA:
-            if (false == pouch_atomic_test_and_set_bit(&sync->flags, DOWNLINK_IN_PROGRESS))
+            if (false == pouch_atomic_test_and_set_bit(sync->flags, DOWNLINK_IN_PROGRESS))
             {
                 /* This is the first downlink data */
                 pouch_downlink_start();
@@ -258,7 +262,7 @@ esp_err_t pouch_uplink_response_callback(esp_http_client_event_t *evt)
             /* falls through */
         case HTTP_EVENT_ON_FINISH:
 
-            if (true == pouch_atomic_test_and_clear_bit(&sync->flags, DOWNLINK_IN_PROGRESS))
+            if (true == pouch_atomic_test_and_clear_bit(sync->flags, DOWNLINK_IN_PROGRESS))
             {
                 ESP_LOGI(TAG, "Received downlink");
                 pouch_downlink_finish();
@@ -478,7 +482,7 @@ int http_client_transport_sync(void)
         return -EINVAL;
     }
 
-    if (true == pouch_atomic_test_and_set_bit(&sync->flags, IN_USE_FLAG))
+    if (true == pouch_atomic_test_and_set_bit(sync->flags, IN_USE_FLAG))
     {
         ESP_LOGW(TAG, "Sync already in progress, aborting.");
         return -EACCES;
@@ -490,7 +494,7 @@ int http_client_transport_sync(void)
         if (NULL == sync->client)
         {
             ESP_LOGE(TAG, "Failed to initialize http client");
-            pouch_atomic_clear_bit(&sync->flags, IN_USE_FLAG);
+            pouch_atomic_clear_bit(sync->flags, IN_USE_FLAG);
             return -ENOENT;
         }
     }
@@ -517,7 +521,7 @@ int http_client_transport_sync(void)
     }
 
 clear_and_return:
-    pouch_atomic_clear_bit(&sync->flags, IN_USE_FLAG);
+    pouch_atomic_clear_bit(sync->flags, IN_USE_FLAG);
 
     if (0 != err)
     {
