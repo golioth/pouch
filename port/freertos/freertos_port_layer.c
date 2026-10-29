@@ -357,7 +357,7 @@ static void work_q_handler_proxy(void *param)
         if (pdTRUE == xQueueReceive(q->items, &work, portMAX_DELAY))
         {
             /* Clear flag immediately; then handler can re-queue work if it wants */
-            pouch_atomic_clear_bit(&work->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED);
+            pouch_atomic_clear_bit(work->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED);
 
             if (work && work->handler)
             {
@@ -371,7 +371,7 @@ static void work_q_handler_proxy(void *param)
 
 void pouch_work_init(pouch_work_t *work, pouch_work_handler_t handler)
 {
-    pouch_atomic_clear(&work->flags);
+    pouch_atomic_clear(work->flags);
     work->handler = handler;
 }
 
@@ -404,7 +404,7 @@ void pouch_work_queue_start(pouch_work_q_t *queue,
 
 int pouch_work_submit_to_queue(pouch_work_q_t *queue, pouch_work_t *work)
 {
-    if (true == pouch_atomic_test_and_set_bit(&work->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED))
+    if (true == pouch_atomic_test_and_set_bit(work->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED))
     {
         /* Work already in queue */
         return 0;
@@ -418,7 +418,7 @@ int pouch_work_submit_to_queue(pouch_work_q_t *queue, pouch_work_t *work)
 
     /* Failed to add work to queue */
     /* Clear pending bit that was set earlier in this function */
-    pouch_atomic_clear_bit(&work->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED);
+    pouch_atomic_clear_bit(work->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED);
     return -ENOMEM;
 }
 
@@ -472,7 +472,7 @@ static void dwork_task_fn(void *param)
         {
             if ((NULL != dwork) && (NULL != dwork->handler))
             {
-                if (pouch_atomic_test_and_clear_bit(&dwork->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED))
+                if (pouch_atomic_test_and_clear_bit(dwork->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED))
                 {
                     dwork->handler(dwork);
                 }
@@ -511,7 +511,7 @@ static void delayable_work_timer_cb(TimerHandle_t timer)
 
     if (NULL != dwork)
     {
-        if (true == pouch_atomic_test_and_set_bit(&dwork->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED))
+        if (true == pouch_atomic_test_and_set_bit(dwork->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED))
         {
             /* Already queued, do nothing */
             return;
@@ -523,7 +523,7 @@ static void delayable_work_timer_cb(TimerHandle_t timer)
 
             /* Queue is full — clear the queued flag that we just set in the check above so future
              * submissions can try again. */
-            pouch_atomic_clear_bit(&dwork->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED);
+            pouch_atomic_clear_bit(dwork->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED);
         }
     }
 }
@@ -548,7 +548,7 @@ void pouch_work_delayable_init(pouch_work_delayable_t *dwork,
     }
 
     dwork->handler = handler;
-    pouch_atomic_clear(&dwork->flags);
+    pouch_atomic_clear(dwork->flags);
 
     dwork_queue_init();
 }
@@ -560,14 +560,14 @@ static int do_work_schedule(pouch_work_delayable_t *dwork, pouch_timeout_t delay
         /* Submit to work queue for immediate processing; if already queued, do nothing. This
          * matches Zephyr k_work_submit_to_queue() behavior
          */
-        if (true == pouch_atomic_test_and_set_bit(&dwork->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED))
+        if (true == pouch_atomic_test_and_set_bit(dwork->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED))
         {
             return 0;
         }
 
         if (xQueueSend(dwork_queue, &dwork, 0) != pdTRUE)
         {
-            pouch_atomic_clear_bit(&dwork->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED);
+            pouch_atomic_clear_bit(dwork->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED);
             return -ENOMEM;
         }
 
@@ -614,7 +614,7 @@ int pouch_work_reschedule(pouch_work_delayable_t *dwork, pouch_timeout_t delay)
 void pouch_work_cancel_delayable(pouch_work_delayable_t *dwork)
 {
     xTimerStop(dwork->timer, portMAX_DELAY);
-    pouch_atomic_clear_bit(&dwork->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED);
+    pouch_atomic_clear_bit(dwork->flags, POUCH_FREERTOS_WORK_FLAG_QUEUED);
 }
 
 #endif /* CONFIG_POUCH_DELAYABLE_WORK */
