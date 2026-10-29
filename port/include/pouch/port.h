@@ -7,6 +7,29 @@
 
 #pragma once
 
+#include <limits.h>
+
+#ifndef DIV_ROUND_UP
+#define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
+#endif
+
+/**
+ * @brief Define number of bits in pouch_atomic_t
+ */
+#define POUCH_ATOMIC_BITS (sizeof(pouch_atomic_t) * CHAR_BIT)
+
+/**
+ * @brief Define an array of pouch_atomic_t variables
+ *
+ * Defines an array of pouch_atomic_t that contain a combined number of bits at least /p num_bits
+ * in size. When used at file scope the array will be initialized to 0, otherwise uninitialized.
+ *
+ * @param name Name of array to define.
+ * @param num_bits Minimum nuber of bits contained by all array members combined.
+ */
+#define POUCH_ATOMIC_DEFINE(name, num_bits) \
+    pouch_atomic_t name[DIV_ROUND_UP(num_bits, POUCH_ATOMIC_BITS)]
+
 #include "pouch_port_macros_internal.h"
 #include <stdint.h>
 
@@ -23,10 +46,6 @@
 #ifndef ROUND_UP
 #define ROUND_UP(x, align) \
     (((unsigned long) (x) + ((unsigned long) align - 1)) & ~((unsigned long) align - 1))
-#endif
-
-#ifndef DIV_ROUND_UP
-#define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 #endif
 
 #ifndef IN_RANGE
@@ -127,14 +146,7 @@ void pouch_yield(void);
  * Atomic
  *------------------------------------------------*/
 
-#include <limits.h>
-
 typedef pouch_atomic_internal_t pouch_atomic_t;
-
-/**
- * @brief Define number of bits in pouch_atomic_t
- */
-#define POUCH_ATOMIC_BITS (sizeof(pouch_atomic_t) * CHAR_BIT)
 
 /**
  * @brief Initialize a pouch_atomic_t
@@ -142,18 +154,6 @@ typedef pouch_atomic_internal_t pouch_atomic_t;
  * @param i Value to assign to atomic variable.
  */
 #define POUCH_ATOMIC_INIT(i) (i)
-
-/**
- * @brief Define an array of pouch_atomic_t variables
- *
- * Defines an array of pouch_atomic_t that contain a combined number of bits at least /p num_bits
- * in size. When used at file scope the array will be initialized to 0, otherwise uninitialized.
- *
- * @param name Name of array to define.
- * @param num_bits Minimum nuber of bits contained by all array members combined.
- */
-#define POUCH_ATOMIC_DEFINE(name, num_bits) \
-    pouch_atomic_t name[DIV_ROUND_UP(num_bits, POUCH_ATOMIC_BITS)]
 
 /**
  * @brief Atomic decrement by 1.
