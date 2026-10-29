@@ -37,9 +37,14 @@ LOG_MODULE_REGISTER(pouch_coap, CONFIG_POUCH_COAP_CLIENT_LOG_LEVEL);
 #define COAP_HEADER_OVERHEAD 48
 #define COAP_BUF_SIZE (COAP_HEADER_OVERHEAD + CONFIG_POUCH_COAP_BLOCK_SIZE)
 
-static atomic_t cert_flow_flags;
-#define SERVER_CERT_DOWNLOADED_BIT (0)
-#define POUCH_CERT_UPLOADED_BIT (1)
+enum cert_flow_flag
+{
+    SERVER_CERT_DOWNLOADED_BIT,
+    POUCH_CERT_UPLOADED_BIT,
+    CERT_FLOW_FLAG_COUNT,
+};
+
+static ATOMIC_DEFINE(cert_flow_flags, CERT_FLOW_FLAG_COUNT);
 
 /*
  * Mutex serialising all CoAP socket and buffer access.  The gateway
@@ -433,8 +438,8 @@ void pouch_coap_close_connection(void)
     /* Safe to call even if no session was ever started. */
     pouch_uplink_finish();
 
-    atomic_clear_bit(&cert_flow_flags, POUCH_CERT_UPLOADED_BIT);
-    atomic_clear_bit(&cert_flow_flags, SERVER_CERT_DOWNLOADED_BIT);
+    atomic_clear_bit(cert_flow_flags, POUCH_CERT_UPLOADED_BIT);
+    atomic_clear_bit(cert_flow_flags, SERVER_CERT_DOWNLOADED_BIT);
 }
 
 /*--------------------------------------------------
@@ -446,7 +451,7 @@ int pouch_coap_fetch_server_cert(void)
     size_t cert_len = 0;
     int err;
 
-    if (atomic_test_bit(&cert_flow_flags, SERVER_CERT_DOWNLOADED_BIT))
+    if (atomic_test_bit(cert_flow_flags, SERVER_CERT_DOWNLOADED_BIT))
     {
         return 0;
     }
@@ -479,7 +484,7 @@ int pouch_coap_fetch_server_cert(void)
     }
 
     atomic_set(&server_cert_len, cert_len);
-    atomic_set_bit(&cert_flow_flags, SERVER_CERT_DOWNLOADED_BIT);
+    atomic_set_bit(cert_flow_flags, SERVER_CERT_DOWNLOADED_BIT);
     LOG_INF("Server certificate fetch complete (%zu bytes)", cert_len);
 
     return 0;
@@ -490,7 +495,7 @@ int pouch_coap_upload_cert(void)
     struct pouch_cert device_cert;
     int err;
 
-    if (atomic_test_bit(&cert_flow_flags, POUCH_CERT_UPLOADED_BIT))
+    if (atomic_test_bit(cert_flow_flags, POUCH_CERT_UPLOADED_BIT))
     {
         return 0;
     }
@@ -513,7 +518,7 @@ int pouch_coap_upload_cert(void)
         return err;
     }
 
-    atomic_set_bit(&cert_flow_flags, POUCH_CERT_UPLOADED_BIT);
+    atomic_set_bit(cert_flow_flags, POUCH_CERT_UPLOADED_BIT);
     LOG_INF("Pouch certificate upload complete");
     return 0;
 }
