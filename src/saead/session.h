@@ -51,12 +51,13 @@ enum session_flags
     SESSION_ACTIVE,
     SESSION_HAS_POUCH,
     SESSION_POUCH_OPEN,
+    SESSION_FLAG_COUNT,
 };
 
 struct session
 {
     struct session_id id;
-    pouch_atomic_t flags;
+    POUCH_ATOMIC_DEFINE(flags, SESSION_FLAG_COUNT);
     psa_algorithm_t algorithm;
     psa_key_id_t key;
     uint8_t max_block_size_log;

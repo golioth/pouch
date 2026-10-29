@@ -31,7 +31,7 @@ POUCH_LOG_REGISTER(saead_session, CONFIG_POUCH_COMMON_LOG_LEVEL);
 
 void session_end(struct session *session)
 {
-    if (!pouch_atomic_test_and_clear_bit(&session->flags, SESSION_ACTIVE))
+    if (!pouch_atomic_test_and_clear_bit(session->flags, SESSION_ACTIVE))
     {
         return;
     }
@@ -176,7 +176,7 @@ exit:
 
 int session_pouch_start(struct session *session, pouch_id_t pouch_id)
 {
-    if (!pouch_atomic_test_bit(&session->flags, SESSION_ACTIVE))
+    if (!pouch_atomic_test_bit(session->flags, SESSION_ACTIVE))
     {
         return -EBUSY;
     }
@@ -184,7 +184,7 @@ int session_pouch_start(struct session *session, pouch_id_t pouch_id)
     session->pouch.id = pouch_id;
     session->pouch.block_index = 0;
 
-    pouch_atomic_set_bit(&session->flags, SESSION_POUCH_OPEN);
+    pouch_atomic_set_bit(session->flags, SESSION_POUCH_OPEN);
 
     return 0;
 }
@@ -201,13 +201,13 @@ static void nonce_generate(const struct session *session,
 
 static bool pouch_is_open(const struct session *session)
 {
-    if (!pouch_atomic_test_bit(&session->flags, SESSION_ACTIVE))
+    if (!pouch_atomic_test_bit(session->flags, SESSION_ACTIVE))
     {
         POUCH_LOG_ERR("Not in a session");
         return false;
     }
 
-    if (!pouch_atomic_test_bit(&session->flags, SESSION_POUCH_OPEN))
+    if (!pouch_atomic_test_bit(session->flags, SESSION_POUCH_OPEN))
     {
         POUCH_LOG_ERR("Pouch has been closed");
         return false;
@@ -288,7 +288,7 @@ struct pouch_buf *session_encrypt_block(struct session *session, struct pouch_bu
     if (session->pouch.block_index == UINT16_MAX)
     {
         // This pouch is now full, and we shouldn't accept any more blocks for it.
-        pouch_atomic_clear_bit(&session->flags, SESSION_POUCH_OPEN);
+        pouch_atomic_clear_bit(session->flags, SESSION_POUCH_OPEN);
         return encrypted;
     }
 
@@ -366,7 +366,7 @@ int session_decrypt_block(struct session *session,
     if (session->pouch.block_index == UINT16_MAX)
     {
         // This pouch is now full, and we can't add any more blocks to it.
-        pouch_atomic_clear_bit(&session->flags, SESSION_POUCH_OPEN);
+        pouch_atomic_clear_bit(session->flags, SESSION_POUCH_OPEN);
         return 0;
     }
 
@@ -374,7 +374,7 @@ int session_decrypt_block(struct session *session,
     pouch_bufview_memcpy(&ciphertext, &session->pouch.ad, AUTH_TAG_LEN);
     session->pouch.block_index++;
 
-    pouch_atomic_set_bit(&session->flags, SESSION_VALID);
+    pouch_atomic_set_bit(session->flags, SESSION_VALID);
 
     return 0;
 }
@@ -384,7 +384,7 @@ int session_match(const struct session *session,
                   uint8_t max_block_size_log,
                   psa_algorithm_t algorithm)
 {
-    if (!pouch_atomic_test_bit(&session->flags, SESSION_VALID))
+    if (!pouch_atomic_test_bit(session->flags, SESSION_VALID))
     {
         // session ID and parameters are unset.
         return 0;
