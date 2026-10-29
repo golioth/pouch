@@ -19,7 +19,7 @@ static struct session uplink;
 
 int saead_uplink_session_start(psa_algorithm_t algorithm, psa_key_id_t private_key)
 {
-    if (pouch_atomic_test_and_set_bit(&uplink.flags, SESSION_ACTIVE))
+    if (pouch_atomic_test_and_set_bit(uplink.flags, SESSION_ACTIVE))
     {
         POUCH_LOG_WRN("Already in a session");
         return -EBUSY;
@@ -27,8 +27,8 @@ int saead_uplink_session_start(psa_algorithm_t algorithm, psa_key_id_t private_k
 
     struct pubkey pubkey;
 
-    pouch_atomic_clear_bit(&uplink.flags, SESSION_HAS_POUCH);
-    pouch_atomic_clear_bit(&uplink.flags, SESSION_VALID);
+    pouch_atomic_clear_bit(uplink.flags, SESSION_HAS_POUCH);
+    pouch_atomic_clear_bit(uplink.flags, SESSION_VALID);
 
     // Sequential IDs require replay protection, which isn't supported yet:
     uplink.id.type = SESSION_ID_TYPE_RANDOM;
@@ -37,7 +37,7 @@ int saead_uplink_session_start(psa_algorithm_t algorithm, psa_key_id_t private_k
     if (err)
     {
         POUCH_LOG_ERR("Session ID generation failed (err: %d)", err);
-        pouch_atomic_clear_bit(&uplink.flags, SESSION_ACTIVE);
+        pouch_atomic_clear_bit(uplink.flags, SESSION_ACTIVE);
         return err;
     }
 
@@ -52,14 +52,14 @@ int saead_uplink_session_start(psa_algorithm_t algorithm, psa_key_id_t private_k
     if (PSA_KEY_ID_NULL == uplink.key)
     {
         POUCH_LOG_ERR("Session key generation failed");
-        pouch_atomic_clear_bit(&uplink.flags, SESSION_ACTIVE);
+        pouch_atomic_clear_bit(uplink.flags, SESSION_ACTIVE);
         return -ENOENT;
     }
 
     uplink.algorithm = algorithm;
     uplink.pouch.id = 0;
     uplink.max_block_size_log = MAX_BLOCK_PAYLOAD_SIZE_LOG;
-    pouch_atomic_set_bit(&uplink.flags, SESSION_VALID);
+    pouch_atomic_set_bit(uplink.flags, SESSION_VALID);
 
     return 0;
 }
@@ -77,7 +77,7 @@ int saead_uplink_pouch_start(void)
 
 int saead_uplink_header_get(struct saead_info *info)
 {
-    if (!pouch_atomic_test_bit(&uplink.flags, SESSION_ACTIVE))
+    if (!pouch_atomic_test_bit(uplink.flags, SESSION_ACTIVE))
     {
         POUCH_LOG_ERR("Not in a session");
         return -ENOTCONN;
@@ -141,7 +141,7 @@ bool saead_uplink_session_matches(const struct session_id *id,
 psa_key_id_t saead_uplink_session_key_copy(psa_key_usage_t usage)
 {
     psa_key_id_t copy = PSA_KEY_ID_NULL;
-    if (!pouch_atomic_test_bit(&uplink.flags, SESSION_VALID))
+    if (!pouch_atomic_test_bit(uplink.flags, SESSION_VALID))
     {
         return PSA_KEY_ID_NULL;
     }
