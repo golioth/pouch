@@ -31,9 +31,14 @@ LOG_MODULE_REGISTER(pouch_http);
 #define HTTP_PATH_SERVER_CERT "/.g/server-cert"
 #define HTTP_PATH_DEVICE_CERT "/.g/device-cert"
 
-static atomic_t pouch_cert_flags;
-#define SERVER_CERT_DOWNLOADED_BIT 0
-#define POUCH_CERT_UPLOADED_BIT 1
+enum pouch_cert_flag
+{
+    SERVER_CERT_DOWNLOADED_BIT,
+    POUCH_CERT_UPLOADED_BIT,
+    POUCH_CERT_FLAG_COUNT,
+};
+
+static ATOMIC_DEFINE(pouch_cert_flags, POUCH_CERT_FLAG_COUNT);
 
 K_EVENT_DEFINE(pouch_http_client_events);
 #define HTTP_CLIENT_CONN_READY BIT(0)
@@ -41,11 +46,15 @@ K_EVENT_DEFINE(pouch_http_client_events);
 static int _sock = -1;
 static sec_tag_t _sec_tag;
 
-#define IN_USE_FLAG 0
+enum sync_flag
+{
+    IN_USE_FLAG,
+    SYNC_FLAG_COUNT,
+};
 
 static struct sync_context
 {
-    atomic_t flags;
+    ATOMIC_DEFINE(flags, SYNC_FLAG_COUNT);
     struct http_request *req;
 
     uint32_t rcv_offset;
@@ -131,7 +140,7 @@ static int pouch_server_cert_response_callback(struct http_response *rsp,
             return err;
         }
 
-        atomic_set_bit(&pouch_cert_flags, SERVER_CERT_DOWNLOADED_BIT);
+        atomic_set_bit(pouch_cert_flags, SERVER_CERT_DOWNLOADED_BIT);
     }
 
     return err;
@@ -150,7 +159,7 @@ static int pouch_http_device_cert_callback(struct http_response *rsp,
     }
     else
     {
-        atomic_set_bit(&pouch_cert_flags, POUCH_CERT_UPLOADED_BIT);
+        atomic_set_bit(pouch_cert_flags, POUCH_CERT_UPLOADED_BIT);
     }
 
     return err;
@@ -353,7 +362,7 @@ static int setup_socket(sec_tag_t sec_tag, k_timeout_t wait_for_conn)
         return -ETIMEDOUT;
     }
 
-    atomic_clear_bit(&_sync_ctx.flags, IN_USE_FLAG);
+    atomic_clear_bit(_sync_ctx.flags, IN_USE_FLAG);
 
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
@@ -413,8 +422,8 @@ static void close_socket(void)
     pouch_uplink_finish();
     zsock_close(_sock);
     _sock = -1;
-    atomic_clear_bit(&pouch_cert_flags, POUCH_CERT_UPLOADED_BIT);
-    atomic_clear_bit(&pouch_cert_flags, SERVER_CERT_DOWNLOADED_BIT);
+    atomic_clear_bit(pouch_cert_flags, POUCH_CERT_UPLOADED_BIT);
+    atomic_clear_bit(pouch_cert_flags, SERVER_CERT_DOWNLOADED_BIT);
 }
 
 int pouch_http_client_init(sec_tag_t sec_tag, k_timeout_t wait_for_conn)
@@ -426,7 +435,7 @@ int pouch_http_client_init(sec_tag_t sec_tag, k_timeout_t wait_for_conn)
 
 static int fetch_server_cert(struct sync_context *sync)
 {
-    if (true == atomic_test_bit(&pouch_cert_flags, SERVER_CERT_DOWNLOADED_BIT))
+    if (true == atomic_test_bit(pouch_cert_flags, SERVER_CERT_DOWNLOADED_BIT))
     {
         return 0;
     }
@@ -453,7 +462,7 @@ static int fetch_server_cert(struct sync_context *sync)
         return ret;
     }
 
-    if (false == atomic_test_bit(&pouch_cert_flags, SERVER_CERT_DOWNLOADED_BIT))
+    if (false == atomic_test_bit(pouch_cert_flags, SERVER_CERT_DOWNLOADED_BIT))
     {
         return -EIO;
     }
@@ -464,7 +473,7 @@ static int fetch_server_cert(struct sync_context *sync)
 
 static int upload_pouch_cert(struct sync_context *sync)
 {
-    if (true == atomic_test_bit(&pouch_cert_flags, POUCH_CERT_UPLOADED_BIT))
+    if (true == atomic_test_bit(pouch_cert_flags, POUCH_CERT_UPLOADED_BIT))
     {
         return 0;
     }
@@ -501,7 +510,7 @@ static int upload_pouch_cert(struct sync_context *sync)
         return ret;
     }
 
-    if (false == atomic_test_bit(&pouch_cert_flags, POUCH_CERT_UPLOADED_BIT))
+    if (false == atomic_test_bit(pouch_cert_flags, POUCH_CERT_UPLOADED_BIT))
     {
         return -EIO;
     }
@@ -572,7 +581,7 @@ int pouch_http_client_sync(k_timeout_t wait_for_conn)
         }
     }
 
-    if (true == atomic_test_and_set_bit(&sync->flags, IN_USE_FLAG))
+    if (true == atomic_test_and_set_bit(sync->flags, IN_USE_FLAG))
     {
         POUCH_LOG_WRN("Sync already in progress, aborting.");
         return -EACCES;
@@ -600,6 +609,6 @@ int pouch_http_client_sync(k_timeout_t wait_for_conn)
     }
 
 clear_and_return:
-    atomic_clear_bit(&sync->flags, IN_USE_FLAG);
+    atomic_clear_bit(sync->flags, IN_USE_FLAG);
     return err;
 }

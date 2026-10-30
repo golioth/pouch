@@ -69,7 +69,7 @@ void pouch_serial_init(struct pouch_serial *s,
     for (enum pouch_serial_channel_id i = 0; i < POUCH_SERIAL_CHANNEL_COUNT; i++)
     {
         s->channels[i].id = i;
-        s->channels[i].flags = 0;
+        pouch_atomic_clear(s->channels[i].flags);
         s->channels[i].bearer.ready = bearer_ready;
         s->channels[i].bearer.close = bearer_close;
         s->channels[i].bearer.send = NULL;
