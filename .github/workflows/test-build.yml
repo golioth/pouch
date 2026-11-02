@@ -23,6 +23,10 @@ jobs:
             example: http_client
             board: native_sim
             no_sysbuild: true
+          - manifest: west-zephyr.yml
+            example: serial_device
+            board: nrf52840dk/nrf52840
+            no_sysbuild: true
       fail-fast: false
     runs-on: ubuntu-24.04
     steps:
