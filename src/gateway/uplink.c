@@ -25,12 +25,13 @@ static pouch_work_q_t gateway_work_q;
 enum pouch_flags
 {
     POUCH_UPLINK_CLOSED,
+    POUCH_FLAG_COUNT,
 };
 
 struct pouch_gateway_uplink
 {
     struct pouch_gateway_downlink_context *downlink;
-    pouch_atomic_t flags[1];
+    POUCH_ATOMIC_DEFINE(flags, POUCH_FLAG_COUNT);
     struct pouch_buf *wblock;
     pouch_buf_queue_t queue;
     size_t total_len;
