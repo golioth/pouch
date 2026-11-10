@@ -21,11 +21,11 @@
 /**
  * @brief Define an array of pouch_atomic_t variables
  *
- * Defines an array of pouch_atomic_t that contain a combined number of bits at least /p num_bits
+ * Defines an array of pouch_atomic_t that contain a combined number of bits at least @p num_bits
  * in size. When used at file scope the array will be initialized to 0, otherwise uninitialized.
  *
  * @param name Name of array to define.
- * @param num_bits Minimum nuber of bits contained by all array members combined.
+ * @param num_bits Minimum number of bits contained by all array members combined.
  */
 #define POUCH_ATOMIC_DEFINE(name, num_bits) \
     pouch_atomic_t name[DIV_ROUND_UP(num_bits, POUCH_ATOMIC_BITS)]
@@ -199,7 +199,7 @@ long pouch_atomic_set(pouch_atomic_t *target, long value);
 /**
  * @brief Atomically clear a bit
  *
- * A pointer to an array of pouch_atomic_t may be supplied as the /p target when /p bit is larger
+ * A pointer to an array of pouch_atomic_t may be supplied as the @p target when @p bit is larger
  * than POUCH_ATOMIC_BITS. See POUCH_ATOMIC_DEFINE().
  *
  * @param target Address of atomic variable
@@ -210,7 +210,7 @@ void pouch_atomic_clear_bit(pouch_atomic_t *target, int bit);
 /**
  * @brief Atomically set a bit
  *
- * A pointer to an array of pouch_atomic_t may be supplied as the /p target when /p bit is larger
+ * A pointer to an array of pouch_atomic_t may be supplied as the @p target when @p bit is larger
  * than POUCH_ATOMIC_BITS. See POUCH_ATOMIC_DEFINE().
  *
  * @param target Address of atomic variable
@@ -221,7 +221,7 @@ void pouch_atomic_set_bit(pouch_atomic_t *target, int bit);
 /**
  * @brief Atomically test the state of a bit
  *
- * A pointer to an array of pouch_atomic_t may be supplied as the /p target when /p bit is larger
+ * A pointer to an array of pouch_atomic_t may be supplied as the @p target when @p bit is larger
  * than POUCH_ATOMIC_BITS. See POUCH_ATOMIC_DEFINE().
  *
  * @param target Address of atomic variable
@@ -233,7 +233,7 @@ bool pouch_atomic_test_bit(const pouch_atomic_t *target, int bit);
 /**
  * @brief Atomically clear bit and return its previous state
  *
- * A pointer to an array of pouch_atomic_t may be supplied as the /p target when /p bit is larger
+ * A pointer to an array of pouch_atomic_t may be supplied as the @p target when @p bit is larger
  * than POUCH_ATOMIC_BITS. See POUCH_ATOMIC_DEFINE().
  *
  * @param target Address of atomic variable
@@ -245,7 +245,7 @@ bool pouch_atomic_test_and_clear_bit(pouch_atomic_t *target, int bit);
 /**
  * @brief Atomically set bit and return its previous state
  *
- * A pointer to an array of pouch_atomic_t may be supplied as the /p target when /p bit is larger
+ * A pointer to an array of pouch_atomic_t may be supplied as the @p target when @p bit is larger
  * than POUCH_ATOMIC_BITS. See POUCH_ATOMIC_DEFINE().
  *
  * @param target Address of atomic variable
