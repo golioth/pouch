@@ -149,6 +149,7 @@ jobs:
       - is_active
       - has_${{ inputs.hil_board }}
       - has_frdm_rw612
+      - mniestroj_hp
 
     container:
       image: golioth/golioth-hil-base:latest
