@@ -155,6 +155,7 @@ jobs:
     runs-on:
       - is_active
       - has_${{ inputs.hil_board }}
+      - jons_raspberry_pi
 
     timeout-minutes: 30
 
