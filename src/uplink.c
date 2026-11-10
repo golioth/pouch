@@ -29,14 +29,18 @@ enum flags
     POUCH_CLOSING,
     /** Pouch-scoped: reset on each pouch_uplink_pouch_open(). */
     POUCH_CLOSED,
+    FLAG_COUNT,
 };
+
+POUCH_STATIC_ASSERT(FLAG_COUNT <= POUCH_ATOMIC_BITS,
+                    "pouch_atomic_clear() covers only the first word of uplink.flags");
 
 POUCH_THREAD_STACK_DEFINE(uplink_processing_stack, CONFIG_POUCH_UPLINK_PROCESSING_STACK_SIZE);
 
 struct pouch_uplink
 {
     struct pouch_buf *header;
-    pouch_atomic_t flags[1];
+    POUCH_ATOMIC_DEFINE(flags, FLAG_COUNT);
     pouch_atomic_t id;
     int error;
 
