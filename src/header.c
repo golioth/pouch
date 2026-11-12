@@ -9,10 +9,13 @@
 #include "crypto.h"
 #include "buf.h"
 #include "cddl/header_encode.h"
+#include "cddl/header_decode.h"
 #include "saead/session.h"
 
 #include <string.h>
 #include <stdio.h>
+#include <errno.h>
+#include <sys/types.h>
 
 #include <zcbor_encode.h>
 #include <zcbor_encode.h>
@@ -77,4 +80,38 @@ struct pouch_buf *pouch_header_create(void)
     }
 
     return header;
+}
+
+ssize_t pouch_parse_header(struct pouch_bufview *v, struct pouch_header *header)
+{
+    size_t available = pouch_bufview_available(v);
+    size_t len = 0;
+    int ret;
+
+    if (available == 0)
+    {
+        return 0;
+    }
+
+    ret = cbor_decode_pouch_header(pouch_bufview_read(v, 0), available, header, &len);
+    if (ret != ZCBOR_SUCCESS)
+    {
+        if (available >= POUCH_HEADER_MAX_LEN)
+        {
+            // We have enough of the buffer here to rule out this just being an incomplete header.
+            // Something must be corrupted.
+            return -EIO;
+        }
+
+        // We can't distinguish incomplete cbor from corrupted cbor. We'll report 0 as
+        // "no header, but also no error", so the caller can try again later with more data.
+        return 0;
+    }
+
+    if (header->version != POUCH_HEADER_VERSION)
+    {
+        return -ENOTSUP;
+    }
+
+    return len;
 }

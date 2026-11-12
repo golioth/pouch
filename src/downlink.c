@@ -17,6 +17,7 @@
 #include <pouch/blockbuf.h>
 #include "buf.h"
 #include "crypto.h"
+#include "header.h"
 #include "downlink.h"
 #include "entry.h"
 
@@ -108,20 +109,16 @@ void pouch_downlink_start(void)
     }
 }
 
-static int pouch_downlink_parse_header(struct pouch_bufview *v, size_t *header_len)
+static ssize_t process_pouch_header(struct pouch_bufview *v)
 {
-    const uint8_t *header_raw = pouch_bufview_read(v, 0);
     struct pouch_header header;
-    int ret;
 
-    ret = cbor_decode_pouch_header(header_raw, pouch_bufview_available(v), &header, header_len);
-    if (ret != ZCBOR_SUCCESS)
+    ssize_t res = pouch_parse_header(v, &header);
+    if (res <= 0)
     {
-        POUCH_LOG_DBG("Failed to decode pouch header: %d", ret);
-        return -EIO;
+        POUCH_LOG_DBG("Unable to decode pouch header: %d", res);
+        return res;
     }
-
-    POUCH_LOG_HEXDUMP(header_raw, *header_len, "pouch header raw");
 
     POUCH_LOG_DBG("Header version %d", (int) header.version);
     POUCH_LOG_DBG("Encryption type %s",
@@ -129,7 +126,7 @@ static int pouch_downlink_parse_header(struct pouch_bufview *v, size_t *header_l
                           == encryption_info_union_plaintext_info_m_c
                       ? "Plaintext"
                       : "SAEAD");
-    POUCH_LOG_DBG("Payload len %d", (int) *header_len);
+    POUCH_LOG_DBG("Payload len %d", (int) res);
 
     int err = crypto_downlink_start(&header.encryption_info_m);
     if (err)
@@ -138,7 +135,7 @@ static int pouch_downlink_parse_header(struct pouch_bufview *v, size_t *header_l
         return err;
     }
 
-    return 0;
+    return res;
 }
 
 int pouch_downlink_push(const void *buf, size_t buf_len)
@@ -172,20 +169,17 @@ int pouch_downlink_push(const void *buf, size_t buf_len)
 
         if (!pouch_header)
         {
-            size_t header_len = 0;
-            int err = pouch_downlink_parse_header(&v, &header_len);
-            if (err)
+            ssize_t res = process_pouch_header(&v);
+            if (res <= 0)
             {
-                /* Match previous behavior but needs more differentiation. Future work tracked here:
-                 * https://github.com/golioth/firmware-issue-tracker/issues/924
-                 */
-                return 0;
+                // header is either broken or incomplete
+                return res;
             }
 
             pouch_header = true;
 
             /* Align first block with encrypted start */
-            buf_trim_start(encrypted, header_len);
+            buf_trim_start(encrypted, res);
 
             POUCH_LOG_HEXDUMP(pouch_bufview_read(&v, 0), pouch_bufview_available(&v), "remaining");
         }
