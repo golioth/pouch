@@ -191,3 +191,134 @@ ZTEST(downlink, test_lorem_09_1024_x5)
 {
     test_lorem(&lorem_1024_x5);
 }
+
+/* Plaintext header: [version=1, [0, "id123"]] */
+static const uint8_t plaintext_header[] = {0x82, 0x01, 0x82, 0x00, 0x65, 'i', 'd', '1', '2', '3'};
+
+/* SAEAD header: [1, [1, [[random bstr16], 0, 1, 10, bstr6], pouch_id=5]]. The mock crypto backend
+ * rejects this with -ENOTSUP in crypto_downlink_start().
+ */
+static const uint8_t saead_header[] = {
+    0x82, 0x01,                                                       /* header */
+    0x83, 0x01,                                                       /* saead_info */
+    0x85,                                                             /* session */
+    0x81, 0x50, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, /* id */
+    0x00,                                                             /* initiator */
+    0x01,                                                             /* algorithm */
+    0x0a,                                                             /* block size log */
+    0x46, 1,    2, 3, 4, 5, 6,                                        /* cert_ref */
+    0x05,                                                             /* pouch_id */
+};
+
+ZTEST(downlink, test_header_complete_plaintext)
+{
+    pouch_downlink_start();
+    zassert_equal(pouch_downlink_push(plaintext_header, sizeof(plaintext_header)),
+                  0,
+                  "valid header should be accepted");
+    pouch_downlink_finish();
+}
+
+ZTEST(downlink, test_header_incomplete_returns_zero)
+{
+    /* Every strict prefix of a valid header is incomplete, not broken */
+    for (size_t len = 1; len < sizeof(plaintext_header); len++)
+    {
+        pouch_downlink_start();
+        zassert_equal(pouch_downlink_push(plaintext_header, len),
+                      0,
+                      "incomplete header (%zu/%zu bytes) should return 0",
+                      len,
+                      sizeof(plaintext_header));
+        pouch_downlink_finish();
+    }
+}
+
+ZTEST(downlink, test_header_split_across_pushes)
+{
+    for (size_t split = 1; split < sizeof(plaintext_header); split++)
+    {
+        pouch_downlink_start();
+        zassert_equal(pouch_downlink_push(plaintext_header, split),
+                      0,
+                      "first part, split %zu",
+                      split);
+        zassert_equal(
+            pouch_downlink_push(plaintext_header + split, sizeof(plaintext_header) - split),
+            0,
+            "second part, split %zu",
+            split);
+        pouch_downlink_finish();
+    }
+}
+
+ZTEST(downlink, test_header_broken_cbor_errors)
+{
+    /* Not an array */
+    static const uint8_t not_array[] = {0xa1, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
+    /* Array of the right shape, but wrong element types */
+    static const uint8_t wrong_types[] =
+        {0x82, 0x61, 'x', 0x82, 0x00, 0x65, 'i', 'd', '1', '2', '3'};
+    /* Unknown encryption type */
+    static const uint8_t bad_enc_type[] = {0x82, 0x01, 0x82, 0x07, 0x65, 'i', 'd', '1', '2', '3'};
+
+    static const struct
+    {
+        const uint8_t *data;
+        size_t len;
+        const char *name;
+    } cases[] = {
+        {not_array, sizeof(not_array), "not an array"},
+        {wrong_types, sizeof(wrong_types), "wrong types"},
+        {bad_enc_type, sizeof(bad_enc_type), "unknown encryption type"},
+    };
+
+    /* Corruption can only be told apart from an incomplete header once more data than the largest
+     * possible header has arrived, so pad the broken headers past that.
+     */
+    for (size_t i = 0; i < ARRAY_SIZE(cases); i++)
+    {
+        uint8_t padded[2 * POUCH_DEVICE_ID_MAX_LEN + 64] = {0};
+
+        zassert_true(cases[i].len <= sizeof(padded));
+        memcpy(padded, cases[i].data, cases[i].len);
+
+        pouch_downlink_start();
+        zassert_true(pouch_downlink_push(padded, sizeof(padded)) < 0,
+                     "broken header (%s) should return an error",
+                     cases[i].name);
+        pouch_downlink_finish();
+    }
+}
+
+ZTEST(downlink, test_header_short_garbage_returns_zero)
+{
+    /* Too little data to rule out an incomplete header, so no error is reported yet */
+    static const uint8_t garbage[] = {0xa1, 0x01, 0x02, 0x03};
+
+    pouch_downlink_start();
+    zassert_equal(pouch_downlink_push(garbage, sizeof(garbage)), 0);
+    pouch_downlink_finish();
+}
+
+ZTEST(downlink, test_header_unsupported_version_errors)
+{
+    uint8_t header[sizeof(plaintext_header)];
+
+    memcpy(header, plaintext_header, sizeof(header));
+    header[1] = 0x02; /* version 2 */
+
+    pouch_downlink_start();
+    zassert_true(pouch_downlink_push(header, sizeof(header)) < 0,
+                 "unsupported header version should return an error");
+    pouch_downlink_finish();
+}
+
+ZTEST(downlink, test_header_crypto_start_failure_errors)
+{
+    pouch_downlink_start();
+    zassert_equal(pouch_downlink_push(saead_header, sizeof(saead_header)),
+                  -ENOTSUP,
+                  "crypto_downlink_start() failure should be propagated");
+    pouch_downlink_finish();
+}
