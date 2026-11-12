@@ -82,7 +82,7 @@ struct pouch_buf *pouch_header_create(void)
     return header;
 }
 
-ssize_t pouch_parse_header(struct pouch_bufview *v, struct pouch_header *header)
+ssize_t pouch_parse_header(const struct pouch_bufview *v, struct pouch_header *header)
 {
     size_t available = pouch_bufview_available(v);
     size_t len = 0;
@@ -93,7 +93,7 @@ ssize_t pouch_parse_header(struct pouch_bufview *v, struct pouch_header *header)
         return 0;
     }
 
-    ret = cbor_decode_pouch_header(pouch_bufview_read(v, 0), available, header, &len);
+    ret = cbor_decode_pouch_header(pouch_bufview_peek(v), available, header, &len);
     if (ret != ZCBOR_SUCCESS)
     {
         if (available >= POUCH_HEADER_MAX_LEN)

@@ -170,6 +170,16 @@ const void *pouch_bufview_read(struct pouch_bufview *v, size_t bytes)
     return bufview_read(v, bytes);
 }
 
+const void *pouch_bufview_peek(const struct pouch_bufview *v)
+{
+    if (!pouch_bufview_available(v))
+    {
+        return NULL;
+    }
+
+    return &v->buf->buf[v->offset];
+}
+
 int pouch_bufview_read_byte(struct pouch_bufview *v, uint8_t *dst)
 {
     if (pouch_bufview_available(v) < sizeof(uint8_t))

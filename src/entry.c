@@ -213,7 +213,7 @@ int pouch_downlink_block_push(struct pouch_buf *pouch_buf)
         return err;
     }
 
-    POUCH_LOG_HEXDUMP(pouch_bufview_read(&v, 0), pouch_bufview_available(&v), "block bufview");
+    POUCH_LOG_HEXDUMP(pouch_bufview_peek(&v), pouch_bufview_available(&v), "block bufview");
 
     if (is_stream)
     {

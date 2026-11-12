@@ -109,7 +109,7 @@ void pouch_downlink_start(void)
     }
 }
 
-static ssize_t process_pouch_header(struct pouch_bufview *v)
+static ssize_t process_pouch_header(const struct pouch_bufview *v)
 {
     struct pouch_header header;
 
@@ -181,7 +181,7 @@ int pouch_downlink_push(const void *buf, size_t buf_len)
             /* Align first block with encrypted start */
             buf_trim_start(encrypted, res);
 
-            POUCH_LOG_HEXDUMP(pouch_bufview_read(&v, 0), pouch_bufview_available(&v), "remaining");
+            POUCH_LOG_HEXDUMP(pouch_bufview_peek(&v), pouch_bufview_available(&v), "remaining");
         }
 
         if (pouch_bufview_available(&v) > sizeof(uint16_t))
@@ -220,7 +220,7 @@ int pouch_downlink_push(const void *buf, size_t buf_len)
 
                 if (pouch_bufview_available(&v) > block_size)
                 {
-                    const uint8_t *remaining = pouch_bufview_read(&v, 0);
+                    const uint8_t *remaining = pouch_bufview_peek(&v);
                     remaining += block_size;
                     size_t remaining_len = pouch_bufview_available(&v) - block_size;
 

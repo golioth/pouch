@@ -25,4 +25,4 @@ struct pouch_buf *pouch_header_create(void);
  * @returns -ENOTSUP if the header format is unsupported.
  * @returns -EIO if the header is invalid.
  */
-ssize_t pouch_parse_header(struct pouch_bufview *v, struct pouch_header *header);
+ssize_t pouch_parse_header(const struct pouch_bufview *v, struct pouch_header *header);
