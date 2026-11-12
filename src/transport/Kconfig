@@ -5,6 +5,14 @@
 # Note: This file must be sourced by each port transport Kconfig file.
 # This is approach is brittle and should be improved in future work.
 
+choice POUCH_TRANSPORT
+    prompt "Transport protocol"
+    optional
+    help
+      The transport protocol to use for communicating with Golioth.
+
+endchoice
+
 menuconfig POUCH_TRANSPORT_SAR
   bool "Enable SAR core transport support" if ZTEST
   help
@@ -33,5 +41,12 @@ config POUCH_TRANSPORT_SAR_MAX_RETRIES
     Number of times the SAR sender goes back and sends unACKed
     fragments again without the receiver making any progress, before
     it abandons the transfer.
+
+config POUCH_TRANSPORT_ACK_TIMEOUT_MS
+  int "Pouch Transport ACK timeout (ms)"
+  default 1000
+  help
+    The timeout, in milliseconds, that a receiver will wait
+    for new packets before retransmitting an acknowledgement
 
 endif

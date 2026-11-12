@@ -6,6 +6,7 @@
 
 #include <pouch/transport/serial/device.h>
 #include "serial.h"
+#include "channel.h"
 #include "../endpoints/device/endpoints.h"
 
 #include <stddef.h>
@@ -34,10 +35,21 @@ static void ready(struct pouch_serial *s)
     }
 }
 
+static void on_close(struct pouch_serial *serial, enum pouch_serial_channel_id ch, bool success)
+{
+    if (ch == POUCH_SERIAL_CH_UPLINK)
+    {
+        pouch_serial_ch_suspend(&serial->channels[ch], true);
+    }
+}
+
 void pouch_serial_device_init(pouch_serial_device_ready_cb_t cb)
 {
     ready_cb = cb;
-    pouch_serial_init(&serial, ready, NULL);
+    pouch_serial_init(&serial, ready, on_close);
+    // Suspend the info and uplink channel until higher level logic unlocks them
+    pouch_serial_ch_suspend(&serial.channels[POUCH_SERIAL_CH_INFO], true);
+    pouch_serial_ch_suspend(&serial.channels[POUCH_SERIAL_CH_UPLINK], true);
 }
 
 int pouch_serial_device_recv(const void *frame, size_t len)
@@ -48,4 +60,10 @@ int pouch_serial_device_recv(const void *frame, size_t len)
 size_t pouch_serial_device_frame_get(uint8_t *buf, size_t maxlen)
 {
     return pouch_serial_frame_get(&serial, buf, maxlen);
+}
+
+void pouch_serial_device_sync(void)
+{
+    pouch_serial_ch_suspend(&serial.channels[POUCH_SERIAL_CH_INFO], false);
+    pouch_serial_ch_suspend(&serial.channels[POUCH_SERIAL_CH_UPLINK], false);
 }
