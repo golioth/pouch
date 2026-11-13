@@ -8,6 +8,7 @@
 
 #include <pouch/types.h>
 #include <sys/types.h>
+#include <stdbool.h>
 
 /** Set the server certificate. */
 int pouch_server_certificate_set(const struct pouch_cert *cert);
@@ -17,3 +18,5 @@ ssize_t pouch_server_certificate_serial_get(uint8_t *serial, size_t len);
 int pouch_device_certificate_ref_get(uint8_t *cert_ref, size_t len);
 /** Get the device's raw certificate. */
 int pouch_device_certificate_get(struct pouch_cert *out);
+/** Whether the current device certificate has already been uploaded to the server */
+bool pouch_device_certificate_is_uploaded(void);

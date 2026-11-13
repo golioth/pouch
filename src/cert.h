@@ -20,3 +20,4 @@ const uint8_t *cert_ref_get(void);
 
 void cert_server_key_get(struct pubkey *out);
 bool cert_has_server_info(void);
+void cert_uploaded(bool success);
