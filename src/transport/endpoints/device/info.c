@@ -39,9 +39,7 @@ static int build_info_data(void)
     ssize_t snr_len = 0;
 #endif
 
-    // TODO: Set the Provisioned flag once we have the functionality to know whether provisioning
-    // has taken place.
-    enum info_flags flags = 0;
+    enum info_flags flags = pouch_device_certificate_is_uploaded() ? INFO_FLAG_PROVISIONED : 0;
 
     struct pouch_gatt_info cbor = {
         .pouch_gatt_info_flags = flags,
