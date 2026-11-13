@@ -19,6 +19,7 @@
 #include "crypto.h"
 #include "downlink.h"
 #include "entry.h"
+#include "cert.h"
 
 POUCH_LOG_REGISTER(downlink, CONFIG_POUCH_COMMON_LOG_LEVEL);
 
@@ -72,6 +73,14 @@ static void decrypt_blocks(pouch_work_t *work)
             POUCH_LOG_ERR("Failed to decrypt block: %d", err);
             // TODO: Abort the downlink
             break;
+        }
+
+        /* The server successfully encrypted a pouch with our credentials,
+         * confirming it has our certificate.
+         */
+        if (IS_ENABLED(CONFIG_POUCH_ENCRYPTION_SAEAD))
+        {
+            cert_uploaded(true);
         }
 
         err = pouch_downlink_block_push(decrypted_block);

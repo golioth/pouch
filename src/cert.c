@@ -29,6 +29,7 @@ static struct
 {
     struct pouch_cert certificate;
     uint8_t ref[CERT_REF_LEN];
+    bool uploaded;
 } device;
 static struct
 {
@@ -205,6 +206,11 @@ int cert_device_set(const struct pouch_cert *cert)
         return -EINVAL;
     }
 
+    // clear the old data first to ensure that old certificate data isn't considered
+    // valid while we store the new one:
+    device.certificate.size = 0;
+    device.uploaded = false;
+
     int err = generate_ref(cert, device.ref);
     if (err)
     {
@@ -286,6 +292,11 @@ bool cert_has_server_info(void)
     return server_cert.pubkey.len != 0;
 }
 
+void cert_uploaded(bool success)
+{
+    device.uploaded = success;
+}
+
 /*
  * Transport API
  */
@@ -329,4 +340,9 @@ int pouch_device_certificate_get(struct pouch_cert *out)
     *out = device.certificate;
 
     return 0;
+}
+
+bool pouch_device_certificate_is_uploaded(void)
+{
+    return device.uploaded;
 }
