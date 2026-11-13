@@ -110,6 +110,9 @@ size_t pouch_bufview_memcpy(struct pouch_bufview *v, void *dst, size_t bytes);
 /** Read available data, if the requested amount is available. */
 const void *pouch_bufview_read(struct pouch_bufview *v, size_t bytes);
 
+/** Peek at the next data in the bufview, if any. */
+const void *pouch_bufview_peek(const struct pouch_bufview *v);
+
 /**
  * Read a byte from the buffer view.
  *
