@@ -6,6 +6,9 @@ config NCS_APPLICATION_BOOT_BANNER_STRING
     string
     default "Pouch BLE GATT Example"
 
+configdefault BT_LONG_WQ_STACK_SIZE
+    default 1800 if !ZEPHYR_NRF_MODULE
+
 source "$ZEPHYR_BASE/Kconfig"
 
 config EXAMPLE_SYNC_PERIOD_S
