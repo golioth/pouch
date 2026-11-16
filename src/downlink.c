@@ -94,8 +94,13 @@ static int block_downlink_push(struct pouch_buf *pouch_buf)
     return pouch_work_submit_to_queue(decrypt.work_queue, &decrypt.work);
 }
 
-void pouch_downlink_start(void)
+int pouch_downlink_start(void)
 {
+    if (encrypted != NULL)
+    {
+        return -EALREADY;
+    }
+
     POUCH_LOG_DBG("Pouch downlink start");
 
     pouch_header = false;
@@ -104,8 +109,10 @@ void pouch_downlink_start(void)
     if (!encrypted)
     {
         POUCH_LOG_ERR("Failed to allocate pouch buf");
-        return;
+        return -ENOMEM;
     }
+
+    return 0;
 }
 
 static int pouch_downlink_parse_header(struct pouch_bufview *v, size_t *header_len)

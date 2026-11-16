@@ -240,7 +240,12 @@ esp_err_t pouch_uplink_response_callback(esp_http_client_event_t *evt)
             if (false == pouch_atomic_test_and_set_bit(sync->flags, DOWNLINK_IN_PROGRESS))
             {
                 /* This is the first downlink data */
-                pouch_downlink_start();
+                err = pouch_downlink_start();
+                if (0 != err)
+                {
+                    ESP_LOGE(TAG, "Failed to open downlink: %i", err);
+                    return ESP_FAIL;
+                }
             }
 
             err = pouch_downlink_push(evt->data, evt->data_len);

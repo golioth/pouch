@@ -9,8 +9,7 @@
 
 static int start(struct pouch_bearer *bearer)
 {
-    pouch_downlink_start();
-    return 0;
+    return pouch_downlink_start();
 }
 
 static int recv(struct pouch_bearer *bearer, const void *buf, size_t len)
