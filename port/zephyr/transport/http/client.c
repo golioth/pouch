@@ -174,7 +174,13 @@ static int pouch_http_response_callback(struct http_response *rsp,
         pouch_downlink_start();
     }
 
-    pouch_downlink_push(rsp->body_frag_start, rsp->body_frag_len);
+    int err = pouch_downlink_push(rsp->body_frag_start, rsp->body_frag_len);
+    if (err)
+    {
+        LOG_ERR("Downlink failed: %d", err);
+        return err;
+    }
+
     ctx->rcv_offset += rsp->body_frag_len;
 
     if (HTTP_DATA_FINAL == final_data)
