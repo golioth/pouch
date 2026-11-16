@@ -546,16 +546,21 @@ static int pouch_coap_sync_block2_cb(const uint8_t *data,
                                      void *user_data)
 {
     struct pouch_sync_state *state = user_data;
+    int err;
 
     if (first_block)
     {
-        pouch_downlink_start();
+        err = pouch_downlink_start();
+        if (err)
+        {
+            LOG_ERR("Failed to open downlink: %d", err);
+            return err;
+        }
     }
 
     if (len > 0)
     {
-        int err = pouch_downlink_push(data, len);
-
+        err = pouch_downlink_push(data, len);
         if (err)
         {
             LOG_ERR("Failed to push downlink payload: %d", err);
