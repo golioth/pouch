@@ -1,0 +1,11 @@
+sample:
+  name: Pouch SPI Serial Device
+common:
+  build_only: true
+  tags: spi
+tests:
+  pouch.serial_device.build:
+    platform_allow:
+      - nrf52840dk/nrf52840
+    integration_platforms:
+      - nrf52840dk/nrf52840

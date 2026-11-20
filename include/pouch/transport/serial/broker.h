@@ -29,6 +29,8 @@
  *   5. Feed received frames to @ref pouch_serial_broker_recv.
  *   6. Call @ref pouch_serial_broker_notify when the device signals that it
  *      has data available (e.g. via an interrupt line).
+ *   7. Call @ref pouch_serial_broker_timeout when the device doesn't respond
+ *      in time, while @ref pouch_serial_broker_is_waiting returns true.
  */
 
 struct pouch_serial_broker;
@@ -58,6 +60,13 @@ struct pouch_serial_broker_adapter
     /**
      * Called when the exchange sequence completes or fails.
      *
+     * After a successful exchange, the broker stays ready for the next sync,
+     * which starts when the device calls for it through
+     * @ref pouch_serial_broker_notify. After a failure, every open transfer
+     * has been abandoned, and the broker stays idle until the adapter calls
+     * @ref pouch_serial_broker_start again. Adapters should back off before
+     * restarting, as the failure may persist.
+     *
      * @param broker  Broker instance.
      * @param success true if the full exchange completed successfully.
      */
@@ -83,13 +92,12 @@ struct pouch_serial_broker *pouch_serial_broker_create(
  *   Uplink drain -> Downlink delivery
  *
  * The adapter's @c end callback is invoked when the sequence completes or
- * fails. Only one exchange may be in progress at a time.
+ * fails. Only one exchange may be in progress at a time: starting the broker
+ * while an exchange is in progress abandons it.
  *
  * @param broker  Broker instance.
- *
- * @return 0 on success, negative error code if the exchange cannot be started.
  */
-int pouch_serial_broker_start(struct pouch_serial_broker *broker);
+void pouch_serial_broker_start(struct pouch_serial_broker *broker);
 
 /**
  * Deliver a received frame from the device to the broker transport layer.
@@ -97,6 +105,12 @@ int pouch_serial_broker_start(struct pouch_serial_broker *broker);
  * Called by the transport adapter with each complete frame received from the
  * device. The first byte of @p frame is the encoded header; the remaining
  * bytes are the payload.
+ *
+ * A malformed frame, such as one broken on the way, is ignored, and the broker
+ * asks the device to send its last frame again. Any other frame that can't be
+ * processed aborts the exchange, and the adapter's @c end callback is invoked
+ * with @c success set to false before this returns. The error code is still
+ * returned, for logging and diagnostics.
  *
  * @param broker  Broker instance.
  * @param frame   Frame bytes, starting with the 1-byte header.
@@ -126,12 +140,38 @@ size_t pouch_serial_broker_frame_get(struct pouch_serial_broker *broker,
  * Signal to the broker that the device has data available to send.
  *
  * Called by the transport adapter when the device asserts an interrupt line or
- * otherwise indicates it has uplink data ready. The broker will issue a prompt
- * on the uplink channel at its next opportunity.
+ * otherwise indicates it has uplink data ready. If the broker is idle, it
+ * starts a new sync at its next opportunity.
  *
  * @param broker  Broker instance.
  */
 void pouch_serial_broker_notify(struct pouch_serial_broker *broker);
+
+/**
+ * Check whether the broker is waiting for a response from the device.
+ *
+ * The adapter should call @ref pouch_serial_broker_timeout if the device
+ * doesn't respond in time. Call this after every exchange of frames to arm or
+ * disarm the timeout.
+ *
+ * @param broker  Broker instance.
+ * @return true if a frame was sent, and the device hasn't responded to it yet.
+ */
+bool pouch_serial_broker_is_waiting(struct pouch_serial_broker *broker);
+
+/**
+ * Signal to the broker that the device didn't respond in time.
+ *
+ * Sends the last frame on every waiting channel again, or asks the device to
+ * send its last frame again. If the device keeps failing to respond, the
+ * exchange is aborted after @c CONFIG_POUCH_SERIAL_BROKER_MAX_RETRIES retries,
+ * and the adapter's @c end callback is invoked with @c success set to false.
+ * Waiting for the first fragment of a transfer from the device doesn't count
+ * towards the retries, as the device might not have any data yet.
+ *
+ * @param broker  Broker instance.
+ */
+void pouch_serial_broker_timeout(struct pouch_serial_broker *broker);
 
 /**
  * Get the adapter associated with a broker instance.

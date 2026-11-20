@@ -70,14 +70,6 @@ config POUCH_GATEWAY_SERVER_CERT_BUILTIN
     bool
     default y if !POUCH_GATEWAY_CLOUD
 
-config POUCH_TRANSPORT_ACK_TIMEOUT_MS
-    int "Pouch Transport ACK timeout (ms)"
-    default 1000
-    help
-        The timeout, in milliseconds, that a receiver will wait
-        for new packets before retransmitting an acknowledgement
-
-
 module = POUCH_GATEWAY
 module-str = Pouch Gateway Library
 source "subsys/logging/Kconfig.template.log_config"
@@ -125,9 +117,11 @@ config POUCH_TRANSPORT_SERIAL
 config POUCH_TRANSPORT_SERIAL_BROKER
     bool "Serial transport"
     help
-      Enable the Pouch Serial transport. This transport can be
-      used in a gateway application that communicates with a
-      node device over a serial connection.
+      Enable the broker side of the Pouch Serial transport. This transport
+      can be used in a gateway application that communicates with a node
+      device over a serial connection. It is independent of the transport
+      the gateway itself uses to reach Golioth, and is selected by the
+      serial transport adapters, such as POUCH_SPI_BROKER.
 
 module = POUCH_TRANSPORT
 module-str = Pouch Transport

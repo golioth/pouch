@@ -3,14 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 menu "Pouch Serial Transport"
-    visible if POUCH_TRANSPORT_SERIAL
-
-config POUCH_TRANSPORT_SERIAL_BROKER
-    bool
-    depends on POUCH_GATEWAY
-    default y
-    help
-        Enable the broker-based implementation of the Pouch Serial transport.
+    visible if POUCH_TRANSPORT_SERIAL || POUCH_GATEWAY
 
 config POUCH_TRANSPORT_SERIAL_DEVICE
     bool
@@ -20,6 +13,122 @@ config POUCH_TRANSPORT_SERIAL_DEVICE
         Enable the device implementation of the Pouch Serial transport, which
         runs on the node device and communicates with a gateway running the
         broker implementation.
+
+config POUCH_SERIAL_FRAME_MAX_LEN
+    int "Maximum serial frame length"
+    default 127
+    range 2 255
+    help
+      Maximum length of a Pouch Serial frame, including its header. Every
+      channel keeps the last frame it sent until it's ACKed, so it can send
+      it again, which takes this much memory per channel. Frames are limited
+      to the smaller of this and the frame size of the transport adapter.
+
+config POUCH_SERIAL_BROKER_MAX_RETRIES
+    int "Maximum number of retries"
+    depends on POUCH_TRANSPORT_SERIAL_BROKER
+    default 5
+    help
+      Number of times the broker sends a frame again, or asks the device to
+      send its last frame again, before it gives up on the exchange. The
+      count is reset whenever the device sends a valid frame.
+
+menuconfig POUCH_SPI_DEVICE
+    bool "Pouch SPI device transport"
+    depends on SPI
+    depends on POUCH
+    select SPI_ASYNC
+    select SPSC_PBUF
+    select POUCH_TRANSPORT_SERIAL_DEVICE
+    default $(dt_compat_on_bus,$(DT_COMPAT_GOLIOTH_POUCH_DEVICE),spi)
+    help
+      Enable the SPI slave transport adapter for the Pouch serial
+      device protocol.
+
+if POUCH_SPI_DEVICE
+
+config POUCH_SPI_DEVICE_FRAME_SIZE
+    int "SPI slave frame size"
+    default 128
+    range 3 256
+    help
+      Maximum frame size in bytes for SPI transactions. Controls the
+      size of the TX and RX buffers. The first byte is reserved for
+      a length field, so the maximum payload is one less than this
+      value.
+
+module = POUCH_SPI_DEVICE
+module-str = Pouch SPI Slave
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # POUCH_SPI_DEVICE
+
+menuconfig POUCH_SPI_BROKER
+    bool "Pouch SPI broker transport"
+    depends on SPI
+    depends on POUCH_GATEWAY
+    select POUCH_TRANSPORT_SERIAL_BROKER
+    default $(dt_compat_on_bus,$(DT_COMPAT_GOLIOTH_POUCH_BROKER),spi)
+    help
+      Enable the SPI broker (master) transport adapter for the Pouch serial
+      broker protocol. Each devicetree node with compatible
+      "golioth,pouch-broker" on an SPI bus creates a broker instance.
+
+if POUCH_SPI_BROKER
+
+config POUCH_SPI_BROKER_FRAME_SIZE
+    int "SPI broker frame size"
+    default 128
+    range 3 256
+    help
+      Maximum frame size in bytes for SPI transactions. Controls the
+      size of the TX and RX buffers. The first byte is reserved for
+      a length field, so the maximum payload is one less than this
+      value.
+
+config POUCH_SPI_BROKER_THREAD_STACK_SIZE
+    int "SPI broker work queue thread stack size"
+    default 1200
+    help
+      Stack size in bytes for the shared SPI broker work queue thread.
+
+config POUCH_SPI_BROKER_RETRY_DELAY_MIN_MS
+    int "Initial delay before restarting a failed exchange (ms)"
+    default 1000
+    help
+      Time in milliseconds to wait before restarting the exchange after it
+      fails. The delay doubles with each consecutive failure, up to
+      POUCH_SPI_BROKER_RETRY_DELAY_MAX_MS, and is reset by a successful
+      exchange.
+
+config POUCH_SPI_BROKER_RETRY_DELAY_MAX_MS
+    int "Maximum delay before restarting a failed exchange (ms)"
+    default 60000
+    help
+      Upper bound for the delay before restarting a failed exchange.
+
+config POUCH_SPI_BROKER_RETRY_TIMEOUT_MS
+    int "Time to wait for a response before retrying (ms)"
+    default 2000
+    help
+      Time in milliseconds to wait for the device to respond to a frame
+      before sending it again, or asking the device to send its last frame
+      again. The device may take a while to process some frames, such as
+      the last fragment of a certificate, but a retry that arrives in the
+      meantime is harmless.
+
+config POUCH_SPI_BROKER_INTERFRAME_DELAY
+    int "Delay between each frame in milliseconds"
+    default 5
+    help
+      Time in milliseconds to wait between frames, to allow the SPI slave to
+      set up its SPI buffers.
+
+module = POUCH_SPI_BROKER
+module-str = Pouch SPI Broker
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # POUCH_SPI_BROKER
 
 module = POUCH_SERIAL
 module-str = Pouch Serial Transport

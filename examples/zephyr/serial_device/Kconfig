@@ -1,0 +1,34 @@
+# Copyright (c) 2025 Golioth, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+config NCS_APPLICATION_BOOT_BANNER_STRING
+    string
+    default "Pouch SPI Serial Device Example"
+
+source "$ZEPHYR_BASE/Kconfig"
+
+config EXAMPLE_SYNC_PERIOD_S
+    int "Sync Period"
+    default 10
+    help
+      The time, in seconds, after a sync to wait before requesting a sync from
+      a gateway.
+
+config EXAMPLE_CREDENTIALS_DIR
+    string "Directory containing credentials"
+    default "/lfs1/credentials"
+    help
+      Directory on mounted file system containing credentials.
+
+config EXAMPLE_POUCH_DEVICE_CRT_FILENAME
+    string "Pouch device crt filename in filesystem"
+    default "crt.der"
+    help
+      The filename used to store the pouch device certificate in the filesystem.
+
+config EXAMPLE_POUCH_DEVICE_KEY_FILENAME
+    string "Pouch device key filename in filesystem"
+    default "key.der"
+    help
+      The filename used to store the pouch device private key in the filesystem.
