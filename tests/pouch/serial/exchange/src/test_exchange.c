@@ -25,6 +25,7 @@
 #include <pouch/transport/serial/broker.h>
 #include <pouch/transport/serial/common.h>
 #include <pouch/transport/serial/device.h>
+#include "transport/serial/packet.h"
 
 #define MAX_FRAME_SIZE 64
 #define MAX_PUMP_ITER 200
@@ -511,9 +512,27 @@ static bool is_data_frame(const uint8_t *frame, size_t len)
     return (frame[0] & 0x80) != 0;
 }
 
+static bool is_ack_on(const uint8_t *frame, uint8_t channel)
+{
+    struct pouch_serial_header hdr;
+
+    return pouch_serial_header_decode(frame[0], &hdr) == 0 && !hdr.is_data
+        && hdr.channel == channel;
+}
+
 static bool is_downlink_ack(const uint8_t *frame, size_t len)
 {
-    return frame[0] == POUCH_SERIAL_CH_DOWNLINK;
+    return is_ack_on(frame, POUCH_SERIAL_CH_DOWNLINK);
+}
+
+static bool is_uplink_ack(const uint8_t *frame, size_t len)
+{
+    return is_ack_on(frame, POUCH_SERIAL_CH_UPLINK);
+}
+
+static bool is_ack_frame(const uint8_t *frame, size_t len)
+{
+    return !is_data_frame(frame, len);
 }
 
 /* Apply the fault to a frame. Returns false if the frame is lost. */
@@ -733,4 +752,158 @@ ZTEST(serial_exchange, test_broken_ack_to_last_fragment)
     zassert_equal(device_stubs.downlink.start_count, 1);
     zassert_equal(device_stubs.downlink.rx_len, sizeof(downlink));
     zassert_mem_equal(device_stubs.downlink.rx_buf, downlink, sizeof(downlink));
+}
+
+/* Three fragments, so the second one is neither the first nor the last */
+#define THREE_FRAGMENTS (2 * (MAX_FRAME_SIZE - 1) + 10)
+
+/*
+ * The device's ACK to the first fragment of a downlink is lost, so the broker sends the fragment
+ * again. The device has already delivered it, and must not deliver it twice.
+ */
+ZTEST(serial_exchange, test_lost_ack_to_first_pushed_fragment)
+{
+    uint8_t downlink[THREE_FRAGMENTS];
+    reset_exchange();
+    fill_pattern(downlink, sizeof(downlink), 0x40);
+    load_default_payloads();
+    stub_sender_set_data(&broker_stubs.downlink, downlink, sizeof(downlink));
+    fault.filter = is_downlink_ack;
+    /* The first DOWNLINK ACK ACKs the first fragment */
+    fault.index = 0;
+    fault.type = FAULT_DROP;
+
+    pouch_serial_broker_start(test_broker);
+    pump_with_faults(MAX_PUMP_ITER);
+
+    zassert_true(fault.injected);
+    zassert_true(timeouts > 0);
+    zassert_true(broker_done);
+    zassert_true(broker_success);
+    zassert_equal(device_stubs.downlink.start_count, 1);
+    zassert_equal(device_stubs.downlink.end_success_count, 1);
+    zassert_equal(device_stubs.downlink.rx_len, sizeof(downlink));
+    zassert_mem_equal(device_stubs.downlink.rx_buf, downlink, sizeof(downlink));
+}
+
+/*
+ * The device's ACK to the middle fragment of a downlink is lost, so the broker sends the fragment
+ * again. The device has already delivered it, and must not deliver it twice.
+ */
+ZTEST(serial_exchange, test_lost_ack_to_middle_pushed_fragment)
+{
+    uint8_t downlink[THREE_FRAGMENTS];
+    reset_exchange();
+    fill_pattern(downlink, sizeof(downlink), 0x40);
+    load_default_payloads();
+    stub_sender_set_data(&broker_stubs.downlink, downlink, sizeof(downlink));
+    fault.filter = is_downlink_ack;
+    /* The second DOWNLINK ACK ACKs the second fragment */
+    fault.index = 1;
+    fault.type = FAULT_DROP;
+
+    pouch_serial_broker_start(test_broker);
+    pump_with_faults(MAX_PUMP_ITER);
+
+    zassert_true(fault.injected);
+    zassert_true(timeouts > 0);
+    zassert_true(broker_done);
+    zassert_true(broker_success);
+    zassert_equal(device_stubs.downlink.start_count, 1);
+    zassert_equal(device_stubs.downlink.end_success_count, 1);
+    zassert_equal(device_stubs.downlink.rx_len,
+                  sizeof(downlink),
+                  "downlink delivered %zu of %zu bytes",
+                  device_stubs.downlink.rx_len,
+                  sizeof(downlink));
+    zassert_mem_equal(device_stubs.downlink.rx_buf, downlink, sizeof(downlink));
+}
+
+/*
+ * The broker's ACK to the middle fragment of an uplink is lost, so the device doesn't send the
+ * next one. The broker's retry makes the device send the middle fragment again, which the broker
+ * has already delivered, and must not deliver twice.
+ */
+ZTEST(serial_exchange, test_lost_ack_to_middle_pulled_fragment)
+{
+    uint8_t uplink[THREE_FRAGMENTS];
+    reset_exchange();
+    fill_pattern(uplink, sizeof(uplink), 0x50);
+    load_default_payloads();
+    stub_sender_set_data(&device_stubs.uplink, uplink, sizeof(uplink));
+    fault.from_broker = true;
+    fault.filter = is_uplink_ack;
+    /* The first UPLINK ACK requests the first fragment, the third one ACKs the second fragment */
+    fault.index = 2;
+    fault.type = FAULT_DROP;
+
+    pouch_serial_broker_start(test_broker);
+    pump_with_faults(MAX_PUMP_ITER);
+
+    zassert_true(fault.injected);
+    zassert_true(timeouts > 0);
+    zassert_true(broker_done);
+    zassert_true(broker_success);
+    zassert_equal(broker_stubs.uplink.start_count, 1);
+    zassert_equal(broker_stubs.uplink.end_success_count, 1);
+    zassert_equal(broker_stubs.uplink.rx_len,
+                  sizeof(uplink),
+                  "uplink delivered %zu of %zu bytes",
+                  broker_stubs.uplink.rx_len,
+                  sizeof(uplink));
+    zassert_mem_equal(broker_stubs.uplink.rx_buf, uplink, sizeof(uplink));
+}
+
+/*
+ * Run an exchange with a fault on every ACK in one direction in turn, and check that every
+ * transfer completes intact. The broker's ACK to the last uplink fragment is only sent after the
+ * exchange has ended, so it's not covered.
+ */
+static void sweep_acks(bool from_broker, enum fault_type type)
+{
+    static uint8_t bufs[5][LARGE_PAYLOAD_SIZE];
+
+    for (int i = 0;; i++)
+    {
+        reset_exchange();
+        fault.from_broker = from_broker;
+        fault.filter = is_ack_frame;
+        fault.index = i;
+        fault.type = type;
+
+        load_large_payloads(bufs);
+        pouch_serial_broker_start(test_broker);
+        pump_with_faults(MAX_PUMP_ITER);
+
+        if (!fault.injected)
+        {
+            // Every ACK has been tried
+            zassert_true(i > 4, "expected a multi-fragment exchange");
+            break;
+        }
+
+        zassert_true(broker_done, "exchange did not complete with a fault on ACK %d", i);
+        zassert_true(broker_success, "exchange failed with a fault on ACK %d", i);
+        expect_large_payloads(bufs);
+    }
+}
+
+ZTEST(serial_exchange, test_lost_broker_acks)
+{
+    sweep_acks(true, FAULT_DROP);
+}
+
+ZTEST(serial_exchange, test_lost_device_acks)
+{
+    sweep_acks(false, FAULT_DROP);
+}
+
+ZTEST(serial_exchange, test_broken_broker_acks)
+{
+    sweep_acks(true, FAULT_TRAILING_GARBAGE);
+}
+
+ZTEST(serial_exchange, test_broken_device_acks)
+{
+    sweep_acks(false, FAULT_TRAILING_GARBAGE);
 }
