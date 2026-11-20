@@ -114,8 +114,9 @@ config POUCH_SPI_BROKER_RETRY_TIMEOUT_MS
       Time in milliseconds to wait for the device to respond to a frame
       before sending it again, or asking the device to send its last frame
       again. The device may take a while to process some frames, such as
-      the last fragment of a certificate, but a retry that arrives in the
-      meantime is harmless.
+      the last fragment of a certificate. A frame that's sent again in the
+      meantime is recognized as a duplicate, unless it's a pushed transfer
+      of a single fragment, which is then received twice.
 
 config POUCH_SPI_BROKER_INTERFRAME_DELAY
     int "Delay between each frame in milliseconds"

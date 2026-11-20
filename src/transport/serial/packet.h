@@ -12,12 +12,16 @@
  * Decoded representation of a 1-byte Pouch Serial frame header.
  *
  * Bit layout:
- *   ACK frame  (bit 7 = 0): [ 0 | ERR | 0 | LAST | channel[3:0] ]
- *   Data frame (bit 7 = 1): [ 1 | ERR | FIRST | LAST | channel[3:0] ]
+ *   ACK frame  (bit 7 = 0): [ 0 | ERR | 0 | LAST | SEQ | channel[2:0] ]
+ *   Data frame (bit 7 = 1): [ 1 | ERR | FIRST | LAST | SEQ | channel[2:0] ]
+ *
+ * SEQ alternates between the Data frames on a channel, and stays the same when a frame is sent
+ * again. ACK and NACK frames carry the SEQ of the Data frame the receiver expects next, which
+ * acknowledges the one before it. Abort frames don't use SEQ.
  *
  * ACK frames come in three kinds:
- *   ACK   (ERR = 0, LAST = 0): The previous frame was received, send the next one.
- *   NACK  (ERR = 1, LAST = 0): The previous frame was lost or broken, send it again.
+ *   ACK   (ERR = 0, LAST = 0): Send the Data frame with SEQ.
+ *   NACK  (ERR = 1, LAST = 0): The Data frame with SEQ didn't arrive in time, send it again.
  *   Abort (ERR = 1, LAST = 1): The receiver has abandoned the transfer.
  */
 struct pouch_serial_header
@@ -34,7 +38,9 @@ struct pouch_serial_header
     bool first;
     /** Last fragment of a transfer. For ACK frames, only valid with ERR, to abort the transfer. */
     bool last;
-    /** Logical channel identifier (4 bits). */
+    /** Alternating sequence bit. */
+    bool seq;
+    /** Logical channel identifier (3 bits). */
     uint8_t channel;
 };
 
