@@ -1918,6 +1918,38 @@ ZTEST(serial_broker, test_request_acknowledges_previous_transfer)
     zassert_not_equal(hdr.seq, last_seq, "the request doesn't acknowledge the last fragment");
 }
 
+/*
+ * The retry timer queues the first fragment to be sent again, but the device's late ACK arrives
+ * before it's sent. The next fragment is sent instead.
+ */
+ZTEST(serial_broker, test_ack_before_queued_resend)
+{
+    uint8_t payload[FRAME_BUF_SIZE * 3];
+    memset(payload, 0xAB, sizeof(payload));
+    stub_sender_set_data(&broker_stubs.downlink, payload, sizeof(payload));
+    advance_to_sync(true, true);
+
+    uint8_t buf[FRAME_BUF_SIZE];
+    struct pouch_serial_header hdr;
+    const uint8_t *frame_payload;
+    size_t payload_len;
+    zassert_true(
+        get_frame_on(POUCH_SERIAL_CH_DOWNLINK, &hdr, &frame_payload, &payload_len, buf, sizeof(buf))
+        > 0);
+    zassert_true(hdr.is_data);
+    zassert_true(hdr.first);
+
+    pouch_serial_broker_timeout(test_broker);
+    zassert_ok(send_ack(POUCH_SERIAL_CH_DOWNLINK, false));
+
+    zassert_true(
+        get_frame_on(POUCH_SERIAL_CH_DOWNLINK, &hdr, &frame_payload, &payload_len, buf, sizeof(buf))
+            > 0,
+        "the next fragment wasn't sent");
+    zassert_true(hdr.is_data);
+    zassert_false(hdr.first);
+}
+
 ZTEST(serial_broker, test_timeout_when_idle)
 {
     /* Nothing to retry before the broker has started */

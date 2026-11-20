@@ -179,6 +179,7 @@ static int handle_ack(struct pouch_serial_channel *ch, const struct pouch_serial
     }
 
     pouch_atomic_clear_bit(ch->flags, CH_FLAG_WAIT_ACK);
+    pouch_atomic_clear_bit(ch->flags, CH_FLAG_RESEND);
     ch->tx_seq = !ch->tx_seq;
 
     if (pouch_atomic_test_and_clear_bit(ch->flags, CH_FLAG_LAST_SENT))
