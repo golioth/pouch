@@ -17,6 +17,12 @@ jobs:
             example: ble_gatt
             board: nrf52840dk/nrf52840
           - manifest: west-zephyr.yml
+            example: ble_gatt
+            board: nrf54lm20dk/nrf54lm20a/cpuapp
+          - manifest: west-ncs.yml
+            example: ble_gatt
+            board: nrf54lm20dk/nrf54lm20a/cpuapp
+          - manifest: west-zephyr.yml
             example: http_client
             board: frdm_rw612
           - manifest: west-zephyr.yml
