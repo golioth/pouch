@@ -822,14 +822,20 @@ ZTEST(serial_device, test_interrupt_ongoing_receive)
     /* Start a multi-fragment receive */
     zassert_ok(send_data(POUCH_SERIAL_CH_DOWNLINK, true, false, false, frag, sizeof(frag)));
 
-    /* Send another FIRST frame: interrupts the ongoing transfer */
+    /* A broker that restarted sends another FIRST, which interrupts the ongoing transfer */
     int err = send_data(POUCH_SERIAL_CH_DOWNLINK, true, false, false, frag, sizeof(frag));
     zassert_not_equal(err, 0, "expected error when sending FIRST to already-open channel");
+    expect_ack(POUCH_SERIAL_CH_DOWNLINK, true);
 
-    /* The first transfer should not have been aborted, but the second transfer should have been
-     * ignored */
-    zassert_equal(device_stubs.downlink.end_fail_count, 0);
+    /* Both transfers are abandoned */
+    zassert_equal(device_stubs.downlink.end_fail_count, 1);
     zassert_equal(device_stubs.downlink.start_count, 1);
+
+    /* The next transfer starts over */
+    zassert_ok(send_data(POUCH_SERIAL_CH_DOWNLINK, true, true, false, frag, sizeof(frag)));
+    expect_ack(POUCH_SERIAL_CH_DOWNLINK, false);
+    zassert_equal(device_stubs.downlink.start_count, 2);
+    zassert_equal(device_stubs.downlink.end_success_count, 1);
 }
 
 ZTEST(serial_device, test_concurrent_sender_and_receiver)

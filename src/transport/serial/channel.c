@@ -206,7 +206,9 @@ static int handle_data(struct pouch_serial_channel *ch,
         if (pouch_atomic_test_bit(ch->flags, CH_FLAG_OPEN)
             && !pouch_atomic_test_bit(ch->flags, CH_FLAG_OPENING))
         {
+            // The sender has started over, e.g. after a restart, and abandoned the open transfer
             POUCH_LOG_ERR("ch %d: already open", channel_id(ch));
+            close_channel(ch, false, false);
             return -EBUSY;
         }
 
