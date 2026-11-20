@@ -711,7 +711,7 @@ static void load_two_fragment_downlink(uint8_t *downlink, size_t len)
 
 /*
  * A single-fragment transfer sent again after its ACK was lost is delivered twice: it starts with
- * FIRST, so without sequence numbers, the device can't tell it from the next transfer.
+ * FIRST, so the device can't tell it from the next transfer. This one takes two fragments.
  */
 ZTEST(serial_exchange, test_lost_ack_to_last_fragment)
 {

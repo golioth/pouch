@@ -5,6 +5,8 @@
  */
 #include "packet.h"
 
+#include <pouch/transport/serial/common.h>
+
 #include <errno.h>
 
 /* Header byte bit positions */
@@ -12,7 +14,10 @@
 #define HDR_ERR (1 << 6)
 #define HDR_FIRST (1 << 5)
 #define HDR_LAST (1 << 4)
-#define HDR_CH_MASK 0x0f
+#define HDR_SEQ (1 << 3)
+#define HDR_CH_MASK 0x07
+
+_Static_assert(POUCH_SERIAL_CHANNEL_COUNT <= HDR_CH_MASK + 1, "Not enough channel IDs");
 
 /* Reserved bits in an ACK frame must be zero. */
 #define HDR_ACK_RESERVED_MASK (HDR_FIRST)
@@ -44,6 +49,11 @@ uint8_t pouch_serial_header_encode(const struct pouch_serial_header *hdr)
         byte |= HDR_ERR;
     }
 
+    if (hdr->seq)
+    {
+        byte |= HDR_SEQ;
+    }
+
     return byte;
 }
 
@@ -51,6 +61,7 @@ int pouch_serial_header_decode(uint8_t byte, struct pouch_serial_header *hdr)
 {
     hdr->is_data = !!(byte & HDR_DATA);
     hdr->err = !!(byte & HDR_ERR);
+    hdr->seq = !!(byte & HDR_SEQ);
     hdr->channel = byte & HDR_CH_MASK;
 
     if (hdr->is_data)

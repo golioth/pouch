@@ -31,9 +31,21 @@ POUCH_LOG_REGISTER(serial_channel, CONFIG_POUCH_SERIAL_LOG_LEVEL);
  *
  * A receiver that didn't get a fragment, or got a broken one, sends a NACK, and the sender sends
  * the fragment again. Only the broker can detect a lost frame, as the device can't send anything
- * on its own, so the broker drives retries with pouch_serial_ch_retry(). There are no sequence
- * numbers, so a fragment sent again after its ACK was lost is received twice. The receiver
- * recognizes this for the last fragment of a transfer, which it just ACKs again.
+ * on its own, so the broker drives retries with pouch_serial_ch_retry().
+ *
+ * Fragments carry an alternating sequence bit, and ACKs carry the bit of the fragment the receiver
+ * expects next. A fragment sent again after its ACK was lost has the old bit, so the receiver ACKs
+ * it again without delivering it twice. An ACK or NACK only acknowledges a fragment if its bit has
+ * moved on from the fragment's. A NACK that hasn't asks for the fragment again, and an ACK that
+ * hasn't is a duplicate of an earlier one.
+ *
+ * The first fragment of a transfer sets the receiver's sequence. Receivers carry their bit over
+ * from one transfer to the next, and pulled transfers start with the bit from the request, so the
+ * request also acknowledges the last fragment of the previous transfer, and a device that
+ * restarted picks up the broker's bit. A first fragment is only taken as sent again if it matches
+ * the one received, as a broker that restarted may start over from the same bit. A pushed transfer
+ * of a single fragment, sent again after its ACK was lost or late, can't be told from the next
+ * transfer, and is received twice.
  */
 
 static enum pouch_serial_channel_id channel_id(const struct pouch_serial_channel *ch)
@@ -101,7 +113,11 @@ static void close_channel(struct pouch_serial_channel *ch, bool success, bool no
 
 static int handle_ack(struct pouch_serial_channel *ch, const struct pouch_serial_header *hdr)
 {
-    POUCH_LOG_DBG("ACK on channel %d (err=%d, last=%d)", channel_id(ch), hdr->err, hdr->last);
+    POUCH_LOG_DBG("ACK on channel %d (err=%d, last=%d, seq=%d)",
+                  channel_id(ch),
+                  hdr->err,
+                  hdr->last,
+                  hdr->seq);
     if (hdr->err && hdr->last)
     {
         POUCH_LOG_ERR("ch %d: transfer aborted by the remote", channel_id(ch));
@@ -121,6 +137,7 @@ static int handle_ack(struct pouch_serial_channel *ch, const struct pouch_serial
         if (!is_push(ch) && !pouch_atomic_test_bit(ch->flags, CH_FLAG_OPEN))
         {
             // The request is only made once, so hold on to it until the channel is resumed
+            ch->tx_seq = hdr->seq;
             pouch_atomic_set_bit(ch->flags, CH_FLAG_REQUESTED);
         }
 
@@ -137,29 +154,32 @@ static int handle_ack(struct pouch_serial_channel *ch, const struct pouch_serial
         }
 
         // The first request from the remote opens the transfer, whether it's an ACK or a NACK
+        ch->tx_seq = hdr->seq;
         return pouch_serial_ch_open(ch);
     }
 
-    if (hdr->err)
+    if (!pouch_atomic_test_bit(ch->flags, CH_FLAG_WAIT_ACK))
     {
-        if (!pouch_atomic_test_bit(ch->flags, CH_FLAG_WAIT_ACK) || ch->frame_len == 0)
+        // We haven't sent anything since the last ACK, so there's nothing to acknowledge
+        return 0;
+    }
+
+    if (hdr->seq == ch->tx_seq)
+    {
+        // The remote is still waiting for the fragment we sent
+        if (hdr->err)
         {
-            // We haven't sent anything since the last ACK, so there's nothing to send again
-            return 0;
+            POUCH_LOG_WRN("ch %d: NACK, sending the last fragment again", channel_id(ch));
+            pouch_atomic_set_bit(ch->flags, CH_FLAG_RESEND);
+            pouch_atomic_set_bit(ch->flags, CH_FLAG_PENDING);
+            signal_ready(ch);
         }
 
-        POUCH_LOG_WRN("ch %d: NACK, sending the last fragment again", channel_id(ch));
-        pouch_atomic_set_bit(ch->flags, CH_FLAG_RESEND);
-        pouch_atomic_set_bit(ch->flags, CH_FLAG_PENDING);
-        signal_ready(ch);
         return 0;
     }
 
-    if (!pouch_atomic_test_and_clear_bit(ch->flags, CH_FLAG_WAIT_ACK))
-    {
-        // We haven't sent anything since the last ACK, so this one is redundant.
-        return 0;
-    }
+    pouch_atomic_clear_bit(ch->flags, CH_FLAG_WAIT_ACK);
+    ch->tx_seq = !ch->tx_seq;
 
     if (pouch_atomic_test_and_clear_bit(ch->flags, CH_FLAG_LAST_SENT))
     {
@@ -173,6 +193,22 @@ static int handle_ack(struct pouch_serial_channel *ch, const struct pouch_serial
 }
 
 /*
+ * Check whether a FIRST fragment on an open receiver is the first fragment of the transfer, sent
+ * again after its ACK was lost. That one wasn't the last fragment, as the transfer is still open.
+ * A sender that restarted may start over from the same SEQ, so the fragment must match the first
+ * one too.
+ */
+static bool is_first_sent_again(const struct pouch_serial_channel *ch,
+                                const struct pouch_serial_header *hdr,
+                                const void *payload,
+                                size_t len)
+{
+    return pouch_atomic_test_bit(ch->flags, CH_FLAG_FIRST_ONLY) && !hdr->last
+        && hdr->seq != ch->rx_seq && len == ch->frame_len
+        && (len == 0 || memcmp(payload, ch->frame, len) == 0);
+}
+
+/*
  * Handle an incoming Data frame. Only receiver channels accept Data frames.
  */
 static int handle_data(struct pouch_serial_channel *ch,
@@ -180,12 +216,13 @@ static int handle_data(struct pouch_serial_channel *ch,
                        const void *payload,
                        size_t len)
 {
-    POUCH_LOG_DBG("DATA on channel %d (len=%u, first=%d, last=%d, err=%d)",
+    POUCH_LOG_DBG("DATA on channel %d (len=%u, first=%d, last=%d, err=%d, seq=%d)",
                   channel_id(ch),
                   len,
                   hdr->first,
                   hdr->last,
-                  hdr->err);
+                  hdr->err,
+                  hdr->seq);
     if (hdr->err)
     {
         POUCH_LOG_WRN("ch %d: error flag set, closing", channel_id(ch));
@@ -206,6 +243,15 @@ static int handle_data(struct pouch_serial_channel *ch,
         if (pouch_atomic_test_bit(ch->flags, CH_FLAG_OPEN)
             && !pouch_atomic_test_bit(ch->flags, CH_FLAG_OPENING))
         {
+            if (is_first_sent_again(ch, hdr, payload, len))
+            {
+                // The ACK to the first fragment was lost, and the sender sent it again
+                POUCH_LOG_WRN("ch %d: first fragment received again, ACKing it again",
+                              channel_id(ch));
+                pouch_atomic_set_bit(ch->flags, CH_FLAG_PENDING);
+                return 0;
+            }
+
             // The sender has started over, e.g. after a restart, and abandoned the open transfer
             POUCH_LOG_ERR("ch %d: already open", channel_id(ch));
             close_channel(ch, false, false);
@@ -227,6 +273,18 @@ static int handle_data(struct pouch_serial_channel *ch,
         }
 
         pouch_atomic_clear_bit(ch->flags, CH_FLAG_OPENING);
+        ch->rx_seq = hdr->seq;
+
+        if (len <= sizeof(ch->frame))
+        {
+            if (len > 0)
+            {
+                memcpy(ch->frame, payload, len);
+            }
+
+            ch->frame_len = len;
+            pouch_atomic_set_bit(ch->flags, CH_FLAG_FIRST_ONLY);
+        }
     }
     else if (!pouch_atomic_test_bit(ch->flags, CH_FLAG_OPEN)
              || pouch_atomic_test_bit(ch->flags, CH_FLAG_OPENING))
@@ -243,6 +301,17 @@ static int handle_data(struct pouch_serial_channel *ch,
         POUCH_LOG_ERR("ch %d: missing FIRST fragment", channel_id(ch));
         return -EINVAL;
     }
+    else if (hdr->seq != ch->rx_seq)
+    {
+        // The ACK to this fragment was lost, and the sender sent it again
+        POUCH_LOG_WRN("ch %d: fragment received again, ACKing it again", channel_id(ch));
+        pouch_atomic_set_bit(ch->flags, CH_FLAG_PENDING);
+        return 0;
+    }
+    else
+    {
+        pouch_atomic_clear_bit(ch->flags, CH_FLAG_FIRST_ONLY);
+    }
 
     if (len > 0)
     {
@@ -256,6 +325,7 @@ static int handle_data(struct pouch_serial_channel *ch,
     }
 
     // Every fragment is ACKed, including the last one
+    ch->rx_seq = !ch->rx_seq;
     pouch_atomic_set_bit(ch->flags, CH_FLAG_PENDING);
 
     if (hdr->last)
@@ -328,6 +398,7 @@ size_t pouch_serial_ch_frame_get(struct pouch_serial_channel *ch, uint8_t *buf, 
         struct pouch_serial_header hdr = {
             .is_data = false,
             .err = pouch_atomic_test_and_clear_bit(ch->flags, CH_FLAG_NACK),
+            .seq = ch->rx_seq,
             .channel = channel_id(ch),
         };
 
@@ -384,6 +455,7 @@ size_t pouch_serial_ch_frame_get(struct pouch_serial_channel *ch, uint8_t *buf, 
         .err = error,
         .first = pouch_atomic_test_and_clear_bit(ch->flags, CH_FLAG_OPENING),
         .last = is_last,
+        .seq = ch->tx_seq,
     };
 
     *buf = pouch_serial_header_encode(&hdr);
@@ -439,6 +511,7 @@ int pouch_serial_ch_open(struct pouch_serial_channel *ch)
     pouch_atomic_clear_bit(ch->flags, CH_FLAG_NACK);
     pouch_atomic_clear_bit(ch->flags, CH_FLAG_REQUESTED);
     pouch_atomic_clear_bit(ch->flags, CH_FLAG_COMPLETED);
+    pouch_atomic_clear_bit(ch->flags, CH_FLAG_FIRST_ONLY);
     ch->frame_len = 0;
 
     if (is_receiver(ch) && pouch_atomic_test_bit(ch->flags, CH_FLAG_PENDING))

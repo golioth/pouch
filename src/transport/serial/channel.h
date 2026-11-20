@@ -40,6 +40,8 @@ enum ch_flag
     CH_FLAG_REQUESTED,
     /** Receiver only: the last transfer was completed successfully. */
     CH_FLAG_COMPLETED,
+    /** Receiver only: the first fragment is the only one received in this transfer so far. */
+    CH_FLAG_FIRST_ONLY,
     /**
      * Receiver only: the transfer was opened while an ACK was owed to the previous one, so the
      * first fragment has to be requested with a separate ACK.
@@ -55,7 +57,14 @@ struct pouch_serial_channel
     pouch_serial_ch_closed_cb_t closed_cb;
     POUCH_ATOMIC_DEFINE(flags, CH_FLAG_COUNT);
     uint8_t id;
-    /** Sender only: the last Data frame, kept until it's ACKed, so it can be sent again. */
+    /** Sender only: SEQ of the next new Data frame, or of the one waiting for an ACK. */
+    bool tx_seq;
+    /** Receiver only: SEQ of the Data frame expected next. */
+    bool rx_seq;
+    /**
+     * Sender: the last Data frame, kept until it's ACKed, so it can be sent again.
+     * Receiver: the payload of the first fragment, while it's the only one received.
+     */
     uint8_t frame[CONFIG_POUCH_SERIAL_FRAME_MAX_LEN];
     size_t frame_len;
 };
