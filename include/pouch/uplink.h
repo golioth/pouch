@@ -14,7 +14,7 @@
  */
 
 /** Maximum number of streams that can be open simultaneously in the same uplink session */
-#define POUCH_STREAMS_MAX 31
+#define POUCH_STREAMS_MAX 30
 
 struct pouch_stream;
 
