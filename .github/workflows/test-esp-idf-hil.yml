@@ -261,11 +261,6 @@ jobs:
           # Ensure we can query the short hash
           git config --global --add safe.directory $GITHUB_WORKSPACE
 
-          WIFI_ARGS=""
-          if [ "$SAMPLE_NAME" != "ble_gatt" ]; then
-            WIFI_ARGS="--wifi-ssid $WIFI_SSID --wifi-psk $WIFI_PSK"
-          fi
-
           GATEWAY_ARGS=()
           if [ "$SAMPLE_NAME" == "ble_gatt" ]; then
             GW_PORT_VAR=CI_FRDM_RW612_PORT
@@ -290,7 +285,6 @@ jobs:
             --erase-all n                    \
             --api-url "$GOLIOTH_API_URL"     \
             --api-key "$GOLIOTH_API_KEY"     \
-            $WIFI_ARGS                       \
             "${GATEWAY_ARGS[@]}"             \
             --generate-certs                 \
             --junit-xml "$UNITY_REPORT_NAME" \
