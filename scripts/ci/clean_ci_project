@@ -205,10 +205,6 @@ async def main(api_url: str, api_key: str, days_old: int, verbose: bool) -> int:
     if oc.devices:
         device_count = await oc.cull_devices(oc.project, timedelta(days=days_old))
 
-    artifact_count = 0
-    if oc.artifacts:
-        artifact_count = await oc.cull_artifacts(oc.project, timedelta(days=days_old))
-
     release_count = 0
     if oc.releases:
         release_count = await oc.cull_releases(oc.project, timedelta(days=days_old))
@@ -216,6 +212,10 @@ async def main(api_url: str, api_key: str, days_old: int, verbose: bool) -> int:
     cohorts_count = 0
     if oc.cohorts:
         cohorts_count = await oc.cull_cohorts(oc.project, timedelta(days=days_old))
+
+    artifact_count = 0
+    if oc.artifacts:
+        artifact_count = await oc.cull_artifacts(oc.project, timedelta(days=days_old))
 
     tag_count = 0
     if oc.tags:
@@ -228,9 +228,9 @@ async def main(api_url: str, api_key: str, days_old: int, verbose: bool) -> int:
         )
 
     print(f"Devices removed: {device_count}")
-    print(f"Artifacts removed: {artifact_count}")
     print(f"Releases removed: {release_count}")
     print(f"Cohorts removed: {cohorts_count}")
+    print(f"Artifacts removed: {artifact_count}")
     print(f"Tags removed: {tag_count}")
     print(f"Certificates removed: {certificate_count}")
 
