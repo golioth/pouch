@@ -96,8 +96,9 @@ async def _send_and_expect_store(
     text = _match_text(match)
     if ("Successfully stored" not in text) or (re.search(expected_log, text) is None):
         command_name = command.split(" ", 1)[0]
-        raise AssertionError(
-            f"Credential store failed for command: {command_name} <secret>"
+        pytest.fail(
+            f"Credential store failed for command: {command_name} <secret>",
+            pytrace=False,
         )
 
 
@@ -149,6 +150,37 @@ async def _wait_for_boot_state(
     ) from last_exception
 
 
+def _console_arg(value: str, name: str) -> str:
+    """Return ``value`` as a single esp_console argument.
+
+    The console gives a backslash and a double quote special meaning even
+    inside a quoted argument, so values containing them are rejected.
+    """
+    if '"' in value or "\\" in value:
+        pytest.fail(
+            f"{name} contains a double quote or a backslash, which the ESP-IDF "
+            "console cannot take in a quoted argument",
+            pytrace=False,
+        )
+    return f'"{value}"'
+
+
+async def _store_wifi_value(
+    dut, command: str, value: str, expected_log: str, store_result_pattern: str
+) -> None:
+    arg = _console_arg(value, f"Wi-Fi {command.upper()}")
+    try:
+        await _send_and_expect_store(
+            dut, f"{command} {arg}", expected_log, store_result_pattern
+        )
+    except Exception as e:  # noqa: BLE001
+        # No frame of the send may be printed: its arguments hold the value.
+        pytest.fail(
+            f"Sending '{command} <secret>' failed: {type(e).__name__}",
+            pytrace=False,
+        )
+
+
 async def _provision_and_boot(
     dut,
     provisioning_creds,
@@ -161,15 +193,17 @@ async def _provision_and_boot(
 
     if provision_wifi:
         print("Provisioning WiFi and credentials")
-        await _send_and_expect_store(
+        await _store_wifi_value(
             dut,
-            f"ssid {provisioning_creds.wifi.ssid}",
+            "ssid",
+            provisioning_creds.wifi.ssid,
             r".*Successfully stored WiFi SSID",
             store_result_pattern,
         )
-        await _send_and_expect_store(
+        await _store_wifi_value(
             dut,
-            f"psk {provisioning_creds.wifi.psk}",
+            "psk",
+            provisioning_creds.wifi.psk,
             r".*Successfully stored WiFi PSK",
             store_result_pattern,
         )
