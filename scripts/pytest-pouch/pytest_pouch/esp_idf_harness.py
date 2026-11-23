@@ -16,7 +16,7 @@ import os
 import re
 import secrets
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
@@ -24,8 +24,8 @@ import pytest
 
 @dataclass
 class WifiCreds:
-    ssid: str
-    psk: str
+    ssid: str = field(repr=False)
+    psk: str = field(repr=False)
 
 
 @dataclass
