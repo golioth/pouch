@@ -55,12 +55,19 @@ patches:
     date: 2026-04-23
     apply-command: >-
       bash -c 'if [ $(west config manifest.file) = "west-zephyr.yml" ]; then git am $@; fi' --
-
   - path: zephyr/zephyr/0008-soc-nxp-rw-re-power-TDDR-PLL-sysbuild.patch
     sha256sum: 6e4eb961d90962433c1b4c408ccdb83f054eeb7ae54a00a6227029252e938039
     module: zephyr
     author: Mike Szczys
     email: michael.szczys@canonical.com
     date: 2026-07-21
+    apply-command: >-
+      bash -c 'if [ $(west config manifest.file) = "west-zephyr.yml" ]; then git am $@; fi' --
+  - path: zephyr/zephyr/0009-boards-nxp-frdm_rw612-fix-swapped-ENET-PHY-reset-and.patch
+    sha256sum: 94ebbbdb1b401d3ed2116c6ed57257262688b64cdb894a6bb1c7e62a2bf5e278
+    module: zephyr
+    author: Tobias Frauenschläger
+    email: t.frauenschlaeger@me.com
+    date: 2026-09-28
     apply-command: >-
       bash -c 'if [ $(west config manifest.file) = "west-zephyr.yml" ]; then git am $@; fi' --
