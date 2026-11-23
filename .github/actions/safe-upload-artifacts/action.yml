@@ -44,7 +44,7 @@ runs:
         do
           secret_val=$(jq -r ".$key" <<< "$SECRETS_CONTEXT")
 
-          if [[ ! $secret_val =~ "\n" ]]; then
+          if [[ -n $secret_val && $secret_val != *$'\n'* ]]; then
             # This approach to escaping the regex found: https://stackoverflow.com/a/29613573/922013
             ESCAPED_SECRET=$(sed 's/[^^]/[&]/g; s/\^/\\^/g' <<< "$secret_val")
 
