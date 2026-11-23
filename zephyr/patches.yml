@@ -71,3 +71,11 @@ patches:
     date: 2026-09-28
     apply-command: >-
       bash -c 'if [ $(west config manifest.file) = "west-zephyr.yml" ]; then git am $@; fi' --
+  - path: zephyr/zephyr/0010-drivers-clock_control-mcux_syscon-fix-RW6xx-ENET-clo.patch
+    sha256sum: 7fcbaea7d00d94d5857d23c8a304763e0dfd88fd00e20cf3894d34fd0498a1be
+    module: zephyr
+    author: Tobias Frauenschläger
+    email: t.frauenschlaeger@me.com
+    date: 2026-09-28
+    apply-command: >-
+      bash -c 'if [ $(west config manifest.file) = "west-zephyr.yml" ]; then git am $@; fi' --
