@@ -7,8 +7,9 @@ __license__ = "Apache-2.0"
 import argparse
 import asyncio
 import sys
-from datetime import datetime, timedelta, timezone
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from golioth import (
     Certificate,
@@ -62,12 +63,12 @@ class OrphanCleaner:
     def get_age(self, ts: str) -> timedelta | None:
         try:
             created_dt = datetime.fromisoformat(ts)
-        except Exception:
+        except (TypeError, ValueError):
             if self.verbose:
                 print(f"Error processing timestamp: {ts}")
             return None
 
-        return datetime.now(timezone.utc) - created_dt
+        return datetime.now(UTC) - created_dt
 
     async def remove_expired_ids(
         self,
@@ -81,7 +82,7 @@ class OrphanCleaner:
             try:
                 await remove(member.id)
                 return member.id
-            except Exception:
+            except Exception:  # noqa: BLE001
                 print(f"Unable to remove: {member.id}")
                 return None
 
@@ -198,7 +199,7 @@ async def main(api_url: str, api_key: str, days_old: int, verbose: bool) -> int:
     print("\nStarting removal process.")
     print(f"  Org: {oc.project.organization}")
     print(f"  Proj: {oc.project.id}")
-    print("")
+    print()
 
     device_count = 0
     if oc.devices:
