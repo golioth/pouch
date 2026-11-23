@@ -83,7 +83,7 @@ jobs:
           west update --narrow -o=--depth=1
           git config --global user.email user@git-scm.com
           git config --global user.name "Git User"
-          west patch apply || true
+          west patch apply
 
       - name: Install pip packages
         run: |
