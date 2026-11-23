@@ -25,6 +25,9 @@ RemFunc = Callable[[Any], Awaitable[Any]]
 
 EXPIRY_AGE = timedelta(days=1)
 
+HIL_OTA_PACKAGE_PREFIX = "hil_ota_"
+CI_OTA_PACKAGES = ("ci_ota_fw", "ci_gateway_ota_fw")
+
 
 class OrphanCleaner:
     def __init__(
@@ -97,7 +100,10 @@ class OrphanCleaner:
         removal_count = 0
         print("Processing Artifacts:")
         for a in self.artifacts:
-            if not a.package.startswith("hil_ota_"):
+            if not (
+                a.package.startswith(HIL_OTA_PACKAGE_PREFIX)
+                or a.package in CI_OTA_PACKAGES
+            ):
                 continue
             id = await self.remove_expired_ids(a, project.artifacts.delete, delta)
             if id:
