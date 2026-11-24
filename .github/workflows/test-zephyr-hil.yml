@@ -174,6 +174,7 @@ jobs:
       - name: Init and update west
         run: |
           rm -rf zephyr
+          rm -rf twister-out
 
           mkdir -p .west
           cat <<EOF > .west/config
@@ -210,8 +211,6 @@ jobs:
 
       - name: Extract build artifact
         run: |
-          rm -rf twister-out
-
           # Build artifacts
           tar -xvf test_artifacts_${{ inputs.hil_board }}.tar
 
