@@ -1,0 +1,2 @@
+# Python scripts without a .py extension, which ruff does not pick up by itself
+extend-include = ["scripts/ci/clean_ci_project"]
