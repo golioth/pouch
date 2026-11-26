@@ -28,7 +28,7 @@ struct pouch_stream
 };
 
 /** Stream IDs currently held by open streams */
-static POUCH_ATOMIC_DEFINE(stream_ids, BLOCK_ID_MASK + 1);
+static POUCH_ATOMIC_DEFINE(stream_ids, POUCH_STREAMS_MAX);
 
 _Static_assert(POUCH_STREAMS_MAX <= BLOCK_ID_MASK, "Not enough stream IDs for POUCH_STREAMS_MAX");
 
@@ -44,16 +44,24 @@ static void write_stream_header(struct pouch_buf *block, uint16_t content_type, 
 static uint8_t new_stream_id(void)
 {
     // Pick the first unused stream ID:
-    for (int id = 1; id < POUCH_STREAMS_MAX + 1; id++)
+    for (int id = 0; id < POUCH_STREAMS_MAX; id++)
     {
         if (!pouch_atomic_test_and_set_bit(stream_ids, id))
         {
-            return id;
+            // ID 0 is the entry block ID, so that's skipped:
+            return id + 1;
         }
     }
 
     // No available stream IDs:
     return 0;
+}
+
+static void release_stream_id(uint8_t id)
+{
+    uint8_t bit = id - 1;
+    __ASSERT_NO_MSG(bit < POUCH_STREAMS_MAX);
+    pouch_atomic_clear_bit(stream_ids, bit);
 }
 
 struct pouch_stream *pouch_uplink_stream_open(const char *path,
@@ -75,7 +83,7 @@ struct pouch_stream *pouch_uplink_stream_open(const char *path,
     struct pouch_stream *stream = malloc(sizeof(struct pouch_stream));
     if (stream == NULL)
     {
-        pouch_atomic_clear_bit(stream_ids, stream_id);
+        release_stream_id(stream_id);
         return NULL;
     }
 
@@ -86,7 +94,7 @@ struct pouch_stream *pouch_uplink_stream_open(const char *path,
     stream->buf = block_alloc_stream(stream->id, true, timeout);
     if (stream->buf == NULL)
     {
-        pouch_atomic_clear_bit(stream_ids, stream->id);
+        release_stream_id(stream->id);
         free(stream);
         return NULL;
     }
@@ -160,7 +168,7 @@ int pouch_stream_close(struct pouch_stream *stream, pouch_timeout_t timeout)
         block_free(stream->buf);
     }
 
-    pouch_atomic_clear_bit(stream_ids, stream->id);
+    release_stream_id(stream->id);
     free(stream);
 
     return 0;
