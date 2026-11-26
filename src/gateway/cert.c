@@ -136,6 +136,8 @@ static int server_crt_update(size_t len)
     memcpy(server_crt_serial, cert_chain.serial.p, cert_chain.serial.len);
     pouch_atomic_set(&server_crt_serial_len, cert_chain.serial.len);
 
+    POUCH_LOG_INF("Server cert updated, len=%zu", len);
+
     pouch_atomic_set(&server_crt_len, len);
     pouch_atomic_inc(&server_crt_id);
 
@@ -154,6 +156,12 @@ int pouch_gateway_server_cert_get_data(struct pouch_gateway_server_cert_context 
                                        size_t *dst_len,
                                        bool *is_last)
 {
+    if (context == NULL || dst == NULL || dst_len == NULL || is_last == NULL)
+    {
+        POUCH_LOG_ERR("Invalid arguments (%p, %p, %p, %p)", context, dst, dst_len, is_last);
+        return -EINVAL;
+    }
+
     size_t len = pouch_atomic_get_value(&server_crt_len);
 
     *is_last = false;
@@ -161,6 +169,9 @@ int pouch_gateway_server_cert_get_data(struct pouch_gateway_server_cert_context 
     if (context->offset >= len)
     {
         *dst_len = 0;
+        POUCH_LOG_ERR("Attempt to read past end of server cert (offset=%zu, len=%zu)",
+                      context->offset,
+                      len);
         return -ENODATA;
     }
 
