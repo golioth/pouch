@@ -1,0 +1,339 @@
+name: "Batch: frdm_rw612 Zephyr HIL"
+
+# Runs the Zephyr HIL test of test-zephyr-hil.yml many times on the
+# mniestroj_hp runner, for several firmware variants built from this commit:
+#
+#   pre       Zephyr patches 0009 and 0010 dropped, 30 s autonegotiation
+#             timeout: pouch main before the frdm_rw612 PHY backports
+#   main      this commit as is
+#   semreset  + zephyr f4b990e2ef6 ("drivers: mdio: nxp_enet: Reset
+#             semaphore before transfer")
+#   poll      + the PHY's int-gpios deleted, so the KSZ8081 driver polls
+#
+# Tests run one at a time, in rounds that each hold every variant once, in an
+# order rotated per round.
+
+on:
+  push:
+    branches:
+      - batch/**
+  workflow_dispatch:
+    inputs:
+      reps:
+        description: Rounds (each variant runs once per round)
+        type: number
+        default: 20
+      variants:
+        description: Comma-separated variants out of pre, main, semreset, poll
+        type: string
+        default: pre,main,semreset,poll
+
+env:
+  REPS: ${{ inputs.reps || 20 }}
+  VARIANTS: ${{ inputs.variants || 'pre,main,semreset,poll' }}
+
+jobs:
+  plan:
+    runs-on: ${{ vars.DEFAULT_RUNNER || 'ubuntu-24.04' }}
+    outputs:
+      variants: ${{ steps.plan.outputs.variants }}
+      tests: ${{ steps.plan.outputs.tests }}
+    steps:
+      - id: plan
+        shell: python3 {0}
+        run: |
+          import json
+          import os
+
+          variants = os.environ["VARIANTS"].split(",")
+          known = {"pre", "main", "semreset", "poll"}
+          if not set(variants) <= known:
+              raise SystemExit(f"unknown variants: {set(variants) - known}")
+
+          tests = []
+          for rep in range(1, int(os.environ["REPS"]) + 1):
+              k = (rep - 1) % len(variants)
+              for variant in variants[k:] + variants[:k]:
+                  tests.append({"rep": rep, "variant": variant})
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"variants={json.dumps(variants)}\n")
+              f.write(f"tests={json.dumps(tests)}\n")
+
+  build:
+    name: build (${{ matrix.variant }})
+    needs: plan
+    permissions:
+      contents: read
+      actions: write
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: ${{ fromJSON(needs.plan.outputs.variants) }}
+    runs-on: ${{ vars.DEFAULT_RUNNER || 'ubuntu-24.04' }}
+    container: golioth/golioth-zephyr-base:sdk-1.0.1
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: pouch
+
+      - name: Init and update west
+        run: |
+          west init -l pouch --mf west-zephyr.yml
+          west update --narrow -o=--depth=1
+          git config --global user.email user@git-scm.com
+          git config --global user.name "Git User"
+          west patch apply
+
+      - name: Apply variant
+        shell: bash
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          set -euo pipefail
+          app=pouch/examples/zephyr/http_client
+
+          case "$VARIANT" in
+          pre)
+            subjects=$(git -C zephyr log --format=%s -2)
+            echo "$subjects"
+            grep -q "frdm_rw612: fix swapped ENET PHY reset" <<<"$subjects"
+            grep -q "fix RW6xx ENET clock rate" <<<"$subjects"
+            git -C zephyr reset --hard HEAD~2
+            sed -i 's/^CONFIG_PHY_AUTONEG_TIMEOUT_MS=.*/CONFIG_PHY_AUTONEG_TIMEOUT_MS=30000/' \
+              "$app/boards/frdm_rw612.conf"
+            ;;
+          main)
+            ;;
+          semreset)
+            git -C zephyr am "$GITHUB_WORKSPACE"/pouch/.github/batch/0011-*.patch
+            ;;
+          poll)
+            printf '\n&phy {\n\t/delete-property/ int-gpios;\n};\n' >> "$app/app.overlay"
+            ;;
+          esac
+
+          git -C zephyr log --oneline manifest-rev..HEAD
+
+      - name: Install pip packages
+        run: |
+          uv pip install                                  \
+            -r zephyr/scripts/requirements-base.txt       \
+            -r zephyr/scripts/requirements-build-test.txt \
+            -r zephyr/scripts/requirements-run-test.txt
+
+          uv pip install                        \
+            -r pouch/requirements-ci-zephyr.txt \
+            --require-hashes
+
+      - name: Build firmware
+        shell: bash
+        run: |
+          zephyr/scripts/twister                \
+            -v                                  \
+            --overflow-as-errors                \
+            --platform frdm_rw612               \
+            -T pouch/examples/zephyr/           \
+            --prep-artifacts-for-testing        \
+            --keep-artifacts zephyr.hex         \
+            --keep-artifacts http_client/zephyr/zephyr.dts
+
+          tar -cjf test_artifacts_frdm_rw612.tar twister-out
+
+      - name: Check variant
+        shell: bash
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          set -euo pipefail
+          d=$(find twister-out -type d -name pouch.http_client.hil | head -1)
+          cfg="$d/http_client/zephyr/.config"
+          dts="$d/http_client/zephyr/zephyr.dts"
+
+          patches=$(git -C zephyr rev-list --count manifest-rev..HEAD)
+          autoneg=$(sed -n 's/^CONFIG_PHY_AUTONEG_TIMEOUT_MS=//p' "$cfg")
+          int_gpios=$(awk '/phy: phy@2 {/,/};/' "$dts" | grep -c int-gpios || true)
+          sem_reset=$(grep -c 'k_sem_reset(&data->mdio_sem)' \
+                      zephyr/drivers/ethernet/mdio/mdio_nxp_enet.c || true)
+
+          case "$VARIANT" in
+          pre)      want="8 30000 1 0" ;;
+          main)     want="10 10000 1 0" ;;
+          semreset) want="11 10000 1 1" ;;
+          poll)     want="10 10000 0 0" ;;
+          esac
+          got="$patches $autoneg $int_gpios $sem_reset"
+
+          {
+            echo "### $VARIANT"
+            echo "patches, CONFIG_PHY_AUTONEG_TIMEOUT_MS, int-gpios, k_sem_reset:"
+            echo "expected \`$want\`, got \`$got\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "expected '$want', got '$got'"
+          [ "$got" = "$want" ]
+
+      - name: Build update version of firmware
+        shell: bash
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          git config --global --add safe.directory $GITHUB_WORKSPACE/pouch
+
+          # MCUboot doesn't allow strings version; convert short hash base-10 by byte.
+          # The patch level tells the variants' update images apart in the cloud.
+          SHORT_HASH=$(git -C pouch rev-parse --short HEAD)
+          V_MAJOR=$((16#${SHORT_HASH:0:2}))
+          V_MINOR=$((16#${SHORT_HASH:2:2}))
+          case "$VARIANT" in
+          pre)      V_PATCH=1 ;;
+          main)     V_PATCH=2 ;;
+          semreset) V_PATCH=3 ;;
+          poll)     V_PATCH=4 ;;
+          esac
+          V_TWEAK=0
+
+          cat > "VERSION" <<EOF
+          VERSION_MAJOR = $V_MAJOR
+          VERSION_MINOR = $V_MINOR
+          PATCHLEVEL = $V_PATCH
+          VERSION_TWEAK = $V_TWEAK
+          EXTRAVERSION =
+          EOF
+
+          find pouch/examples/zephyr/ -name VERSION -exec cp VERSION {} \;
+          rm VERSION
+
+          zephyr/scripts/twister                \
+            -v                                  \
+            --overflow-as-errors                \
+            --platform frdm_rw612               \
+            -T pouch/examples/zephyr/           \
+            --build-only
+
+          find twister-out -name "zephyr.signed.bin" | \
+            tar -cf fw_update_bins_frdm_rw612.tar -T -
+
+          echo "$V_MAJOR.$V_MINOR.$V_PATCH" > twister-out/update-ver-num.txt
+          find twister-out -name "update-ver-num.txt" | \
+            tar -rf fw_update_bins_frdm_rw612.tar -T -
+
+      - name: Upload build artifact
+        if: github.repository == 'golioth/pouch'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: zephyr-frdm_rw612-build-${{ matrix.variant }}
+          path: |
+            test_artifacts_frdm_rw612.tar
+            fw_update_bins_frdm_rw612.tar
+
+  hil-test:
+    name: hil (${{ matrix.rep }}, ${{ matrix.variant }})
+    if: github.repository == 'golioth/pouch'
+    needs:
+      - plan
+      - build
+    permissions:
+      contents: read
+      actions: write
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.tests) }}
+    runs-on:
+      - is_active
+      - has_frdm_rw612
+      - mniestroj_hp
+    timeout-minutes: 30
+    container:
+      image: golioth/golioth-twister-base:sdk-1.0.1
+      volumes:
+        - /dev:/dev
+        - /home/golioth/credentials:/opt/credentials
+      options: --privileged
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: pouch
+
+      - name: Init and update west
+        run: |
+          rm -rf zephyr
+          rm -rf twister-out
+
+          mkdir -p .west
+          cat <<EOF > .west/config
+          [manifest]
+          path = pouch
+          file = west-zephyr.yml
+
+          [zephyr]
+          base = zephyr
+          EOF
+
+          west update --narrow -o=--depth=1
+          git config --global user.email user@git-scm.com
+          git config --global user.name "Git User"
+
+          uv pip install                                  \
+            -r zephyr/scripts/requirements-base.txt       \
+            -r zephyr/scripts/requirements-build-test.txt \
+            -r zephyr/scripts/requirements-run-test.txt   \
+            git+https://github.com/golioth/python-golioth-tools@v0.7.0
+
+          uv pip install                        \
+            -r pouch/requirements-ci-zephyr.txt \
+            --require-hashes
+
+      - name: Power On USB Hub
+        run: python3 /opt/golioth-scripts/usb_hub_power.py on
+
+      - name: Download build artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: zephyr-frdm_rw612-build-${{ matrix.variant }}
+          path: .
+
+      - name: Extract build artifact
+        run: |
+          tar -xvf test_artifacts_frdm_rw612.tar
+
+          mkdir -p twister-out/fw_update_bins
+          tar -xvf fw_update_bins_frdm_rw612.tar --strip-components=1 -C twister-out/fw_update_bins
+
+      - name: Run HIL test
+        shell: bash
+        run: |
+          source /opt/credentials/runner_env.sh
+          export PATH=$PATH:/opt/SEGGER/JLink
+
+          zephyr/scripts/twister                                       \
+            -vv                                                        \
+            -p frdm_rw612                                              \
+            -T pouch/examples/zephyr/                                  \
+            --device-testing                                           \
+            --device-serial "$CI_FRDM_RW612_PORT"                      \
+            --test-only                                                \
+            --west-flash="--dev-id=$CI_FRDM_RW612_SNR"                 \
+            --pytest-args="--api-url=https://api.golioth.io"           \
+            --pytest-args="--api-key=${{ secrets.PROD_CI_PROJECT_API_KEY }}" \
+            --pytest-args="--generate-certs"
+
+      - name: Safe upload twister artifacts
+        if: success() || failure()
+        uses: ./pouch/.github/actions/safe-upload-artifacts
+        with:
+          secrets-json: ${{ toJson(secrets) }}
+          name: twister-run-artifacts-frdm_rw612-${{ matrix.variant }}-${{ matrix.rep }}
+          path: |
+            reports/*
+            twister-out/**/*.log
+            twister-out/**/report.xml
+            twister-out/*.xml
+            twister-out/*.json
+
+      - name: Power Off USB Hub
+        if: always()
+        run: python3 /opt/golioth-scripts/usb_hub_power.py off
